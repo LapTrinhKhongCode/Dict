@@ -9,4 +9,6 @@ public interface IKanjiService
         string languageCode = "en",
         int maxWords = 200,
         CancellationToken cancellationToken = default);
+
+    Task<string?> GetKanjiJson(string label);
 }

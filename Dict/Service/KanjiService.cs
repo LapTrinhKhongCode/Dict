@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dict.Data;
 using Dict.DTO;
+using EllipticCurve.Utils;
 using Microsoft.EntityFrameworkCore;
 
 public class KanjiService : IKanjiService
@@ -14,6 +15,15 @@ public class KanjiService : IKanjiService
         _db = db;
     }
 
+    public async Task<string?> GetKanjiJson(string label)
+    {
+        return await _db.Entries
+            .AsNoTracking()
+            .Where(k => k.Type == "kanji" && k.Label == label)
+            .Select(k => k.RawJson)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<KanjiDto?> GetKanjiInfoAsync(
         string character,
         string languageCode = "en",
@@ -23,7 +33,6 @@ public class KanjiService : IKanjiService
         if (string.IsNullOrWhiteSpace(character))
             throw new ArgumentException("character is required", nameof(character));
 
-        // Query with projection to DTO to avoid loading entire entities
         var query = _db.Kanji
             .AsNoTracking()
             .Where(k => k.Character == character)

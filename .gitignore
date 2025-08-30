@@ -1,1 +1,4 @@
-﻿/Dict/appsettings.json
+﻿bin/
+obj/
+.vs/
+/Dict/appsettings.json

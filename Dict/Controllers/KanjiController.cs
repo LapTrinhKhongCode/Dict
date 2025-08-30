@@ -1,6 +1,7 @@
 ﻿using Dict.DTO;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Dict.Controllers
 {
@@ -31,5 +32,20 @@ namespace Dict.Controllers
             }
             return Ok(_response);
         }
+
+        [HttpGet]
+        [Route("GetKanjiJson/{label}")]
+        public async Task<IActionResult> GetKanjiJson(string label)
+        {
+            var json = await _kanjiService.GetKanjiJson(label);
+
+            if (string.IsNullOrEmpty(json))
+                return NotFound();
+
+            var doc = JsonDocument.Parse(json);
+            return Ok(doc.RootElement);
+        }
+
+
     }
 }
