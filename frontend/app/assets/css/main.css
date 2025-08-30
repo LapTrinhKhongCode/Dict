@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+.sidebar-link-style {
+  @apply flex items-center space-x-2 px-3 py-2 rounded-lg
+           hover:bg-neutral-700 hover:text-white
+           [&.router-link-exact-active]:bg-neutral-600
+           [&.router-link-exact-active]:text-primary-400
+           transition-colors duration-250;
+}
