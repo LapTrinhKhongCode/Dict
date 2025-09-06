@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import Papa from "papaparse";
@@ -181,3 +182,157 @@ watch(selectedLevel, () => {
     </main>
   </div>
 </template>
+=======
+<template>
+  <div class="page">
+    <h1>Kanji graph explorer</h1>
+
+    <div class="controls">
+      <label>
+        Root kanji:
+        <input v-model="root" placeholder="e.g. 日" />
+      </label>
+
+      <label>
+        Depth:
+        <input type="number" v-model.number="depth" min="0" max="6" />
+      </label>
+
+      <label>
+        Max nodes:
+        <input type="number" v-model.number="maxNodes" min="10" max="5000" />
+      </label>
+
+      <button @click="build">Build subgraph</button>
+      <button @click="reset">Reset</button>
+      <button @click="toggleParticles">Toggle particles ({{ showParticles }})</button>
+      <button @click="triggerFocusOnce">Focus main</button>
+    </div>
+
+    <div ref="containerRef" class="graph-container">
+      <Graph2D
+        v-if="graphReady && graphData"
+        :kanjiInfo="kanjiInfo"
+        :graphData="graphData"
+        :showOutLinks="showOutLinks"
+        :showParticles="showParticles"
+        :triggerFocus="triggerFocus"
+        :bounds="bounds"
+      />
+      <div v-else class="loading">Preparing graph...</div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+/**
+ * Minimal, valid Nuxt 3 page SFC using composition API.
+ *
+ * Requirements:
+ * - ~/data/composition.json must exist (your radicals JSON)
+ * - ~/utils/convert-radical-json.ts (convertRadicalJson, buildSubgraphAround) should be present
+ * - ~/components/Graph2D.vue should exist (the component we created earlier)
+ *
+ * If any path not present, adjust imports or move files inside project.
+ */
+
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
+import Graph2D from '~/components/Graph2D.vue'
+import radicalsRaw from '../../../data/composition.json' // <- ensure this file is at project_root/data/composition.json
+import { convertRadicalJson, buildSubgraphAround } from '~/utils/convert-radical-json'
+import type { BothGraphData } from '~/types/graph'
+import type { KanjiInfo } from '~/types/kanji'
+
+const containerRef = ref<HTMLElement | null>(null)
+const bounds = reactive({ width: 1000, height: 600 })
+
+const showOutLinks = ref(true)
+const showParticles = ref(true)
+const triggerFocus = ref(0)
+const graphReady = ref(false)
+
+const root = ref<string>(Object.keys(radicalsRaw)[0] ?? '')
+const depth = ref<number>(2)
+const maxNodes = ref<number>(800)
+
+const kanjiInfo = reactive<KanjiInfo>({ id: root.value, jishoData: { kunyomi: '', meaning: '', onyomi: [] } })
+let graphData = ref<BothGraphData | null>(null)
+let ro: ResizeObserver | undefined
+
+onMounted(() => {
+  if (containerRef.value) {
+    bounds.width = containerRef.value.clientWidth || 1000
+    bounds.height = containerRef.value.clientHeight || 600
+    ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const cr = e.contentRect
+        bounds.width = Math.round(cr.width)
+        bounds.height = Math.round(cr.height)
+      }
+    })
+    ro.observe(containerRef.value)
+  }
+  void build()
+})
+
+onBeforeUnmount(() => {
+  if (ro && containerRef.value) ro.unobserve(containerRef.value)
+})
+
+watch(root, (v) => {
+  kanjiInfo.id = v
+})
+
+function toggleParticles() {
+  showParticles.value = !showParticles.value
+}
+function triggerFocusOnce() {
+  triggerFocus.value++
+}
+function reset() {
+  showOutLinks.value = true
+  void build()
+}
+
+async function build() {
+  graphReady.value = false
+  // BFS subgraph around root to avoid rendering whole huge graph
+  const filteredRaw = buildSubgraphAround(root.value, radicalsRaw as any, depth.value, maxNodes.value)
+  // build BothGraphData (no external kanji mapping here; Graph2D will display id)
+  const both = convertRadicalJson(filteredRaw, { kanjiInfoMap: {}, limitNodes: maxNodes.value })
+  graphData.value = both
+  // update kanjiInfo.jishoData if present
+  const mainNode = both.withOutLinks.nodes.find((n) => String(n.id) === String(root.value))
+  if (mainNode?.data?.jishoData) kanjiInfo.jishoData = mainNode.data.jishoData as any
+  graphReady.value = true
+}
+</script>
+
+<style scoped>
+.page {
+  padding: 16px;
+}
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.graph-container {
+  width: 100%;
+  height: 720px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+.loading {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  color:#666;
+}
+</style>
+>>>>>>> 97f4f7d (add graph 2d)
