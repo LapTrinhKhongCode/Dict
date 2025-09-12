@@ -17,7 +17,7 @@
 </ClientOnly>
 
     <!-- Controls -->
-    <div class="flex gap-2 mt-4">
+    <div class="flex gap-2 mt-4  justify-self-center content-center" >
       <button @click="animate" class="px-4 py-2 bg-blue-500 text-white rounded">
         Animate
       </button>
@@ -29,21 +29,90 @@
       </button>
     </div>
   </div>
+    <div class="bg-[#1e293b] text-white p-6 rounded-lg shadow-lg w-[380px]">
+    <h2 class="text-lg font-bold mb-4">
+      Chi tiết chữ kanji <span v-if="selectedKanji" class="text-2xl">{{ selectedKanji.char }}</span>
+    </h2>
+
+  <div v-if="selectedKanji" class="space-y-3">
+    <!-- Hán tự -->
+    <div class="flex items-center space-x-2">
+      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Hán tự</span>
+      <span>{{ selectedKanji.char }} - {{ selectedKanji.mean }}</span>
+    </div>
+
+    <!-- Kunyomi -->
+    <div class="flex items-center space-x-2">
+      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Kunyomi</span>
+      <span class="text-blue-400">{{ selectedKanji.kunyomi }}</span>
+    </div>
+
+    <!-- Onyomi -->
+    <div class="flex items-center space-x-2">
+      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Onyomi</span>
+      <span class="text-red-400">{{ selectedKanji.onyomi }}</span>
+    </div>
+
+    <!-- Số nét -->
+    <div class="flex items-center space-x-2">
+      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Số nét</span>
+      <span>{{ selectedKanji.strokes }}</span>
+    </div>
+
+    <!-- JLPT -->
+    <div class="flex items-center space-x-2">
+      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">JLPT</span>
+      <span>{{ selectedKanji.jlpt }}</span>
+    </div>
+
+     <!-- FREQ -->
+      <div class="flex items-center space-x-2">
+      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Độ phổ biến</span>
+      <span>{{ selectedKanji.freq }}</span>
+    </div>
+  </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue"
+import { ref, onMounted, watch, nextTick } from "vue"
 import { useRoute } from "vue-router"
 import HanziWriter from "hanzi-writer"
+import Papa from "papaparse"
+
+interface KanjiRow {
+  Id: string
+  Character: string
+  JlptLevel: string
+  Meaning: string
+  StrokeCount: string
+  Freq: string
+  AllRebs?: string
+}
+
+interface KanjiItem {
+  id: string
+  char: string
+  jlpt: string
+  mean: string
+  strokes: string
+  freq: string
+  onyomi: string
+  kunyomi: string
+}
+
+const kanjiList = ref<KanjiItem[]>([])
 
 const route = useRoute()
 const kanji = ref(route.params.kanji as string || "永")
+const selectedKanji = computed(() => {
+  return kanjiList.value.find(k => k.char === kanji.value) || null
+})
 const writerInstance = ref<HanziWriter | null>(null)
 const writerTarget = ref<HTMLDivElement | null>(null)
 
 // Khởi tạo HanziWriter khi component mount
 onMounted(async () => {
-  // chờ DOM render xong
   await nextTick()
 
   if (writerTarget.value) {
@@ -58,7 +127,43 @@ onMounted(async () => {
       strokeAnimationSpeed: 0.5,
     })
   }
+
+  const response = await fetch("/kanji.csv")
+  const csvText = await response.text()
+
+  // 👇 Thêm generic <KanjiRow>
+  const result = Papa.parse<KanjiRow>(csvText, {
+    header: true,
+    skipEmptyLines: true,
+  })
+
+  // 👇 Chỉ định rõ row: KanjiRow
+  kanjiList.value = result.data.map((row: KanjiRow) => {
+    const firstMeaning = (row.Meaning?.split(",")[0] || "").trim()
+
+    // Tách Onyomi và Kunyomi
+    let onyomi = ""
+    let kunyomi = ""
+
+    if (row.AllRebs) {
+      const parts = row.AllRebs.split("|").map((p: string) => p.trim())
+      onyomi = parts[0] || ""
+      kunyomi = parts[1] || ""
+    }
+
+    return {
+      id: row.Id,
+      char: row.Character,
+      jlpt: row.JlptLevel,
+      mean: firstMeaning,
+      strokes: row.StrokeCount,
+      freq: row.Freq,
+      onyomi,
+      kunyomi,
+    }
+  })
 })
+
 // Watch route param để đổi chữ
 watch(() => route.params.kanji, async (newKanji) => {
   if (!newKanji) return
@@ -88,14 +193,14 @@ const quiz = () => {
   writerInstance.value?.quiz({
     onMistake: (strokeData) => console.log("❌ Mistake", strokeData),
     onCorrectStroke: (strokeData) => console.log("✔️ Correct", strokeData),
-    onComplete: () => console.log("🎉 Done!")
+    onComplete: () => console.log("🎉 Done!"),
   })
 }
 const reset = () => {
   writerInstance.value?.hideCharacter()
-// writerInstance.value?.showCharacter({ duration: 0 })
 }
 </script>
+
 
 <style scoped>
 button {

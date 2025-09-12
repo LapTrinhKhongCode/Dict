@@ -5,7 +5,7 @@ import { ref, shallowRef, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import compositionJson from "@/data/composition.json";
 import kanjiListJson from "@/data/kanjilist.json"; // thêm file này
-import SpriteText from "three-spritetext"; 
+import { validateKanji } from '@/utils/kanjiValidator';
 import * as THREE from "three";
 import Kanjistroke from "./kanjistroke.vue";
 
@@ -33,6 +33,16 @@ const graphData = shallowRef<{ nodes: GraphNode[]; links: GraphLink[] }>({
 
 const mode = ref<"composition" | "onyomi">("composition"); 
 const dimension = ref<"2d" | "3d">("2d");
+const isValidKanji = validateKanji(kanji);
+
+// Nếu không hợp lệ, redirect đến trang 404
+if (!isValidKanji) {
+  throw createError({
+    statusCode: 404,
+    statusMessage: 'Kanji Not Found',
+    fatal: true
+  });
+}
 
 async function setDimension(dim: "2d" | "3d") {
   dimension.value = dim;
@@ -353,12 +363,12 @@ function drawNode(
   ctx.fill();
 
   ctx.lineWidth = strokeWidth;
-  ctx.strokeStyle = "#transparent";
+ctx.strokeStyle = "#000";  // đen nhạt, 30% opacity
   ctx.stroke();
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = center ? "#fff" : "#0B2A39";
+  ctx.fillStyle = "#000";    //Màu chữ
   ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial`;
   ctx.fillText(label, node.x ?? 0, node.y ?? 0);
 }
