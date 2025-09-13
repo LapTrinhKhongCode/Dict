@@ -35,8 +35,8 @@
            hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md w-48"
     @click="selectedCharacter = { ...item, src: `/hiragana/${item.romaji}.png` }"
   >
-    <span class="text-2xl sm:text-3xl md:text-=4xl lg:text-5xl font-japanese">{{ item.char }}</span>
-    <span class="text-base sm:text-lg ">{{ item.romaji }}</span>
+    <span class="text-2xl sm:text-3xl md:text-=4xl lg:text-5xl font-japanese text-sky-200">{{ item.char }}</span>
+    <span class="text-base sm:text-lg text-sky-200">{{ item.romaji }}</span>
   </div>
 </div>
 
@@ -57,8 +57,8 @@
            hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md w-48"
       @click="selectedCharacter = { ...item, src: `/katakana/${item.romaji}.png` }"
     >
-      <span class="text-2xl sm:text-3xl md:text-=4xl lg:text-5xl font-japanese">{{ item.char }}</span>
-      <span class="text-base sm:text-lg ">{{ item.romaji }}</span>
+      <span class="text-2xl sm:text-3xl md:text-=4xl lg:text-5xl font-japanese text-sky-200">{{ item.char }}</span>
+      <span class="text-base sm:text-lg text-sky-200">{{ item.romaji }}</span>
     </div>
   </div>
 </div>

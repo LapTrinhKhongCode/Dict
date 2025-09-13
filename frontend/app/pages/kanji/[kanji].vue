@@ -2,6 +2,7 @@
 <script setup lang="ts">
 // import search from "@/pages/kanji/search.vue";
 import { ref, shallowRef, onMounted } from "vue";
+import KanjiReadingsCard from '~/components/KanjiReadingsCard.vue'
 import { useRoute, useRouter } from "vue-router";
 import compositionJson from "@/data/composition.json";
 import kanjiListJson from "@/data/kanjilist.json"; // thêm file này
@@ -343,7 +344,7 @@ function drawNode(
 ) {
   const center = node.group === "center";
   const r = center ? 26 : 18;
-  const strokeWidth = center ? 2 : 1;
+  const strokeWidth = center ? 1 : 1;
   const label = String(node.id ?? "");
   const fontSize = Math.max(10, (center ? 30 : 20) * (1 / globalScale));
 
@@ -387,7 +388,7 @@ function makeNodeText(node: GraphNode & { color?: string }) {
   // Sphere
   const geometry = new THREE.SphereGeometry(radius, 32, 32);
   const material = new THREE.MeshPhongMaterial({
-    color: node.group === "center" ? 0x0b6db0 : 0xadd8e6,
+    color: node.group === "center" ? 0x0b6db0 : randomBlueToWhite(),
     shininess: 80,
     specular: 0xffffff,
   });
@@ -654,6 +655,7 @@ function onNodeClick(node: GraphNode | null) {
       </div>
     </div>
   </div>
+  <KanjiReadingsCard/>
 </template>
 
 <style scoped>
