@@ -27,6 +27,7 @@
 
 using Dict.Data;
 using Dict.Service;
+using Dict.Service.IService;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 
@@ -46,6 +47,7 @@ builder.Services.AddScoped<WordImportService>();
 
 
 builder.Services.AddScoped<IKanjiService, KanjiService>();
+builder.Services.AddScoped<IWordService, WordService>();
 var app = builder.Build();
 
 //using (var scope = app.Services.CreateScope())
