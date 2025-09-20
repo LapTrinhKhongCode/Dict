@@ -168,6 +168,8 @@ namespace Dict.Data
                 b.Property(x => x.Type).HasMaxLength(32);
                 b.Property(x => x.Label).HasMaxLength(32);
                 b.Property(x => x.RawJson);
+                b.Property(x => x.MobileId);
+                b.Property(x => x.CommentRawJson);
                 b.Property(x => x.CreatedAt);
                 b.Property(x => x.UpdatedAt);
 

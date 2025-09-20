@@ -17,6 +17,10 @@ namespace Dict.Models
         // raw jmDictionary JSON — keep as string, provider-specific JSON column can be configured
         public string RawJson { get; set; }
 
+        public int? MobileId { get; set; }
+
+        public string CommentRawJson { get; set; }  
+
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
