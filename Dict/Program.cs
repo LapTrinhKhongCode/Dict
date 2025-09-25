@@ -58,6 +58,7 @@ builder.Services.AddScoped<WordImportService>();
 
 builder.Services.AddScoped<IKanjiService, KanjiService>();
 builder.Services.AddScoped<IWordService, WordService>();
+builder.Services.AddScoped<ICommentService, CommentService>();
 var app = builder.Build();
 
 //using (var scope = app.Services.CreateScope())
@@ -155,6 +156,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("AllowAnyOrigin");
+
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
