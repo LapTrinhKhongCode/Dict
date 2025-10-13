@@ -172,6 +172,15 @@ namespace Dict.Data
                 b.Property(x => x.CommentRawJson);
                 b.Property(x => x.CreatedAt);
                 b.Property(x => x.UpdatedAt);
+                b.Property(x => x.JsonProcessingStatus).HasMaxLength(50);
+                b.Property(x => x.CommentRawJson);
+                b.Property(x => x.MobileId);
+                b.Property(x => x.JsonErrorMessage);
+                b.Property(x => x.Phonetic).HasMaxLength(255);
+                b.Property(x => x.Romaji).HasMaxLength(255);
+
+                b.HasIndex(x => new { x.Type, x.Label }, "IX_entries_Type_Label");
+                b.HasIndex(x => new { x.Type, x.Phonetic }, "IX_entries_Type_Phonetic");
 
                 b.HasMany(x => x.KanjiElements).WithOne(k => k.Entry).HasForeignKey(k => k.EntryId).OnDelete(DeleteBehavior.Cascade);
                 b.HasMany(x => x.ReadingElements).WithOne(r => r.Entry).HasForeignKey(r => r.EntryId).OnDelete(DeleteBehavior.Cascade);
