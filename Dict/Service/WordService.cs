@@ -1,5 +1,6 @@
 ﻿using Dict.Data;
 using Dict.Service.IService;
+using MailKit.Search;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dict.Service
@@ -17,7 +18,7 @@ namespace Dict.Service
         {
             return await _db.Entries
                 .AsNoTracking()
-                .Where(k => k.Type == "word" && k.Label == label)
+                .Where(k => k.Type == "word" && (k.Label == label || k.Phonetic == label))
                 .Select(k => k.RawJson)
                 .FirstOrDefaultAsync();
         }
