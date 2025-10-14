@@ -316,9 +316,17 @@ namespace Dict.Data
                 b.Property(x => x.RelationType).HasMaxLength(64);
                 b.Property(x => x.Note);
 
-                // self-referencing relation
-                b.HasOne(x => x.Word).WithMany(w => w.Relations).HasForeignKey(x => x.WordId).OnDelete(DeleteBehavior.Restrict);
-                b.HasOne(x => x.RelatedWord).WithMany().HasForeignKey(x => x.RelatedWordId).OnDelete(DeleteBehavior.Restrict);
+                // Mối quan hệ thứ nhất (từ WordId -> Word.Relations) - Dòng này đã đúng
+                b.HasOne(x => x.Word)
+                 .WithMany(w => w.Relations) // Chỉ đến ICollection<WordRelation> Relations
+                 .HasForeignKey(x => x.WordId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                // SỬA LỖI: Mối quan hệ thứ hai (từ RelatedWordId -> Word.AppearingInRelations)
+                b.HasOne(x => x.RelatedWord)
+                 .WithMany(w => w.AppearingInRelations) // Sửa WithMany() thành WithMany(w => w.AppearingInRelations)
+                 .HasForeignKey(x => x.RelatedWordId)
+                 .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Tag>(b =>

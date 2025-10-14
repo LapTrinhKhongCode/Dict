@@ -29,7 +29,10 @@ namespace Dict.Models
         public virtual ICollection<Media> Media { get; set; }
         public virtual ICollection<WordRelation> Relations { get; set; }
         public virtual ICollection<WordTag> WordTags { get; set; }
+        [InverseProperty("Word")]
         public virtual ICollection<Translation> Translations { get; set; }
+        [InverseProperty("RelatedWord")]
+        public virtual ICollection<WordRelation> AppearingInRelations { get; set; } = new List<WordRelation>();
         public virtual ICollection<StatsWordFreq> WordFreqStats { get; set; }
         public virtual ICollection<OcrResult> OcrResults { get; set; }
         public virtual ICollection<Card> Cards { get; set; }
