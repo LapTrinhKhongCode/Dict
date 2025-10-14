@@ -4,6 +4,7 @@ using Dict.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dict.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250915094919_add_commentJson")]
+    partial class add_commentJson
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -205,15 +208,6 @@ namespace Dict.Migrations
                     b.Property<long?>("EntSeq")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("JsonErrorMessage")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("JsonProcessingStatus")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -222,19 +216,9 @@ namespace Dict.Migrations
                     b.Property<int?>("MobileId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Phonetic")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
                     b.Property<string>("RawJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Romaji")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -249,10 +233,6 @@ namespace Dict.Migrations
                     b.HasIndex("EntSeq", "Type")
                         .IsUnique()
                         .HasFilter("[EntSeq] IS NOT NULL");
-
-                    b.HasIndex(new[] { "Type", "Label" }, "IX_entries_Type_Label");
-
-                    b.HasIndex(new[] { "Type", "Phonetic" }, "IX_entries_Type_Phonetic");
 
                     b.ToTable("entries", (string)null);
                 });

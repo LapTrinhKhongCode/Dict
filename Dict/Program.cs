@@ -58,6 +58,7 @@ builder.Services.AddScoped<WordImportService>();
 
 builder.Services.AddScoped<IKanjiService, KanjiService>();
 builder.Services.AddScoped<IWordService, WordService>();
+builder.Services.AddScoped<ICommentService, CommentService>();
 var app = builder.Build();
 
 //using (var scope = app.Services.CreateScope())

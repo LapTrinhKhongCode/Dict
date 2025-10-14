@@ -19,7 +19,7 @@ public class KanjiService : IKanjiService
     {
         return await _db.Entries
             .AsNoTracking()
-            .Where(k => k.Type == "kanji" && k.Label == label)
+            .Where(k => k.Type == "kanji" && (k.Label == label || k.Phonetic == label))
             .Select(k => k.RawJson)
             .FirstOrDefaultAsync();
     }
