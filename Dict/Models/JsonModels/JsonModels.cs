@@ -22,13 +22,38 @@ namespace Dict.Models.JsonModels
     }
 
     /// <summary>
+    /// Đại diện cho một mục từ "nhẹ" trong danh sách gợi ý.
+    /// Chỉ chứa những thông tin cần thiết nhất.
+    /// </summary>
+    public class SuggestWord
+    {
+        [JsonProperty("_id")]
+        public string IdFromSource { get; set; }
+
+        [JsonProperty("word")]
+        public string WordText { get; set; }
+
+        [JsonProperty("phonetic")]
+        public string Phonetic { get; set; }
+
+        [JsonProperty("means")]
+        public List<Mean> Means { get; set; } = new List<Mean>();
+
+        [JsonProperty("short_mean")]
+        public string ShortMean { get; set; }
+
+        [JsonProperty("mobileId")]
+        public int? MobileId { get; set; }
+    }
+
+    /// <summary>
     /// Đối tượng chứa dữ liệu chính của từ điển.
     /// </summary>
     public class Data
     {
         // suggestWords có thể được thêm vào sau nếu cần
-        // [JsonProperty("suggestWords")]
-        // public List<Word> SuggestWords { get; set; } = new List<Word>();
+         [JsonProperty("suggestWords")]
+         public List<SuggestWord> SuggestWords { get; set; } = new List<SuggestWord>();
 
         [JsonProperty("words")]
         public List<Word> Words { get; set; } = new List<Word>();
