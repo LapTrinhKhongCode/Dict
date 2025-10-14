@@ -54,7 +54,8 @@ builder.Services.AddHttpClient<KanjiImportService>();
 builder.Services.AddScoped<KanjiImportService>();
 builder.Services.AddScoped<JsonService>();
 builder.Services.AddScoped<WordImportService>();
-
+builder.Services.AddScoped<IDeckService, DeckService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
 
 builder.Services.AddScoped<IKanjiService, KanjiService>();
 builder.Services.AddScoped<IWordService, WordService>();

@@ -13,7 +13,7 @@ namespace Dict.Models
         public int? WordId { get; set; }
         public virtual Word Word { get; set; }
 
-        public string Template { get; set; } // json
+        public string? Template { get; set; } // json
         public string FrontText { get; set; }
         public string BackText { get; set; }
         public string Tags { get; set; }
