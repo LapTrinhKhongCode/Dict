@@ -28,7 +28,7 @@ namespace Dict.Service
                 .Include(e => e.Senses).ThenInclude(s => s.Glosses)
                 .Include(e => e.Senses).ThenInclude(s => s.Examples)
                 .Include(e => e.Media.Where(m => m.MediaType == "image"))
-                .Include(e => e.Senses).ThenInclude(s => s.Synsets)
+                .Include(e => e.Senses).ThenInclude(s => s.SynsetEntries).ThenInclude(se => se.SynonymItems)
                 // MỚI: Include cả các quan hệ từ
                 .Include(e => e.Words).ThenInclude(w => w.Relations)
                     .ThenInclude(r => r.RelatedWord) // Tải thông tin của từ liên quan
@@ -55,7 +55,11 @@ namespace Dict.Service
                 ShortMean = mainWordRecord.ShortMean,
                 Weight = mainWordRecord.Weight,
                 MobileId = mainWordRecord.MobileId,
-                Images = entryFromDb.Media.Select(m => m.Url).ToList()
+                Images = entryFromDb.Media.Select(m => m.Url).ToList(),
+                OppositeWord = mainWordRecord.Relations
+                    .Where(r => r.RelationType == "opposite")
+                    .Select(r => r.RelatedWord.WordText)
+                    .ToList()
             };
 
             // Xử lý các tầng nghĩa và ví dụ
@@ -77,17 +81,24 @@ namespace Dict.Service
 
             // Xử lý synsets (với giới hạn hiện tại)
             var firstSense = entryFromDb.Senses.OrderBy(s => s.SenseOrder).FirstOrDefault();
-            if (firstSense != null && firstSense.Synsets.Any())
+            if (firstSense != null && firstSense.SynsetEntries.Any())
             {
-                // Lưu ý: Logic này vẫn sẽ gộp tất cả các từ đồng nghĩa vào một 'entry' duy nhất
-                // vì cấu trúc DB đã bị làm phẳng.
                 var synsetObject = new Dict.Models.JsonModels.Synset
                 {
-                    BaseForm = firstSense.Synsets.First().BaseForm,
-                    Pos = firstSense.Synsets.First().Pos
+                    BaseForm = firstSense.SynsetEntries.First().BaseForm,
+                    Pos = firstSense.SynsetEntries.First().Pos
                 };
-                var allSynonyms = firstSense.Synsets.SelectMany(s => s.Synonyms.Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries)).Distinct().ToList();
-                synsetObject.Entry.Add(new SynonymEntry { Synonym = allSynonyms });
+
+                // Lặp qua mỗi entry group để tạo lại cấu trúc lồng nhau
+                foreach (var entryGroup in firstSense.SynsetEntries)
+                {
+                    var synonymList = entryGroup.SynonymItems.Select(si => si.Word).ToList();
+                    synsetObject.Entry.Add(new SynonymEntry
+                    {
+                        Synonym = synonymList,
+                        DefinitionId = entryGroup.DefinitionId ?? ""
+                    });
+                }
                 wordObject.Synsets.Add(synsetObject);
             }
 

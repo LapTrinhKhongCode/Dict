@@ -55,7 +55,8 @@ namespace Dict.Data
         public DbSet<Sense> Senses { get; set; }
         public DbSet<Gloss> Glosses { get; set; }
         public DbSet<Example> Examples { get; set; }
-        public DbSet<Synset> Synsets { get; set; }
+        public DbSet<SynsetEntry> SynsetEntries { get; set; }
+        public DbSet<SynonymItem> SynonymItems { get; set; }
 
         // Words & mappings
         public DbSet<Word> Words { get; set; }
@@ -222,7 +223,7 @@ namespace Dict.Data
 
                 b.HasMany(x => x.Glosses).WithOne(g => g.Sense).HasForeignKey(g => g.SenseId).OnDelete(DeleteBehavior.Cascade);
                 b.HasMany(x => x.Examples).WithOne(e => e.Sense).HasForeignKey(e => e.SenseId).OnDelete(DeleteBehavior.Cascade);
-                b.HasMany(x => x.Synsets).WithOne(s => s.Sense).HasForeignKey(s => s.SenseId).OnDelete(DeleteBehavior.Cascade);
+                b.HasMany(x => x.SynsetEntries).WithOne(s => s.Sense).HasForeignKey(s => s.SenseId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Gloss>(b =>
@@ -245,13 +246,26 @@ namespace Dict.Data
                 b.Property(x => x.SourceRef).HasMaxLength(256);
             });
 
-            modelBuilder.Entity<Synset>(b =>
+            modelBuilder.Entity<SynsetEntry>(b =>
             {
-                b.ToTable("synsets");
+                b.ToTable("SynsetEntries"); // Sửa tên bảng cho đúng
                 b.HasKey(x => x.Id);
                 b.Property(x => x.BaseForm).HasMaxLength(255);
-                b.Property(x => x.Synonyms);
                 b.Property(x => x.Pos).HasMaxLength(64);
+                // b.Property(x => x.DefinitionId); // Bỏ dòng này nếu DefinitionId có thể null
+
+                // SỬA LỖI: Xóa dòng "b.Property(x => x.SynonymItems);" và thay bằng định nghĩa quan hệ
+                b.HasMany(se => se.SynonymItems)        // Một SynsetEntry có nhiều SynonymItem
+                 .WithOne(si => si.SynsetEntry)         // Mỗi SynonymItem có một SynsetEntry
+                 .HasForeignKey(si => si.SynsetEntryId) // Khóa ngoại là SynsetEntryId
+                 .OnDelete(DeleteBehavior.Cascade);     // Nếu xóa cha thì xóa luôn con
+            });
+
+            modelBuilder.Entity<SynonymItem>(b =>
+            {
+                b.ToTable("SynonymItems"); // Chỉ định tên bảng
+                b.HasKey(si => si.Id);
+                b.Property(si => si.Word).IsRequired().HasMaxLength(255);
             });
 
             // words and mapping
