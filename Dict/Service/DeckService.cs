@@ -3,6 +3,7 @@ using Dict.DTO.Deck;
 using Dict.Models;
 using Dict.Service.IService;
 using Microsoft.EntityFrameworkCore;
+using SendGrid.Helpers.Mail;
 
 namespace Dict.Service
 {
@@ -198,6 +199,45 @@ namespace Dict.Service
             deck.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             return true;
+        }
+        public async Task<IEnumerable<UserDeckSummary>> GetPublicDecksByUsernameAsync(string username)
+        {
+            // Tìm kiếm các bộ thẻ thuộc về người dùng có username tương ứng
+            // và chỉ lấy những bộ thẻ có trạng thái IsPublic = true.
+            var decks = await _db.Decks
+               .Where(deck => deck.User.Username.ToLower() == username.ToLower() && deck.IsPublic == true)
+                .Select(deck => new UserDeckSummary
+                {
+                    Id = deck.Id,
+                    Name = deck.Name,
+                    Description = deck.Description,
+                    CardCount = deck.Cards.Count(),
+                    AuthorUsername = deck.User.Username // Lấy username của tác giả
+                })
+                .ToListAsync();
+
+            return decks;
+        }
+        public async Task<IEnumerable<UserDeckSummary>> SearchPublicDecksByNameAsync(string nameQuery)
+        {
+            var query = nameQuery.ToLower().Trim(); // Chuẩn hóa từ khóa tìm kiếm
+
+            var decks = await _db.Decks
+                // Chỉ tìm trong các bộ thẻ công khai
+                .Where(deck => deck.IsPublic == true &&
+                               // Tên bộ thẻ chứa từ khóa (không phân biệt hoa/thường)
+                               deck.Name.ToLower().Contains(query))
+                .Select(deck => new UserDeckSummary
+                {
+                    Id = deck.Id,
+                    Name = deck.Name,
+                    Description = deck.Description,
+                    CardCount = deck.Cards.Count(),
+                    AuthorUsername = deck.User.Username
+                })
+                .ToListAsync();
+
+            return decks;
         }
     }
 }
