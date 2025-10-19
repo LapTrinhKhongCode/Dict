@@ -27,10 +27,6 @@ namespace Dict.Models
 
         public string JsonProcessingStatus { get; set; }
 
-        public string CommentRawJson { get; set; }
-
-        public int? MobileId { get; set; }
-
         public string JsonErrorMessage { get; set; }
 
         public string Phonetic { get; set; }

@@ -27,7 +27,7 @@ public class InferController : ControllerBase
 {
 
     private readonly ILogger<InferController> _logger;
-    private readonly IOcrProcessingService _ocrProcessingService; // ✨ Chỉ cần service này
+    private readonly IOcrProcessingService _ocrProcessingService; 
     private readonly ResponseDTO _response;
 
     // Định nghĩa form nhận file

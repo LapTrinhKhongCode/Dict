@@ -21,47 +21,86 @@ namespace Dict.Service
             _emailService = emailService;
         }
 
+        //public async Task<string> RegisterAsync(RegistrationRequestDto request)
+        //{
+        //    // ✨ THÊM MỚI: BƯỚC 1 - Kiểm tra độ mạnh mật khẩu
+        //    var passwordError = ValidatePassword(request.Password);
+        //    if (!string.IsNullOrEmpty(passwordError))
+        //    {
+        //        // Ném lỗi để Controller bắt và trả về 400 Bad Request
+        //        throw new InvalidOperationException(passwordError);
+        //    }
+
+        //    // BƯỚC 2: Kiểm tra User/Email (giữ nguyên)
+        //    var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username || u.Email == request.Email);
+        //    if (existingUser != null)
+        //    {
+        //        throw new InvalidOperationException("Username or Email already exists.");
+        //    }
+
+        //    // ... (Phần còn lại của logic đăng ký: tạo mã, tạo user, gửi email...)
+        //    // (Giữ nguyên như cũ)
+        //    var verificationCode = new Random().Next(1000, 9999).ToString();
+        //    //var user = new User
+        //    //{
+        //    //    Username = request.Username,
+        //    //    Email = request.Email,
+        //    //    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // Chỉ hash sau khi đã validate
+        //    //    IsActive = false,
+        //    //    EmailVerificationCode = verificationCode,
+        //    //    VerificationCodeExpires = DateTime.UtcNow.AddMinutes(15),
+        //    //    CreatedAt = DateTime.UtcNow
+        //    //};
+        //    //// ... (lưu CSDL và gửi email)
+        //    //_context.Users.Add(user);
+        //    await _context.SaveChangesAsync();
+
+        //    var subject = "Your Verification Code";
+        //    var body = $"Your verification code is: <strong>{verificationCode}</strong>. It will expire in 15 minutes.";
+        //    //await _emailService.SendEmailAsync(user.Email, subject, body);
+
+        //    return "Registration successful. Please check your email for the verification code.";
+        //}
+
         public async Task<string> RegisterAsync(RegistrationRequestDto request)
         {
-            // ✨ THÊM MỚI: BƯỚC 1 - Kiểm tra độ mạnh mật khẩu
+            // BƯỚC 1: Kiểm tra độ mạnh mật khẩu (Giữ nguyên)
             var passwordError = ValidatePassword(request.Password);
             if (!string.IsNullOrEmpty(passwordError))
             {
-                // Ném lỗi để Controller bắt và trả về 400 Bad Request
                 throw new InvalidOperationException(passwordError);
             }
 
-            // BƯỚC 2: Kiểm tra User/Email (giữ nguyên)
+            // BƯỚC 2: Kiểm tra User/Email (Giữ nguyên)
             var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username || u.Email == request.Email);
             if (existingUser != null)
             {
                 throw new InvalidOperationException("Username or Email already exists.");
             }
 
-            // ... (Phần còn lại của logic đăng ký: tạo mã, tạo user, gửi email...)
-            // (Giữ nguyên như cũ)
-            var verificationCode = new Random().Next(1000, 9999).ToString();
-            //var user = new User
-            //{
-            //    Username = request.Username,
-            //    Email = request.Email,
-            //    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // Chỉ hash sau khi đã validate
-            //    IsActive = false,
-            //    EmailVerificationCode = verificationCode,
-            //    VerificationCodeExpires = DateTime.UtcNow.AddMinutes(15),
-            //    CreatedAt = DateTime.UtcNow
-            //};
-            //// ... (lưu CSDL và gửi email)
-            //_context.Users.Add(user);
+            // BƯỚC 3: Tạo người dùng mới và kích hoạt ngay
+            var user = new User
+            {
+                Username = request.Username,
+                Email = request.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                IsActive = true, // ✨ THAY ĐỔI: Kích hoạt tài khoản ngay lập tức
+                // Không cần mã xác thực
+                // EmailVerificationCode = null,
+                // VerificationCodeExpires = null,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // BƯỚC 4: Lưu vào CSDL
+            _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            var subject = "Your Verification Code";
-            var body = $"Your verification code is: <strong>{verificationCode}</strong>. It will expire in 15 minutes.";
-            //await _emailService.SendEmailAsync(user.Email, subject, body);
+            // Không gửi email
+            // var subject = "Your Verification Code"; ...
+            // await _emailService.SendEmailAsync(user.Email, subject, body);
 
-            return "Registration successful. Please check your email for the verification code.";
+            return "Registration successful."; // ✨ THAY ĐỔI: Tin nhắn trả về
         }
-
         // ✨ THÊM MỚI: Phương thức private để kiểm tra mật khẩu
         private string? ValidatePassword(string password)
         {
