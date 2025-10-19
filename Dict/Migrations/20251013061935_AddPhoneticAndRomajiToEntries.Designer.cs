@@ -4,6 +4,7 @@ using Dict.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dict.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251013061935_AddPhoneticAndRomajiToEntries")]
+    partial class AddPhoneticAndRomajiToEntries
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -219,7 +222,7 @@ namespace Dict.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<int?>("MobileId")
+                    b.Property<int>("MobileId")
                         .HasColumnType("int");
 
                     b.Property<string>("Phonetic")
@@ -249,10 +252,6 @@ namespace Dict.Migrations
                     b.HasIndex("EntSeq", "Type")
                         .IsUnique()
                         .HasFilter("[EntSeq] IS NOT NULL");
-
-                    b.HasIndex(new[] { "Type", "Label" }, "IX_entries_Type_Label");
-
-                    b.HasIndex(new[] { "Type", "Phonetic" }, "IX_entries_Type_Phonetic");
 
                     b.ToTable("entries", (string)null);
                 });

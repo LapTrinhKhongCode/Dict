@@ -17,8 +17,25 @@ namespace Dict.Models
         // raw jmDictionary JSON — keep as string, provider-specific JSON column can be configured
         public string RawJson { get; set; }
 
+        public int? MobileId { get; set; }
+
+        public string CommentRawJson { get; set; }  
+
         public DateTime? CreatedAt { get; set; }
+
         public DateTime? UpdatedAt { get; set; }
+
+        public string JsonProcessingStatus { get; set; }
+
+        public string CommentRawJson { get; set; }
+
+        public int? MobileId { get; set; }
+
+        public string JsonErrorMessage { get; set; }
+
+        public string Phonetic { get; set; }
+
+        public string Romaji { get; set; }
 
         public virtual ICollection<KanjiElement> KanjiElements { get; set; }
         public virtual ICollection<ReadingElement> ReadingElements { get; set; }

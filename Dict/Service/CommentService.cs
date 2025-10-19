@@ -1,25 +1,22 @@
 ﻿using Dict.Data;
 using Dict.Service.IService;
-using MailKit.Search;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dict.Service
 {
-    public class WordService : IWordService
+    public class CommentService : ICommentService
     {
         private readonly ApplicationDbContext _db;
-
-        public WordService(ApplicationDbContext db)
+        public CommentService(ApplicationDbContext db)
         {
             _db = db;
         }
-
-        public async Task<string?> GetWordJson(string label)
+        public async Task<string?> GetCommentJson(string label)
         {
             return await _db.Entries
                 .AsNoTracking()
-                .Where(k => k.Type == "word" && (k.Label == label || k.Phonetic == label))
-                .Select(k => k.RawJson)
+                .Where(k => k.Type == "kanji" && k.Label == label)
+                .Select(k => k.CommentRawJson)
                 .FirstOrDefaultAsync();
         }
     }
