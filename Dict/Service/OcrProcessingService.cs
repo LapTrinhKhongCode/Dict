@@ -1,0 +1,307 @@
+﻿using Dict.Data;
+using Dict.DTO;
+using Dict.Models;
+using Dict.Service.IService;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Text;
+using System.Security.Cryptography;
+using System.Net.Http.Headers;
+using Dict.DTO.Ocr;
+using Microsoft.EntityFrameworkCore;
+
+namespace Dict.Service
+{
+    public class OcrProcessingService : IOcrProcessingService
+    {
+        // Định nghĩa các lớp parse JSON nội bộ
+        private class MainTextItem { public int[] Bbox { get; set; } public string Text { get; set; } public List<List<int>> BoxPoints { get; set; } public string Type { get; set; } }
+        private class FuriganaItem { public string Text { get; set; } public int[] Position { get; set; } public string Type { get; set; } }
+        private class ImageInfo { public int Width { get; set; } public int Height { get; set; } }
+        private class ApiResult { public List<MainTextItem> Main_Text { get; set; } public List<FuriganaItem> Furigana { get; set; } public ImageInfo Image_Info { get; set; } public string Annotated_Image { get; set; } public string Detected_Text_Lines { get; set; } }
+
+        private readonly IHttpClientFactory _httpFactory;
+        private readonly IConfiguration _cfg;
+        private readonly ILogger<OcrProcessingService> _logger;
+        private readonly IOcrJobService _ocrJobService;
+        private readonly ApplicationDbContext _db;
+        private readonly IBlobService _blobService;
+
+        public OcrProcessingService(
+            IHttpClientFactory httpFactory,
+            IConfiguration cfg,
+            ILogger<OcrProcessingService> logger,
+            IOcrJobService ocrJobService,
+            ApplicationDbContext db,
+            IBlobService blobService)
+        {
+            _httpFactory = httpFactory;
+            _cfg = cfg;
+            _logger = logger;
+            _ocrJobService = ocrJobService;
+            _db = db;
+            _blobService = blobService;
+        }
+        public async Task<IEnumerable<OcrJobDetailDto>> GetRecentOcrJobsForUserAsync(int userId, int limit = 5)
+        {
+            var jobs = await _db.OcrJobs
+                .AsNoTracking()
+                .Where(job => job.UserId == userId)
+                // Sắp xếp theo ngày tạo mới nhất
+                .OrderByDescending(job => job.CreatedAt)
+                // Giới hạn số lượng kết quả
+                .Take(limit)
+                // Tải kèm dữ liệu liên quan
+                .Include(job => job.Media) // Tải ảnh (MediaStore)
+                .Include(job => job.Results) // Tải kết quả chi tiết
+                                             // Ánh xạ sang DTO
+                .Select(job => new OcrJobDetailDto
+                {
+                    Id = job.Id,
+                    Status = job.Status,
+                    DetectedText = job.DetectedText,
+                    CreatedAt = job.CreatedAt,
+                    // Lấy URL từ MediaStore liên quan
+                    ImageUrl = job.Media != null ? job.Media.StorageUrl : null,
+                    // Ánh xạ danh sách các kết quả con
+                    Results = job.Results.Select(result => new OcrResultDto
+                    {
+                        Id = result.Id,
+                        WordText = result.WordText,
+                        BoundingBox = result.BoundingBox,
+                        Confidence = result.Confidence
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return jobs;
+        }
+
+        public async Task<OcrProcessingResultDto> ProcessImageAsync(IFormFile image, int userId, bool saveAnnotated)
+        {
+            // --- 1. Đọc ảnh vào bộ nhớ ---
+            byte[] originalImageBytes;
+            await using (var ms = new MemoryStream())
+            {
+                await image.CopyToAsync(ms);
+                originalImageBytes = ms.ToArray();
+            }
+
+            // --- 2. Tải ảnh gốc lên Azure Blob Storage và lưu MediaStore ---
+            int originalMediaId;
+            string uploadedUrl;
+            try
+            {
+                var uniqueFileName = $"{Guid.NewGuid()}_{image.FileName}";
+                await using (var stream = new MemoryStream(originalImageBytes))
+                {
+                    uploadedUrl = await _blobService.UploadFileBlobAsync(
+                        containerName: "ocr-images", // Tên container của bạn
+                        content: stream,
+                        contentType: image.ContentType,
+                        fileName: uniqueFileName
+                    );
+                }
+                _logger.LogInformation("Saved original image to Azure Blob. URL: {Url}", uploadedUrl);
+
+                var originalMedia = new MediaStore
+                {
+                    OwnerId = userId,
+                    FileName = image.FileName,
+                    MimeType = image.ContentType,
+                    SizeBytes = image.Length,
+                    StorageUrl = uploadedUrl, // ✅ SỬA LỖI: Lưu URL từ Azure
+                    Sha256 = ComputeSha256(originalImageBytes),
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.MediaStore.Add(originalMedia);
+                await _db.SaveChangesAsync();
+                originalMediaId = originalMedia.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to upload to Azure or save MediaStore record.");
+                throw new Exception("Failed to save original image.", ex); // Ném lỗi để Controller xử lý
+            }
+
+            // --- 3. Tạo OcrJob ---
+            var createJobDto = new OcrJobCreateDto
+            {
+                UserId = userId,
+                MediaId = originalMediaId,
+                Status = "pending",
+                DetectedText = string.Empty
+            };
+            var jobDto = await _ocrJobService.CreateAsync(createJobDto);
+            _logger.LogInformation("Created OcrJob id={Id} linked to MediaId={MediaId}", jobDto.Id, originalMediaId);
+
+            // --- 4. Gọi service Python (Flask) ---
+            var flaskUrl = _cfg["InferService:Url"] ?? "http://127.0.0.1:5000/infer";
+            _logger.LogInformation("Proxying image to infer service at {Url} for job {JobId}", flaskUrl, jobDto.Id);
+
+            HttpResponseMessage resp;
+            string respText;
+            try
+            {
+                var client = _httpFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(60);
+                using var content = new MultipartFormDataContent();
+                var streamContent = new ByteArrayContent(originalImageBytes);
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue(image.ContentType ?? "application/octet-stream");
+                content.Add(streamContent, "image", image.FileName);
+
+                resp = await client.PostAsync(flaskUrl, content);
+                respText = await resp.Content.ReadAsStringAsync();
+            }
+            catch (TaskCanceledException tex) // Lỗi timeout
+            {
+                _logger.LogError(tex, "Timeout contacting infer service {Url}", flaskUrl);
+                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto { Status = "failed", DetectedText = null });
+                throw new TimeoutException("Timeout contacting infer service", tex);
+            }
+            catch (Exception ex) // Lỗi không kết nối được
+            {
+                _logger.LogError(ex, "Failed to contact infer service {Url}", flaskUrl);
+                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto { Status = "failed", DetectedText = null });
+                throw new HttpRequestException("Failed to contact infer service", ex);
+            }
+
+            // --- 5. Xử lý phản hồi từ Flask ---
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Infer service returned non-success {Status}: {Body}", (int)resp.StatusCode, respText);
+                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto { Status = "failed", DetectedText = respText });
+                throw new Exception($"Infer service returned error {(int)resp.StatusCode}: {respText}");
+            }
+
+            ApiResult result;
+            try
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                result = JsonSerializer.Deserialize<ApiResult>(respText, opts);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse infer response JSON. Body: {Body}", respText);
+                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto { Status = "failed", DetectedText = null });
+                throw new JsonException("Failed to parse infer response", ex);
+            }
+
+            // --- 6. Lưu kết quả OCR ---
+            var createResults = new List<CreateOcrResultDto>();
+            if (result?.Main_Text != null)
+            {
+                foreach (var item in result.Main_Text)
+                {
+                    var bboxJson = "{}";
+                    try { if (item.Bbox != null) bboxJson = JsonSerializer.Serialize(item.Bbox); } catch { }
+                    createResults.Add(new CreateOcrResultDto
+                    {
+                        PageNumber = 1,
+                        WordText = item.Text,
+                        BoundingBox = bboxJson
+                    });
+                }
+            }
+            if (createResults.Count > 0)
+            {
+                await _ocrJobService.AppendResultsAsync(jobDto.Id, createResults);
+            }
+
+            var detectedText = result?.Detected_Text_Lines ?? string.Join("\n", createResults.ConvertAll(r => r.WordText));
+            await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto { Status = "completed", DetectedText = detectedText });
+
+            // --- 7. Lưu ảnh chú thích (nếu có) ---
+            string? annotatedImageUrl = null;
+            int? annotatedMediaId = null;
+
+            if (saveAnnotated && !string.IsNullOrEmpty(result?.Annotated_Image))
+            {
+                annotatedMediaId = await SaveAnnotatedImageAsync(result.Annotated_Image, userId, jobDto.Id);
+                if (annotatedMediaId.HasValue)
+                {
+                    // Lấy lại URL từ CSDL
+                    var media = await _db.MediaStore.FindAsync(annotatedMediaId.Value);
+                    annotatedImageUrl = media?.StorageUrl;
+                }
+            }
+
+            // --- 8. Trả về DTO kết quả ---
+            return new OcrProcessingResultDto
+            {
+                JobId = jobDto.Id,
+                Status = "completed",
+                DetectedText = detectedText,
+                MediaId = originalMediaId,
+                ImageUrl = uploadedUrl,
+                AnnotatedMediaId = annotatedMediaId,
+                AnnotatedImageUrl = annotatedImageUrl
+            };
+        }
+
+        private async Task<int?> SaveAnnotatedImageAsync(string base64Image, int userId, int jobId)
+        {
+            var match = Regex.Match(base64Image, @"data:image\/(?<type>.+?);base64,(?<data>.+)");
+            if (!match.Success)
+            {
+                _logger.LogWarning("Invalid annotated image format received from infer service for job {JobId}", jobId);
+                return null;
+            }
+
+            try
+            {
+                var type = match.Groups["type"].Value;
+                var b64Data = match.Groups["data"].Value;
+                var bytes = Convert.FromBase64String(b64Data);
+                var mimeType = $"image/{type}";
+                var uniqueFileName = $"annotated_{jobId}_{Guid.NewGuid()}.{type}";
+
+                string uploadedUrl;
+                await using (var stream = new MemoryStream(bytes))
+                {
+                    uploadedUrl = await _blobService.UploadFileBlobAsync(
+                        containerName: "ocr-images-annotated", // Container riêng cho ảnh chú thích
+                        content: stream,
+                        contentType: mimeType,
+                        fileName: uniqueFileName
+                    );
+                }
+
+                var media = new MediaStore
+                {
+                    OwnerId = userId,
+                    FileName = uniqueFileName,
+                    MimeType = mimeType,
+                    SizeBytes = bytes.LongLength,
+                    StorageUrl = uploadedUrl,
+                    Sha256 = ComputeSha256(bytes),
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.MediaStore.Add(media);
+                await _db.SaveChangesAsync();
+
+                _logger.LogInformation("Saved annotated image to Blob for job {JobId}, MediaId {MediaId}", jobId, media.Id);
+                return media.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to save annotated image for job {JobId}", jobId);
+                return null;
+            }
+        }
+
+        private static string ComputeSha256(byte[] data)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                var hashBytes = sha256.ComputeHash(data);
+                var sb = new StringBuilder();
+                foreach (var b in hashBytes)
+                {
+                    sb.Append(b.ToString("x2"));
+                }
+                return sb.ToString();
+            }
+        }
+    }
+}
