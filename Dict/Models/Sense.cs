@@ -25,6 +25,6 @@ namespace Dict.Models
 
         public virtual ICollection<Gloss> Glosses { get; set; }
         public virtual ICollection<Example> Examples { get; set; }
-        public virtual ICollection<Synset> Synsets { get; set; }
+        public virtual ICollection<SynsetEntry> SynsetEntries { get; set; } = new List<SynsetEntry>();
     }
 }

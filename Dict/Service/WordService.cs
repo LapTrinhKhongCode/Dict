@@ -18,7 +18,10 @@ namespace Dict.Service
         {
             return await _db.Entries
                 .AsNoTracking()
-                .Where(k => k.Type == "word" && (k.Label == label || k.Phonetic == label))
+                .Where(k => k.Type == "word" &&
+                    (EF.Functions.Collate(k.Label, "Japanese_CS_AS_KS_WS") == label ||
+                     EF.Functions.Collate(k.Phonetic, "Japanese_CS_AS_KS_WS") == label))
+                .OrderBy(k => k.Id)
                 .Select(k => k.RawJson)
                 .FirstOrDefaultAsync();
         }
