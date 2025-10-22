@@ -303,6 +303,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import conjugationsData from "~/data/conjugations_normalized.json";
+import {toKana} from 'wanakana';
 
 const route = useRoute();
 const router = useRouter();
@@ -449,10 +450,15 @@ const goSearch = () => {
   if (!searchWord.value.trim()) return;
   
   const trimmedWord = searchWord.value.trim();
-  const queryParam = isSingleKanji(trimmedWord) ? 'kanji' : 'word';
+
+  // *** NEW STEP: Convert Romaji to Kana before searching ***
+  const convertedWord = toKana(trimmedWord); // This handles both lowercase->hira and uppercase->kata
+  // *******************************************************
+
+  const queryParam = isSingleKanji(convertedWord) ? 'kanji' : 'word';
   
-  router.push({ path: "/", query: { [queryParam]: trimmedWord } });
-  fetchWord(trimmedWord);
+  router.push({ path: "/", query: { [queryParam]: convertedWord } });
+  fetchWord(convertedWord);
 };
 
 // Select suggested word
