@@ -43,6 +43,7 @@ namespace Dict.Data
         // Kanji
         public DbSet<Kanji> Kanji { get; set; }
         public DbSet<WordKanji> WordKanji { get; set; }
+        public DbSet<KanjiExample> KanjiExamples { get; set; }
 
         // Lemmas / Inflections
         public DbSet<Lemma> Lemmas { get; set; }
@@ -128,6 +129,7 @@ namespace Dict.Data
                 b.Property(x => x.UpdatedAt);
 
                 b.HasMany(x => x.WordKanji).WithOne(wk => wk.Kanji).HasForeignKey(wk => wk.KanjiId);
+                b.HasMany(k => k.KanjiExamples).WithOne(ke => ke.Kanji).HasForeignKey(ke => ke.KanjiId).OnDelete(DeleteBehavior.Cascade);
             });
 
             // word_kanji (many-to-many manual join)
@@ -139,6 +141,20 @@ namespace Dict.Data
                 b.HasOne(x => x.Word).WithMany(w => w.WordKanji).HasForeignKey(x => x.WordId).OnDelete(DeleteBehavior.Cascade);
                 b.HasOne(x => x.Kanji).WithMany(k => k.WordKanji).HasForeignKey(x => x.KanjiId).OnDelete(DeleteBehavior.Cascade);
             });
+
+            modelBuilder.Entity<KanjiExample>(b =>
+            {
+                b.ToTable("KanjiExample");
+                b.HasKey(x => x.Id);
+                b.Property(x => x.ExampleType).IsRequired() .HasColumnType("nvarchar(50)");
+                b.Property(x => x.ReadingGroup).HasColumnType("nvarchar(255)"); 
+                b.Property(x => x.Word).IsRequired().HasColumnType("nvarchar(255)");
+                b.Property(x => x.Meaning).IsRequired().HasColumnType("nvarchar(max)");
+                b.Property(x => x.Reading).IsRequired().HasColumnType("nvarchar(255)");
+                b.Property(x => x.HanViet).HasColumnType("nvarchar(255)"); 
+                b.HasOne(ke => ke.Kanji).WithMany(k => k.KanjiExamples).HasForeignKey(ke => ke.KanjiId).OnDelete(DeleteBehavior.Cascade);
+            });
+
 
             // lemmas
             modelBuilder.Entity<Lemma>(b =>
@@ -407,6 +423,8 @@ namespace Dict.Data
                 b.HasIndex(x => x.Email).IsUnique();
                 b.Property(x => x.PasswordHash).HasMaxLength(255);
                 b.Property(x => x.IsActive).HasDefaultValue(true);
+                b.Property(x => x.Role).HasMaxLength(64);   
+                b.Property(x => x.AvatarUrl);
                 b.Property(x => x.CreatedAt);
                 b.Property(x => x.UpdatedAt);
             });

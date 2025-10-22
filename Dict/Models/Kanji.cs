@@ -22,5 +22,8 @@ namespace Dict.Models
         public DateTime? UpdatedAt { get; set; }
 
         public virtual ICollection<WordKanji> WordKanji { get; set; }
+
+        public virtual ICollection<KanjiExample> KanjiExamples { get; set; } = new List<KanjiExample>();
     }
 }
+
