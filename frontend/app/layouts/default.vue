@@ -20,8 +20,8 @@
     </div>
 
     <!-- 🔹 Bottom Sidebar / Footer -->
-    <footer class="bg-gray-100 border-t p-4 flex justify-around">
+    <!-- <footer class="bg-gray-100 border-t p-4 flex justify-around">
       
-    </footer>
+    </footer> -->
   </div>
 </template>

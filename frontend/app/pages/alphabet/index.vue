@@ -19,8 +19,6 @@
       </button>
     </div>
 
-    <p class="mb-3 text-center text-gray-700">Bấm để xem chi tiết về mỗi chữ</p>
-
     <!-- Hiển thị Hiragana -->
 <div v-if="activeTab === 'hiragana'">
 <div
