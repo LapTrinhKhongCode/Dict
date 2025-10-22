@@ -15,6 +15,10 @@ namespace Dict.Models
 
         public bool IsActive { get; set; }
 
+        public string Role { get; set; }
+
+        public string AvatarUrl { get; set; }
+
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
