@@ -9,7 +9,7 @@ namespace Dict.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize]
+    [Authorize]
     public class DecksController : ControllerBase
     {
         private readonly IDeckService _deckService;
