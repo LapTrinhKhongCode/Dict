@@ -8,8 +8,15 @@ namespace Dict.DTO.User
         public string Username { get; set; }
         public string Email { get; set; }
         public bool IsActive { get; set; }
+
+        // ✨ THÊM CÁC TRƯỜNG MỚI ✨
+        public string Role { get; set; }
+        public string? AvatarUrl { get; set; }
+
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
-        public IEnumerable<DeckSummaryDto> Decks { get; set; }
+
+        // Danh sách các Deck (tùy chọn, giữ lại nếu cần)
+        public IEnumerable<DeckSummaryDto>? Decks { get; set; }
     }   
 }

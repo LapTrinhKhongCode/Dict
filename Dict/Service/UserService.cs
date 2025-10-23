@@ -4,80 +4,83 @@ using Dict.DTO.User;
 using Dict.Models;
 using Dict.Service.IService;
 using Microsoft.EntityFrameworkCore;
+using System; // Thêm
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks; // Thêm
 
 namespace Dict.Service
 {
     public class UserService : IUserService
     {
         private readonly ApplicationDbContext _context;
+        private const string DefaultAvatarUrl = "/images/default_ava.jpg"; // Đường dẫn avatar mặc định
+        private readonly IBlobService _blobService;
+        private readonly string _containerName;
 
-        public UserService(ApplicationDbContext context)
+        public UserService(ApplicationDbContext context, IBlobService blobService, IConfiguration configuration)
         {
             _context = context;
+            _blobService = blobService;
+            _containerName = configuration.GetValue<string>("AzureBlob:ContainerName") ?? "avatars";
+        }
+        // --- HÀM HELPER ĐỂ ÁNH XẠ ---
+        private UserDto MapUserToDto(User user)
+        {
+            // Xác định URL avatar, dùng mặc định nếu null hoặc rỗng
+            string avatarUrl = string.IsNullOrEmpty(user.AvatarUrl)
+                ? DefaultAvatarUrl
+                : user.AvatarUrl;
+
+            return new UserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                IsActive = user.IsActive,
+                Role = user.Role, // Lấy Role từ model
+                AvatarUrl = avatarUrl, // Lấy AvatarUrl đã xử lý
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt,
+                // Ánh xạ Decks (nếu có và đã được Include)
+                Decks = user.Decks?.Select(d => new DeckSummaryDto
+                {
+                    Id = d.Id,
+                    Name = d.Name,
+                    Description = d.Description ?? "",
+                    IsPublic = d.IsPublic ?? false,
+                    // Cần Include Cards để tính Count() chính xác
+                    CardCount = d.Cards?.Count() ?? 0,
+                    AuthorName = user.Username
+                }).ToList() ?? new List<DeckSummaryDto>() // Trả về list rỗng nếu Decks là null
+            };
         }
 
-        // ✨ SỬA ĐỔI: Lấy tất cả user kèm theo deck của họ
+        // --- CÁC HÀM GET ---
         public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
         {
             var users = await _context.Users
-                .AsNoTracking() // Tối ưu cho truy vấn chỉ đọc
-                .Include(u => u.Decks) // Tải kèm các Deck
-                    .ThenInclude(d => d.Cards) // Tải kèm Cards để tính CardCount
-                .Select(u => new UserDto
-                {
-                    Id = u.Id,
-                    Username = u.Username,
-                    Email = u.Email,
-                    IsActive = u.IsActive,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
-                    Decks = u.Decks.Select(d => new DeckSummaryDto
-                    {
-                        Id = d.Id,
-                        Name = d.Name,
-                        Description = d.Description ?? "",
-                        IsPublic = d.IsPublic ?? false,
-                        CardCount = d.Cards.Count(),
-                        AuthorName = u.Username
-                    }).ToList()
-                })
-                .ToListAsync();
+                .AsNoTracking()
+                .Include(u => u.Decks)
+                    .ThenInclude(d => d.Cards) // Include Cards cho CardCount
+                .ToListAsync(); // Lấy tất cả user
 
-            return users;
+            // Ánh xạ từng user sang DTO
+            return users.Select(user => MapUserToDto(user));
         }
 
-        // ✨ SỬA ĐỔI: Lấy một user theo ID kèm theo deck
-        public async Task<UserDto> GetUserByIdAsync(int id)
+        public async Task<UserDto?> GetUserByIdAsync(int id) // Trả về UserDto? (nullable)
         {
             var user = await _context.Users
                 .AsNoTracking()
                 .Include(u => u.Decks)
                     .ThenInclude(d => d.Cards)
-                .Where(u => u.Id == id)
-                .Select(u => new UserDto
-                {
-                    Id = u.Id,
-                    Username = u.Username,
-                    Email = u.Email,
-                    IsActive = u.IsActive,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
-                    Decks = u.Decks.Select(d => new DeckSummaryDto
-                    {
-                        Id = d.Id,
-                        Name = d.Name,
-                        Description = d.Description ?? "",
-                        IsPublic = d.IsPublic ?? false,
-                        CardCount = d.Cards.Count(),
-                        AuthorName = u.Username
-                    }).ToList()
-                })
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(u => u.Id == id); // Tìm user theo Id
 
-            return user;
+            // Trả về null nếu không tìm thấy, ngược lại ánh xạ sang DTO
+            return user == null ? null : MapUserToDto(user);
         }
 
-        // ✨ SỬA ĐỔI: Tìm kiếm user theo username, kết quả trả về cũng kèm theo deck
         public async Task<IEnumerable<UserDto>> SearchUsersByUsernameAsync(string username)
         {
             if (string.IsNullOrWhiteSpace(username))
@@ -90,33 +93,13 @@ namespace Dict.Service
                 .AsNoTracking()
                 .Include(u => u.Decks)
                     .ThenInclude(d => d.Cards)
-                .Where(u => u.Username.ToLower().Contains(query))
-                .Select(u => new UserDto
-                {
-                    Id = u.Id,
-                    Username = u.Username,
-                    Email = u.Email,
-                    IsActive = u.IsActive,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
-                    Decks = u.Decks.Select(d => new DeckSummaryDto
-                    {
-                        Id = d.Id,
-                        Name = d.Name,
-                        Description = d.Description ?? "",
-                        IsPublic = d.IsPublic ?? false,
-                        CardCount = d.Cards.Count(),
-                        AuthorName = u.Username
-                    }).ToList()
-                })
+                .Where(u => u.Username.ToLower().Contains(query)) // Tìm theo username
                 .ToListAsync();
 
-            return users;
+            return users.Select(user => MapUserToDto(user));
         }
 
-
-        // --- CÁC PHƯƠNG THỨC CẬP NHẬT VÀ XÓA KHÔNG THAY ĐỔI ---
-
+        // --- CÁC HÀM UPDATE VÀ DELETE ---
         public async Task<bool> DeleteUserAsync(int id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -129,61 +112,141 @@ namespace Dict.Service
             return true;
         }
 
-        public async Task<bool> UpdateUserAsync(int id, UpdateUserDto updateUserDto)
+
+        public async Task<UserResponseDto?> UpdateUserAsync(int id, UpdateUserDto dto)
         {
             var user = await _context.Users.FindAsync(id);
-            if (user == null)
+            if (user == null) return null;
+
+            if (!string.IsNullOrWhiteSpace(dto.Username))
             {
-                return false;
+                var newUsername = dto.Username!.Trim();
+                if (!user.Username.Equals(newUsername, StringComparison.OrdinalIgnoreCase) &&
+                    await _context.Users.AnyAsync(u => u.Username.ToLower() == newUsername.ToLower() && u.Id != id))
+                    throw new InvalidOperationException("Username already taken.");
+                user.Username = newUsername;
             }
 
-            if (!string.IsNullOrEmpty(updateUserDto.Username))
+            if (!string.IsNullOrWhiteSpace(dto.Email))
             {
-                user.Username = updateUserDto.Username;
+                var newEmail = dto.Email!.Trim();
+                if (!user.Email.Equals(newEmail, StringComparison.OrdinalIgnoreCase) &&
+                    await _context.Users.AnyAsync(u => u.Email.ToLower() == newEmail.ToLower() && u.Id != id))
+                    throw new InvalidOperationException("Email already taken.");
+                user.Email = newEmail;
             }
-            if (!string.IsNullOrEmpty(updateUserDto.Email))
+
+            if (dto.IsActive.HasValue)
+                user.IsActive = dto.IsActive.Value;
+
+            if (dto.AvatarUrl != null && dto.AvatarUrl.Length > 0)
             {
-                user.Email = updateUserDto.Email;
+                var file = dto.AvatarUrl;
+                var blobFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+                using var stream = file.OpenReadStream();
+                var newBlobUrl = await _blobService.UploadFileBlobAsync(_containerName, stream, file.ContentType ?? "application/octet-stream", blobFileName);
+
+                if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                {
+                    var existingBlobName = GetBlobNameFromUrl(user.AvatarUrl, _containerName);
+                    if (!string.IsNullOrWhiteSpace(existingBlobName))
+                        await _blobService.DeleteFileBlobAsync(_containerName, existingBlobName);
+                }
+
+                user.AvatarUrl = newBlobUrl;
             }
-            if (updateUserDto.IsActive.HasValue)
-            {
-                user.IsActive = updateUserDto.IsActive.Value;
-            }
+
             user.UpdatedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
-            return true;
+
+            return new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                IsActive = user.IsActive,
+                AvatarUrl = user.AvatarUrl,
+                UpdatedAt = user.UpdatedAt
+            };
         }
 
-        public async Task<bool> UpdateUserByUsernameAsync(string username, UpdateUserDto updateUserDto)
+        public async Task<UserResponseDto?> UpdateUserByUsernameAsync(string username, UpdateUserDto dto)
         {
             var user = await _context.Users.SingleOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
-            if (user == null)
-            {
-                return false;
-            }
+            if (user == null) return null;
 
-            if (!string.IsNullOrEmpty(updateUserDto.Username))
+            if (!string.IsNullOrWhiteSpace(dto.Username))
             {
-                if (user.Username.ToLower() != updateUserDto.Username.ToLower() &&
-                    await _context.Users.AnyAsync(u => u.Username.ToLower() == updateUserDto.Username.ToLower()))
-                {
+                var newUsername = dto.Username!.Trim();
+                if (!user.Username.Equals(newUsername, StringComparison.OrdinalIgnoreCase) &&
+                    await _context.Users.AnyAsync(u => u.Username.ToLower() == newUsername.ToLower() && u.Id != user.Id))
                     throw new InvalidOperationException("New username is already taken.");
-                }
-                user.Username = updateUserDto.Username;
+                user.Username = newUsername;
             }
-            if (!string.IsNullOrEmpty(updateUserDto.Email))
-            {
-                user.Email = updateUserDto.Email;
-            }
-            if (updateUserDto.IsActive.HasValue)
-            {
-                user.IsActive = updateUserDto.IsActive.Value;
-            }
-            user.UpdatedAt = DateTime.UtcNow;
 
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var newEmail = dto.Email!.Trim();
+                if (!user.Email.Equals(newEmail, StringComparison.OrdinalIgnoreCase) &&
+                    await _context.Users.AnyAsync(u => u.Email.ToLower() == newEmail.ToLower() && u.Id != user.Id))
+                    throw new InvalidOperationException("New email is already taken.");
+                user.Email = newEmail;
+            }
+
+            if (dto.IsActive.HasValue)
+                user.IsActive = dto.IsActive.Value;
+
+
+
+            if (dto.AvatarUrl != null && dto.AvatarUrl.Length > 0)
+            {
+                var file = dto.AvatarUrl;
+                var blobFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+                using var stream = file.OpenReadStream();
+                var newBlobUrl = await _blobService.UploadFileBlobAsync(_containerName, stream, file.ContentType ?? "application/octet-stream", blobFileName);
+
+                if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                {
+                    var existingBlobName = GetBlobNameFromUrl(user.AvatarUrl, _containerName);
+                    if (!string.IsNullOrWhiteSpace(existingBlobName))
+                        await _blobService.DeleteFileBlobAsync(_containerName, existingBlobName);
+                }
+
+                user.AvatarUrl = newBlobUrl;
+            }
+
+            user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-            return true;
+
+            return new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                IsActive = user.IsActive,
+                AvatarUrl = user.AvatarUrl,
+                UpdatedAt = user.UpdatedAt
+            };
         }
+
+        private static string? GetBlobNameFromUrl(string blobUrl, string containerName)
+        {
+            if (string.IsNullOrWhiteSpace(blobUrl)) return null;
+            try
+            {
+                var uri = new Uri(blobUrl);
+                var path = uri.AbsolutePath;
+                var prefix = $"/{containerName}/";
+                if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
+                return path.Substring(prefix.Length);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // ❌ REMOVE: The dedicated UpdateAvatarUrlAsync method is no longer needed
+        // public async Task<bool> UpdateAvatarUrlAsync(int userId, string newAvatarUrl) { ... }
     }
 }

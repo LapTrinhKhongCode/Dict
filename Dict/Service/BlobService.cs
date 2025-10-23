@@ -30,5 +30,12 @@ namespace Dict.Service
             // 4. Trả về URL của file đã tải lên
             return blobClient.Uri.ToString();
         }
+        public async Task DeleteFileBlobAsync(string containerName, string blobName)
+        {
+            if (string.IsNullOrWhiteSpace(blobName)) return;
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            var blobClient = containerClient.GetBlobClient(blobName);
+            await blobClient.DeleteIfExistsAsync();
+        }
     }
 }

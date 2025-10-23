@@ -65,36 +65,7 @@ namespace Dict.Controllers
 
         // POST: api/users
        
-        // PUT: api/users/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateUserDto)
-        {
-            if (!ModelState.IsValid)
-            {
-                _response.IsSuccess = false;
-                _response.Message = "Invalid input data.";
-                return BadRequest(_response);
-            }
-
-            try
-            {
-                var result = await _userService.UpdateUserAsync(id, updateUserDto);
-                if (!result)
-                {
-                    _response.IsSuccess = false;
-                    _response.Message = "User not found or update failed.";
-                    return NotFound(_response);
-                }
-                _response.Message = "User updated successfully.";
-                return Ok(_response); // Thay vì NoContent(), trả về Ok() với thông điệp
-            }
-            catch (Exception ex)
-            {
-                _response.IsSuccess = false;
-                _response.Message = ex.Message;
-                return StatusCode(500, _response);
-            }
-        }
+       
 
         // DELETE: api/users/5
         [HttpDelete("{id}")]
@@ -137,9 +108,8 @@ namespace Dict.Controllers
             }
         }
 
-        // PUT: api/users/by-username/johndoe
         [HttpPut("by-username/{username}")]
-        public async Task<IActionResult> UpdateUserByUsername([FromRoute] string username, [FromBody] UpdateUserDto updateUserDto)
+        public async Task<IActionResult> UpdateUserByUsername([FromRoute] string username, [FromForm] UpdateUserDto updateUserDto)
         {
             if (!ModelState.IsValid)
             {
@@ -150,21 +120,57 @@ namespace Dict.Controllers
 
             try
             {
-                var result = await _userService.UpdateUserByUsernameAsync(username, updateUserDto);
-                if (!result)
+                var updated = await _userService.UpdateUserByUsernameAsync(username, updateUserDto);
+                if (updated == null)
                 {
                     _response.IsSuccess = false;
                     _response.Message = "User not found or update failed.";
                     return NotFound(_response);
                 }
+
+                _response.IsSuccess = true;
                 _response.Message = "User updated successfully.";
+                _response.Result = updated;
                 return Ok(_response);
             }
             catch (InvalidOperationException ex)
             {
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                return Conflict(_response); // 409 Conflict nếu username mới bị trùng
+                return Conflict(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return StatusCode(500, _response);
+            }
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateUser(int id, [FromForm] UpdateUserDto updateUserDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Invalid input data.";
+                return BadRequest(_response);
+            }
+
+            try
+            {
+                var updated = await _userService.UpdateUserAsync(id, updateUserDto);
+                if (updated == null)
+                {
+                    _response.IsSuccess = false;
+                    _response.Message = "User not found or update failed.";
+                    return NotFound(_response);
+                }
+
+                _response.IsSuccess = true;
+                _response.Message = "User updated successfully.";
+                _response.Result = updated;
+                return Ok(_response);
             }
             catch (Exception ex)
             {
