@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Dict.Service
@@ -18,6 +19,129 @@ namespace Dict.Service
         public JsonBuilder(ApplicationDbContext db)
         {
             _db = db;
+        }
+
+        /// <summary>
+        /// Truy vấn và xây dựng chuỗi JSON hoàn chỉnh cho một Hán tự.
+        /// </summary>
+        public async Task<string> RebuildJsonForKanjiAsync(string kanjiCharacter)
+        {
+            if (string.IsNullOrEmpty(kanjiCharacter) || kanjiCharacter.Length != 1)
+            {
+                return JsonConvert.SerializeObject(new { status = 404, error = "Invalid Kanji character" });
+            }
+
+            // SỬA LỖI: Chạy các truy vấn một cách tuần tự (sequentially)
+
+            // 1. Truy vấn Entry (lấy cách đọc, nghĩa...) VÀ ĐỢI (await)
+            var entryFromDb = await _db.Entries
+                .AsNoTracking()
+                .Where(e => e.Type == "kanji" && e.Label == kanjiCharacter)
+                .Include(e => e.ReadingElements)
+                .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.Glosses)
+                .FirstOrDefaultAsync();
+
+            // 2. Truy vấn Kanji (lấy số nét, ví dụ lồng nhau...) VÀ ĐỢI (await)
+            var kanjiFromDb = await _db.Kanji
+                .AsNoTracking()
+                .Where(k => k.Character == kanjiCharacter)
+                .Include(k => k.KanjiExamples) // Nạp TẤT CẢ các ví dụ liên quan
+                .FirstOrDefaultAsync();
+
+            // 3. Bây giờ mới kiểm tra kết quả
+            if (entryFromDb == null || kanjiFromDb == null)
+            {
+                var rawJsonEntry = await _db.Entries
+                    .AsNoTracking()
+                    .Where(e => e.Type == "kanji" && e.Label == kanjiCharacter)
+                    .Select(e => e.RawJson)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrEmpty(rawJsonEntry)) return rawJsonEntry;
+
+                return JsonConvert.SerializeObject(new { status = 404, error = "Kanji data not found in database" });
+            }
+
+            // 4. Ánh xạ (Map) sang Model JSON
+            var kanjiResult = MapKanjiDataToJson(entryFromDb, kanjiFromDb); // Gọi hàm helper
+
+            var rootObject = new KanjiRootObject
+            {
+                Results = new List<KanjiResult> { kanjiResult }
+            };
+
+            return JsonConvert.SerializeObject(rootObject, Formatting.Indented, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore,
+                DefaultValueHandling = DefaultValueHandling.Ignore
+            });
+        }
+
+
+        // (Helper cho KANJI)
+        private KanjiResult MapKanjiDataToJson(Entry entry, Kanji kanji)
+        {
+            var kanjiResult = new KanjiResult
+            {
+                Kanji = kanji.Character,
+                Stroke_count = kanji.StrokeCount,
+                Freq = kanji.Freq,
+                //MobileId = kanji.MobileId, // Lấy MobileId từ bảng Kanji
+                Level = new List<string> { kanji.JlptLevel ?? "" }
+            };
+
+            // Phân biệt On/Kun Reading
+            var onReadings = entry.ReadingElements
+                                  .Select(r => r.Reb)
+                                  .Where(r => !string.IsNullOrEmpty(r) && IsKatakana(Regex.Replace(r, @"[\.|\-]", "")))
+                                  .ToList();
+            var kunReadings = entry.ReadingElements
+                                   .Select(r => r.Reb)
+                                   .Where(r => !onReadings.Contains(r))
+                                   .ToList();
+
+            kanjiResult.On = string.Join(" ", onReadings);
+            kanjiResult.Kun = string.Join(" ", kunReadings);
+
+            // Điền các nghĩa từ Senses/Glosses
+            foreach (var sense in entry.Senses.OrderBy(s => s.SenseOrder))
+            {
+                var glossText = sense.Glosses.FirstOrDefault()?.Text ?? "";
+                switch (sense.Pos) // Dùng Pos (mà chúng ta đã lưu là "HanViet", "Detail", "Tips")
+                {
+                    case "HanViet": kanjiResult.Mean = glossText; break;
+                    case "Detail": kanjiResult.Detail = glossText; break;
+                    case "Tips": kanjiResult.Tips = new KanjiTipsJson { Vi = glossText }; break;
+                }
+            }
+
+            // Tái tạo "example_kun"
+            kanjiResult.Example_kun = kanji.KanjiExamples
+                .Where(ex => ex.ExampleType == "kun" && ex.ReadingGroup != null)
+                .GroupBy(ex => ex.ReadingGroup!)
+                .ToDictionary(g => g.Key, g => g.Select(item => new KanjiExampleJson { W = item.Word, M = item.Meaning, P = item.Reading }).ToList());
+
+            // Tái tạo "example_on"
+            kanjiResult.Example_on = kanji.KanjiExamples
+                .Where(ex => ex.ExampleType == "on" && ex.ReadingGroup != null)
+                .GroupBy(ex => ex.ReadingGroup!)
+                .ToDictionary(g => g.Key, g => g.Select(item => new KanjiExampleJson { W = item.Word, M = item.Meaning, P = item.Reading }).ToList());
+
+            // Tái tạo "examples"
+            kanjiResult.Examples = kanji.KanjiExamples
+                .Where(ex => ex.ExampleType == "general")
+                .Select(item => new KanjiExampleGeneralJson { W = item.Word, M = item.Meaning, P = item.Reading, H = item.HanViet })
+                .ToList();
+
+            return kanjiResult;
+        }
+
+        // Helper để kiểm tra Katakana (cho việc phân loại On/Kun)
+        private bool IsKatakana(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            // Dải Unicode cho Katakana (U+30A0 đến U+30FF)
+            return text.All(c => c >= 0x30A0 && c <= 0x30FF);
         }
 
         public async Task<string> RebuildJsonForWordAsync(string labelToTest)
