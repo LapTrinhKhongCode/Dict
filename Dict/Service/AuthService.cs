@@ -7,6 +7,7 @@ using Dict.Models.Enum;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using static System.Net.WebRequestMethods;
 
 namespace Dict.Service
 {
@@ -16,17 +17,22 @@ namespace Dict.Service
         private readonly IJwtService _jwtService;
         private readonly IEmailService _emailService;
         private readonly IWebHostEnvironment _webHostEnvironment; // ✨ Thêm dòng này
-
+        private readonly IBlobService _blobService;
+        private readonly IConfiguration _configuration;
         public AuthService(
             ApplicationDbContext context,
             IJwtService jwtService,
             IEmailService emailService,
-            IWebHostEnvironment webHostEnvironment) // ✨ Thêm vào constructor
+            IWebHostEnvironment webHostEnvironment,
+            IBlobService blobService,
+            IConfiguration configuration) // ✨ Thêm vào constructor
         {
             _context = context;
             _jwtService = jwtService;
             _emailService = emailService;
             _webHostEnvironment = webHostEnvironment; // ✨ Lưu lại
+            _blobService = blobService;
+            _configuration = configuration;
         }
 
         //public async Task<string> RegisterAsync(RegistrationRequestDto request)
@@ -80,48 +86,17 @@ namespace Dict.Service
                 throw new InvalidOperationException(passwordError);
             }
 
-            // BƯỚC 2: Kiểm tra User/Email
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username || u.Email == request.Email);
+            // BƯỚC 2: Kiểm tra User/Email tồn tại
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username == request.Username || u.Email == request.Email);
             if (existingUser != null)
             {
                 throw new InvalidOperationException("Username or Email already exists.");
             }
 
-            // BƯỚC 3: Tạo người dùng mới với Role và Avatar mặc định
-            // (Model User của bạn phải có các cột Role và AvatarUrl)
-            string defaultAvatarBase64;
-            try
-            {
-                // Đường dẫn tương đối đến file avatar mặc định trong wwwroot
-                string defaultAvatarRelativePath = "images/default_ava.jpg";
-                // Lấy đường dẫn vật lý
-                string defaultAvatarFullPath = Path.Combine(_webHostEnvironment.WebRootPath, defaultAvatarRelativePath);
-
-                if (System.IO.File.Exists(defaultAvatarFullPath))
-                {
-                    // Đọc toàn bộ byte của file
-                    byte[] imageBytes = await System.IO.File.ReadAllBytesAsync(defaultAvatarFullPath);
-                    // Lấy kiểu MIME (cần thiết cho data URI) - bạn có thể cần logic phức tạp hơn nếu có nhiều loại ảnh
-                    string mimeType = "image/jpeg"; // Hoặc image/png, image/gif tùy file của bạn
-                                                    // Tạo chuỗi Base64 data URI
-                    defaultAvatarBase64 = $"data:{mimeType};base64,{Convert.ToBase64String(imageBytes)}";
-                }
-                else
-                {
-                    // Xử lý nếu file không tìm thấy (gán null hoặc một giá trị mặc định khác)
-                    defaultAvatarBase64 = null; // Hoặc ném lỗi tùy bạn
-                                                // Log lỗi ở đây nếu cần
-                                                // _logger.LogWarning("Default avatar file not found at {Path}", defaultAvatarFullPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                // Xử lý lỗi đọc file
-                // _logger.LogError(ex, "Error reading default avatar file.");
-                defaultAvatarBase64 = null; // Gán null khi có lỗi
-            }
-
-
+            // BƯỚC 3: Upload avatar mặc định lên Azure Blob
+       
+            // BƯỚC 4: Tạo user mới
             var user = new User
             {
                 Username = request.Username,
@@ -129,14 +104,11 @@ namespace Dict.Service
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
-
-                // --- ✨ GÁN GIÁ TRỊ BASE64 ---
                 Role = "USER",
-                AvatarUrl = defaultAvatarBase64 // ✨ Lưu chuỗi Base64 (có thể rất dài)
-                                                // --- KẾT THÚC ---
+                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/default_avatar_2ed7dd9d-82f6-46bf-b9ea-486b3a3c1b0a.jpg"
             };
 
-            // BƯỚC 4: Lưu vào CSDL
+            // BƯỚC 5: Lưu vào DB
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
