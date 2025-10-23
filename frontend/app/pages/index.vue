@@ -58,11 +58,7 @@
     <div v-if="result" class="space-y-8">
       <div v-if="result.type === 'kanji' && result.kanji" class="space-y-6">
         <h2 class="text-xl font-semibold border-b pb-2">Kanji Result</h2>
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> 1380acf70f8f69c75c98c81f5f0accee079d84b6
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
           <div class="space-y-3">
             <h1 class="text-6xl font-bold text-gray-900">{{ result.kanji.kanji }}</h1>
@@ -182,15 +178,9 @@
 
       <div v-if="result.type === 'word' && result.words && result.words.length > 0" class="space-y-6">
         <h2 class="text-xl font-semibold border-b pb-2">Main Results</h2>
-<<<<<<< HEAD
 
         <div v-for="word in result.words" :key="word._id"
           class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-=======
-        
-        <div v-for="word in result.words" :key="word._id" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-          <!-- Word Header -->
->>>>>>> 1380acf70f8f69c75c98c81f5f0accee079d84b6
           <div class="space-y-2">
             <h1 class="text-3xl font-bold text-gray-900">{{ word.word }}</h1>
             <div class="flex items-center space-x-4">
@@ -282,7 +272,6 @@
         </div>
       </div>
 
-<<<<<<< HEAD
       <div v-if="conjugationResult" class="space-y-6">
         <h2 class="text-xl font-semibold border-b pb-2">Verb Conjugation</h2>
         <ConjugationTable :root="conjugationResult.root" :conjugations="conjugationResult.conjugations"
@@ -290,21 +279,6 @@
       </div>
 
       <div v-if="!result && !conjugationResult && !loading && !error" class="text-center py-12">
-=======
-      <!-- Conjugation Results -->
-      <div v-if="conjugationResult" class="space-y-6">
-        <h2 class="text-xl font-semibold border-b pb-2">Verb Conjugation</h2>
-        <ConjugationTable 
-          :root="conjugationResult.root" 
-          :conjugations="conjugationResult.conjugations"
-          :originalForm="conjugationResult.originalForm"
-        />
-      </div>
-
-      <!-- No Results -->
-      <div v-if="!result && !conjugationResult && !loading && !error" 
-           class="text-center py-12">
->>>>>>> 1380acf70f8f69c75c98c81f5f0accee079d84b6
         <UIcon name="i-lucide-search-x" class="size-12 text-gray-400 mx-auto mb-4" />
         <p class="text-gray-500 text-lg">No results found for "{{ searchWord }}"</p>
         <p class="text-gray-400 text-sm mt-2">Try a different search term</p>
@@ -341,11 +315,7 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import conjugationsData from "~/data/conjugations_normalized.json";
-<<<<<<< HEAD
 import { toKana } from 'wanakana';
-=======
-import {toKana} from 'wanakana';
->>>>>>> 1380acf70f8f69c75c98c81f5f0accee079d84b6
 
 const route = useRoute();
 const router = useRouter();
@@ -355,7 +325,6 @@ const result = ref<any | null>(null);
 const loading = ref(false);
 const error = ref("");
 const conjugationResult = ref<any | null>(null);
-<<<<<<< HEAD
 
 // --- NEW AUTOCOMPLETE STATE ---
 const suggestions = ref<any[]>([]);
@@ -367,8 +336,6 @@ const suggestionsListEl = ref<HTMLUListElement | null>(null); // 3. Add ref for 
 
 const isProgrammaticSearch = ref(false); // <-- ADD THIS FLAG
 // --- END NEW STATE ---
-=======
->>>>>>> 1380acf70f8f69c75c98c81f5f0accee079d84b6
 
 // Image modal state
 const showImageModal = ref(false);
@@ -505,56 +472,6 @@ const checkConjugation = (word: string): any | null => {
   return null;
 };
 
-// Extract word left of "/" if it exists
-const extractWordLeftOfSlash = (word: string): string => {
-  const slashIndex = word.indexOf('/');
-  return slashIndex !== -1 ? word.substring(0, slashIndex) : word;
-};
-
-// Convert any form to dictionary form using byForm
-const getDictionaryForm = (word: string): string => {
-  const trimmed = word.trim();
-  if (!trimmed) return trimmed;
-  
-  // Check if the word exists in byForm data
-  if (conjugationsData.byForm && conjugationsData.byForm[trimmed]) {
-    const dictionaryFormWithSlash = conjugationsData.byForm[trimmed];
-    // Extract word left of "/" from the dictionary form
-    return extractWordLeftOfSlash(dictionaryFormWithSlash);
-  }
-  
-  // If no byForm match, return the original word (also extract left of "/" if needed)
-  return extractWordLeftOfSlash(trimmed);
-};
-
-// Check if word has conjugation data
-const checkConjugation = (word: string): any | null => {
-  const trimmed = word.trim();
-  if (!trimmed) return null;
-  
-  // First, convert to dictionary form using byForm
-  const dictionaryForm = getDictionaryForm(trimmed);
-  
-  // For normalized data, we need to find the byRoot key that matches our dictionary form
-  // The byRoot keys have "/" format, so we need to find the one that starts with our dictionary form
-  if (conjugationsData.byRoot) {
-    // Look for a byRoot key that starts with our dictionary form + "/"
-    const targetKey = `${dictionaryForm}/`;
-    
-    for (const [key, conjugations] of Object.entries(conjugationsData.byRoot)) {
-      if (key.startsWith(targetKey)) {
-        return {
-          root: dictionaryForm,
-          conjugations: conjugations,
-          originalForm: trimmed !== dictionaryForm ? trimmed : null
-        };
-      }
-    }
-  }
-  
-  return null;
-};
-
 // Fetch API
 const fetchWord = async (word: string) => {
   try {
@@ -588,17 +505,10 @@ const fetchWord = async (word: string) => {
       if (conjugation) {
         conjugationResult.value = conjugation;
       }
-<<<<<<< HEAD
 
       // Use dictionary form for API call (API only accepts dictionary forms)
       const dictionaryForm = getDictionaryForm(word);
 
-=======
-      
-      // Use dictionary form for API call (API only accepts dictionary forms)
-      const dictionaryForm = getDictionaryForm(word);
-      
->>>>>>> 1380acf70f8f69c75c98c81f5f0accee079d84b6
       // Use word API for regular words
       apiUrl = `https://localhost:7084/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
       const res = await fetch(apiUrl);
@@ -644,7 +554,6 @@ const goSearch = () => {
   // *******************************************************
 
   const queryParam = isSingleKanji(convertedWord) ? 'kanji' : 'word';
-<<<<<<< HEAD
 
   router.push({ path: "/", query: { [queryParam]: convertedWord } });
   fetchWord(convertedWord);
@@ -672,11 +581,6 @@ const scrollToSelected = async () => {
       behavior: 'smooth'
     });
   }
-=======
-  
-  router.push({ path: "/", query: { [queryParam]: convertedWord } });
-  fetchWord(convertedWord);
->>>>>>> 1380acf70f8f69c75c98c81f5f0accee079d84b6
 };
 
 // Select suggested word
