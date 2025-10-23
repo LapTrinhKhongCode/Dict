@@ -6,9 +6,9 @@ namespace Dict.Service.IService
     {
         Task<IEnumerable<UserDto>> GetAllUsersAsync();
         Task<UserDto> GetUserByIdAsync(int id);
-        Task<bool> UpdateUserAsync(int id, UpdateUserDto updateUserDto);
+        Task<UserResponseDto> UpdateUserAsync(int id, UpdateUserDto updateUserDto);
         Task<bool> DeleteUserAsync(int id);
         Task<IEnumerable<UserDto>> SearchUsersByUsernameAsync(string username);
-        Task<bool> UpdateUserByUsernameAsync(string username, UpdateUserDto updateUserDto);
+        Task<UserResponseDto> UpdateUserByUsernameAsync(string username, UpdateUserDto updateUserDto);
     }
 }

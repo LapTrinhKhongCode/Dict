@@ -1,12 +1,14 @@
 ﻿using Dict.DTO;
 using Dict.DTO.User;
 using Dict.Service.IService;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Dict.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -20,6 +22,7 @@ namespace Dict.Controllers
 
         // GET: api/users
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetUsers()
         {
             try
@@ -40,6 +43,7 @@ namespace Dict.Controllers
 
         // GET: api/users/5
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetUser(int id)
         {
             try
@@ -65,36 +69,7 @@ namespace Dict.Controllers
 
         // POST: api/users
        
-        // PUT: api/users/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateUserDto)
-        {
-            if (!ModelState.IsValid)
-            {
-                _response.IsSuccess = false;
-                _response.Message = "Invalid input data.";
-                return BadRequest(_response);
-            }
-
-            try
-            {
-                var result = await _userService.UpdateUserAsync(id, updateUserDto);
-                if (!result)
-                {
-                    _response.IsSuccess = false;
-                    _response.Message = "User not found or update failed.";
-                    return NotFound(_response);
-                }
-                _response.Message = "User updated successfully.";
-                return Ok(_response); // Thay vì NoContent(), trả về Ok() với thông điệp
-            }
-            catch (Exception ex)
-            {
-                _response.IsSuccess = false;
-                _response.Message = ex.Message;
-                return StatusCode(500, _response);
-            }
-        }
+       
 
         // DELETE: api/users/5
         [HttpDelete("{id}")]
@@ -120,6 +95,7 @@ namespace Dict.Controllers
             }
         }
         [HttpGet("search/{username}")]
+        [AllowAnonymous]
         public async Task<IActionResult> SearchUsers(string username)
         {
             try
@@ -137,9 +113,8 @@ namespace Dict.Controllers
             }
         }
 
-        // PUT: api/users/by-username/johndoe
         [HttpPut("by-username/{username}")]
-        public async Task<IActionResult> UpdateUserByUsername([FromRoute] string username, [FromBody] UpdateUserDto updateUserDto)
+        public async Task<IActionResult> UpdateUserByUsername([FromRoute] string username, [FromForm] UpdateUserDto updateUserDto)
         {
             if (!ModelState.IsValid)
             {
@@ -150,21 +125,130 @@ namespace Dict.Controllers
 
             try
             {
-                var result = await _userService.UpdateUserByUsernameAsync(username, updateUserDto);
-                if (!result)
+                var updated = await _userService.UpdateUserByUsernameAsync(username, updateUserDto);
+                if (updated == null)
                 {
                     _response.IsSuccess = false;
                     _response.Message = "User not found or update failed.";
                     return NotFound(_response);
                 }
+
+                _response.IsSuccess = true;
                 _response.Message = "User updated successfully.";
+                _response.Result = updated;
                 return Ok(_response);
             }
             catch (InvalidOperationException ex)
             {
                 _response.IsSuccess = false;
                 _response.Message = ex.Message;
-                return Conflict(_response); // 409 Conflict nếu username mới bị trùng
+                return Conflict(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return StatusCode(500, _response);
+            }
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateUser(int id, [FromForm] UpdateUserDto updateUserDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Invalid input data.";
+                return BadRequest(_response);
+            }
+
+            try
+            {
+                var updated = await _userService.UpdateUserAsync(id, updateUserDto);
+                if (updated == null)
+                {
+                    _response.IsSuccess = false;
+                    _response.Message = "User not found or update failed.";
+                    return NotFound(_response);
+                }
+
+                _response.IsSuccess = true;
+                _response.Message = "User updated successfully.";
+                _response.Result = updated;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return StatusCode(500, _response);
+            }
+        }
+        private int GetUserId()
+        {
+            var userIdClaim = User.FindFirst("userId");
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
+            return userId;
+        }
+
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            try
+            {
+                var userId = GetUserId();
+                var user = await _userService.GetUserByIdAsync(userId);
+                if (user == null)
+                {
+                    _response.IsSuccess = false;
+                    _response.Message = "User not found.";
+                    return NotFound(_response);
+                }
+
+                _response.IsSuccess = true;
+                _response.Result = user;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return StatusCode(500, _response);
+            }
+        }
+
+        [HttpPut("me")]
+        public async Task<IActionResult> UpdateMe([FromForm] UpdateUserDto updateUserDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Invalid input data.";
+                return BadRequest(_response);
+            }
+
+            try
+            {
+                var userId = GetUserId();
+                var updated = await _userService.UpdateUserAsync(userId, updateUserDto);
+                if (updated == null)
+                {
+                    _response.IsSuccess = false;
+                    _response.Message = "User not found or update failed.";
+                    return NotFound(_response);
+                }
+
+                _response.IsSuccess = true;
+                _response.Message = "User updated successfully.";
+                _response.Result = updated;
+                return Ok(_response);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return Conflict(_response);
             }
             catch (Exception ex)
             {
