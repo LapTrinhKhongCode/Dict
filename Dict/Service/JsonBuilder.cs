@@ -149,11 +149,18 @@ namespace Dict.Service
             // --- TRUY VẤN KẾT QUẢ CHÍNH (words[0]) ---
             var entryFromDb = await _db.Entries
                 .AsNoTracking()
-                .Include(e => e.Words).ThenInclude(w => w.Relations).ThenInclude(r => r.RelatedWord)
+                .Include(e => e.Words)
+                    .ThenInclude(w => w.Relations)
+                    .ThenInclude(r => r.RelatedWord)
                 .Include(e => e.Senses).ThenInclude(s => s.Glosses)
                 .Include(e => e.Senses).ThenInclude(s => s.Examples)
                 .Include(e => e.Media.Where(m => m.MediaType == "image"))
                 .Include(e => e.Senses).ThenInclude(s => s.SynsetEntries).ThenInclude(se => se.SynonymItems)
+                // THÊM INCLUDE NÀY: để lấy được liên kết Word -> Kanji
+                .Include(e => e.Words)
+                    .ThenInclude(w => w.WordKanji) // Tải bảng nối word_kanji
+                        .ThenInclude(wk => wk.Kanji) // Từ bảng nối, tải Hán tự...
+                            .ThenInclude(k => k.KanjiExamples) // ...và tải luôn ví dụ của Hán tự đó
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(e => e.Label == labelToTest);
 
@@ -231,6 +238,32 @@ namespace Dict.Service
                             Transcriptions = new List<Transcription> { new Transcription { Romaji = mainWordRecord.Romaji, Kana = mainWordRecord.Phonetic } }
                         });
                     }
+
+                    var relatedKanjiChars = mainWordRecord.WordKanji
+                        .Select(wk => wk.Kanji?.Character)
+                        .Where(c => c != null)
+                        .Distinct()
+                        .ToList();
+
+                    if (relatedKanjiChars.Any())
+                    {
+                        // 2. Chạy một truy vấn phụ để lấy dữ liệu Entry của các Kanji đó
+                        var kanjiEntryData = await GetKanjiEntryDataForMappingAsync(relatedKanjiChars!);
+
+                        // 3. Lặp qua các liên kết và map dữ liệu
+                        foreach (var wordKanjiLink in mainWordRecord.WordKanji.OrderBy(wk => wk.KanjiId))
+                        {
+                            var kanji = wordKanjiLink.Kanji;
+                            // Kiểm tra xem đã lấy được Entry của Kanji này chưa
+                            if (kanji != null && kanjiEntryData.TryGetValue(kanji.Character, out var kanjiEntry))
+                            {
+                                // Tái sử dụng helper 'MapKanjiDataToJson'
+                                var kanjiResult = MapKanjiDataToJson(kanjiEntry, kanji);
+                                mainWordObject.RelatedKanji.Add(kanjiResult);
+                            }
+                        }
+                    }
+
                 }
             }
             else
@@ -258,6 +291,25 @@ namespace Dict.Service
             });
 
             return json;
+        }
+
+        /// <summary>
+        /// Helper mới để tải (Entry) của các Hán tự
+        /// </summary>
+        private async Task<Dictionary<string, Entry>> GetKanjiEntryDataForMappingAsync(List<string> kanjiChars)
+        {
+            if (kanjiChars == null || !kanjiChars.Any())
+            {
+                return new Dictionary<string, Entry>();
+            }
+
+            // Truy vấn các Entry (loại 'kanji') có Label nằm trong danh sách
+            return await _db.Entries
+                .AsNoTracking()
+                .Where(e => e.Type == "kanji" && kanjiChars.Contains(e.Label))
+                .Include(e => e.ReadingElements) // Tải cách đọc
+                .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.Glosses) // Tải nghĩa
+                .ToDictionaryAsync(e => e.Label); // Trả về Dictionary để tra cứu nhanh
         }
 
         /// <summary>
