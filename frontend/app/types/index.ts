@@ -7,9 +7,23 @@ export interface DeckSummaryDto {
     description: string;
     cardCount: number;
     isPublic: boolean;
-    authorName: string;  // ✨ SỬA: từ 'creatorName' thành 'authorName'
+    authorName: string; 
+    authorImageUrl: string; // ✨ SỬA: từ 'creatorName' thành 'authorName'
+      nowAuthorName: string | null; // Current owner if saved/copied
+  nowAuthorImageUrl: string | null;
 }
 
+export interface DeckCreateDto {
+  title: string;
+  description?: string | null;
+  isPublic: boolean;
+  cards: CardCreateDto[]; 
+}
+export interface CardCreateDto {
+  frontText: string; 
+  backText: string;
+  tags?: string | null;
+}
 /** DTO cho một thẻ flashcard đơn lẻ */
 export interface CardDto {
     id: number;
@@ -25,6 +39,9 @@ export interface DeckDetailDto {
     title: string;
     description: string;
     cards: CardDto[];
+    userId: number;
+    isPublic: boolean;
+    authorName: string;
 }
 
 /** DTO cho request khi người dùng trả lời một thẻ */

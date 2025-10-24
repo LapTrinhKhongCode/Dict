@@ -13,11 +13,12 @@ namespace Dict.Service.IService
         Task<DeckSummaryDto> CreateDeckAsync(DeckCreateDto deckDto, int userId);
         Task<bool> UpdateDeckAsync(int deckId, DeckUpdateDto deckDto, int userId);
         Task<bool> DeleteDeckAsync(int deckId, int userId);
-        Task<CardDto> AddCardToDeckAsync(int deckId, CardCreateDto cardDto, int userId);
+        Task<List<CardDto>> AddCardToDeckAsync(int deckId, List<CardCreateDto> cardDto, int userId);
         Task<bool> UpdateCardAsync(int cardId, CardUpdateDto cardDto, int userId);
         Task<bool> DeleteCardAsync(int cardId, int userId);
         Task<bool> SetDeckPublicStatusAsync(int deckId, bool isPublic, int userId);
         Task<IEnumerable<UserDeckSummary>> GetPublicDecksByUsernameAsync(string username);
         Task<IEnumerable<UserDeckSummary>> SearchPublicDecksByNameAsync(string nameQuery);
+        Task<DeckSummaryDto> SaveDeckForUserAsync(int originalDeckId, int newOwnerUserId);
     }
 }
