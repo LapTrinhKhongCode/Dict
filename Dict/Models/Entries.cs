@@ -33,6 +33,11 @@ namespace Dict.Models
 
         public string? Romaji { get; set; }
 
+        public string? ShortMean { get; set; }
+
+        public int? Weight { get; set; }
+        public string? EntryCategory { get; set; }
+
         public virtual ICollection<KanjiElement> KanjiElements { get; set; }
         public virtual ICollection<ReadingElement> ReadingElements { get; set; }
         public virtual ICollection<Sense> Senses { get; set; }
