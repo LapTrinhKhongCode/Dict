@@ -16,6 +16,10 @@
       <UIcon name="i-custom-word" class="text-3xl" />
       <span>Words</span>
     </NuxtLink>
+       <NuxtLink to="/explore" class="sidebar-link-style">
+      <UIcon name="i-lucide-book-a" class="text-3xl" />
+      <span>Explore</span>
+    </NuxtLink>
 
     <!-- Settings -->
     <div class="px-3 py-2 text-sm font-medium text-gray-400 mt-4">Settings</div>
@@ -28,5 +32,7 @@
       <UIcon name="i-lucide-credit-card" />
       <span>Premium</span>
     </NuxtLink>
+    
+ 
   </nav>
 </template>
