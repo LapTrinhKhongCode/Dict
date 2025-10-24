@@ -3,3 +3,6 @@ obj/
 .vs/
 /Dict/appsettings.json
 .git
+Dict/venv
+Dict/TempOcr
+Dict/requirements.txt

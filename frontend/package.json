@@ -25,6 +25,7 @@
     "lucide-vue-next": "^0.542.0",
     "nuxt": "^4.1.0",
     "papaparse": "^5.5.3",
+    "pinia": "^3.0.3",
     "signature_pad": "^5.1.0",
     "tailwindcss": "^4.1.12",
     "tesseract.js": "^6.0.1",
