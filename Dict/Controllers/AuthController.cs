@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
 using Dict.DTO;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Dict.Controllers
 {
@@ -12,13 +13,28 @@ namespace Dict.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
-        private readonly ResponseDTO _response; 
+        private readonly ResponseDTO _response;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
             _authService = authService;
             _response = new ResponseDTO();
+            _logger = logger;
         }
+
+        private int GetUserId()
+        {
+            var userIdClaim = User.FindFirst("userId");
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
+                // mặc dù [Authorize] thường sẽ chặn các request này trước.
+                throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
+            }
+            return userId;
+        }
+
         [HttpPost("verify-email")]
         public async Task<IActionResult> VerifyEmail(VerifyEmailDto verifyDto)
         {
@@ -98,6 +114,35 @@ namespace Dict.Controllers
                 _response.Message = ex.Message; // Ví dụ: "Invalid username or password."
                 // Sử dụng 401 Unauthorized cho lỗi đăng nhập sai
                 return Unauthorized(_response);
+            }
+        }
+        [HttpPost("logout")]
+        [Authorize] // User must be logged in to log out
+        public async Task<IActionResult> Logout()
+        {
+            try
+            {
+                var userId = GetUserId();
+                await _authService.LogoutAsync(userId);
+
+                _response.IsSuccess = true;
+                _response.Message = "Logout successful. Please clear your token.";
+                return Ok(_response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return Unauthorized(_response);
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                _logger.LogError(ex, "Error during logout for user {UserId}", GetUserId()); // Use GetUserId carefully in catch block if it can fail
+
+                _response.IsSuccess = false;
+                _response.Message = "An error occurred during logout.";
+                return StatusCode(StatusCodes.Status500InternalServerError, _response);
             }
         }
     }

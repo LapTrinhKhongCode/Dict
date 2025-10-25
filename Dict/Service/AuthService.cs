@@ -19,13 +19,15 @@ namespace Dict.Service
         private readonly IWebHostEnvironment _webHostEnvironment; // ✨ Thêm dòng này
         private readonly IBlobService _blobService;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<AuthService> _logger;
         public AuthService(
             ApplicationDbContext context,
             IJwtService jwtService,
             IEmailService emailService,
             IWebHostEnvironment webHostEnvironment,
             IBlobService blobService,
-            IConfiguration configuration) // ✨ Thêm vào constructor
+            IConfiguration configuration,
+            ILogger<AuthService> logger) // ✨ Thêm vào constructor
         {
             _context = context;
             _jwtService = jwtService;
@@ -33,6 +35,7 @@ namespace Dict.Service
             _webHostEnvironment = webHostEnvironment; // ✨ Lưu lại
             _blobService = blobService;
             _configuration = configuration;
+            _logger = logger;
         }
 
         //public async Task<string> RegisterAsync(RegistrationRequestDto request)
@@ -194,6 +197,24 @@ namespace Dict.Service
                 Role = user.Role, // Đã là string
                 AvatarUrl = avatarUrl
             };
+        }
+        public async Task LogoutAsync(int userId)
+        {
+            // In a simple JWT setup, logout is primarily handled client-side
+            // by deleting the token.
+
+            // Server-side actions (optional):
+            // 1. Log the logout event
+            _logger.LogInformation("User {UserId} logged out at {Timestamp}", userId, DateTime.UtcNow);
+
+            // 2. If using a token blacklist:
+            //    - Extract the token identifier (e.g., JTI) from the current request's token.
+            //    - Add the identifier to the blacklist (e.g., in Redis or a database table)
+            //      with an expiry matching the token's original expiry.
+            //    await _tokenBlacklistService.BlacklistTokenAsync(jti, expiry);
+
+            // For now, we just log.
+            await Task.CompletedTask; // Represents async operation completion
         }
     }
 }
