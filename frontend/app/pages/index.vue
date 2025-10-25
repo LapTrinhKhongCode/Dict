@@ -1,7 +1,13 @@
 <template>
   <div class="p-6 space-y-6">
-    <div ref="searchContainer" class="relative w-full max-w-md">
+    <div ref="searchContainer" class="relative w-full">
       <div class="flex items-center border rounded-2xl px-3 py-2 w-full">
+        <button
+          @click="goSearch"
+          class="text-gray-500 hover:text-gray-700 transition mr-3"
+        >
+          <UIcon name="i-lucide-search" class="size-5" />
+        </button>
         <input
           v-model="searchWord"
           type="text"
@@ -10,32 +16,27 @@
           @keyup.enter="goSearch"
           @focus="showSuggestions = suggestions.length > 0"
         />
-        <button
-          @click="goSearch"
-          class="text-gray-500 hover:text-gray-700 transition"
-        >
-          <UIcon name="i-lucide-search" class="size-5" />
-        </button>
+        
       </div>
 
       <div 
         v-if="showSuggestions && suggestions.length > 0"
-        class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto suggestions-list"
+        class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto suggestions-list"
       >
         <ul ref="suggestionsListEl"> 
           <li 
             v-for="(suggestion, index) in suggestions" 
             :key="suggestion.word + suggestion.reading"
             
-            class="px-4 py-3 border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50"
-            :class="{ 'bg-gray-100': index === selectedIndex }"
+            class="px-4 py-3 border-b border-gray-700 last:border-b-0 cursor-pointer hover:bg-gray-700"
+            :class="{ 'bg-gray-700': index === selectedIndex }"
             @click="selectSuggestion(suggestion)"
           >
-            <div class="flex items-center justify-between">
-              <span class="font-medium text-gray-900">{{ suggestion.word }}</span>
-              <span class="text-sm text-blue-600">{{ suggestion.reading }}</span>
+            <div class="flex items-baseline gap-x-2">
+              <span class="font-medium text-white">{{ suggestion.word }}</span>
+              <span class="text-sm text-blue-400">{{ suggestion.reading }}</span>
             </div>
-            <p class="text-sm text-gray-600 mt-1">{{ suggestion.meaning }}</p>
+            <p class="text-sm text-gray-300 mt-1">{{ suggestion.meaning }}</p>
           </li>
         </ul>
       </div>
@@ -223,7 +224,9 @@
             </h3>
             <div class="flex flex-wrap gap-2">
               <span v-for="synonym in word.synsets[0]?.entry[0]?.synonym || []" :key="synonym"
-                class="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">
+                class="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full cursor-pointer"
+                @click="selectSynonym(synonym)"
+                >
                 {{ synonym }}
               </span>
             </div>
@@ -286,6 +289,15 @@
     </div>
 
   </div>
+
+
+
+  <WordResultModal
+    class="p-10"
+    v-if="showSuggestedWordModal"
+    :search-word="modalSearchWord"
+    @close="showSuggestedWordModal = false"
+  />
 </template>
 
 <style scoped>
@@ -294,19 +306,19 @@
 }
 
 .suggestions-list::-webkit-scrollbar-track {
-  background: #ffffff; /* Track background, matching your bg-white */
+  background: #1F2937; /* Track background, matching your bg-white */
   border-radius: 10px;
 }
 
 .suggestions-list::-webkit-scrollbar-thumb {
-  background-color: #d1d5db; /* A light gray (Tailwind's gray-300) */
+  background-color: #4B5563; /* A light gray (Tailwind's gray-300) */
   border-radius: 10px;
-  border: 2px solid #ffffff; /* Creates a padding effect, matching bg-white */
+  border: 2px solid #1F2937; /* Creates a padding effect, matching bg-white */
   background-clip: padding-box;
 }
 
 .suggestions-list::-webkit-scrollbar-thumb:hover {
-  background-color: #9ca3af; /* A slightly darker gray on hover (Tailwind's gray-400) */
+  background-color: #6B7280; /* A slightly darker gray on hover (Tailwind's gray-400) */
 }
 </style>
 
@@ -316,6 +328,7 @@ import { useRoute, useRouter } from "vue-router";
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import conjugationsData from "~/data/conjugations_normalized.json";
 import { toKana } from 'wanakana';
+import WordResultModal from '~/components/WordResultModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -335,6 +348,10 @@ const selectedIndex = ref(-1); // 2. Add for tracking selection
 const suggestionsListEl = ref<HTMLUListElement | null>(null); // 3. Add ref for scrolling
 
 const isProgrammaticSearch = ref(false); // <-- ADD THIS FLAG
+
+// --- 2. Add new state for the modal ---
+const showSuggestedWordModal = ref(false);
+const modalSearchWord = ref("");
 // --- END NEW STATE ---
 
 // Image modal state
@@ -585,9 +602,18 @@ const scrollToSelected = async () => {
 
 // Select suggested word
 const selectSuggestedWord = (word: string) => {
-  isProgrammaticSearch.value = true; // <-- ADD THIS
-  searchWord.value = word;
-  goSearch();
+  // isProgrammaticSearch.value = true; // <-- ADD THIS
+  // searchWord.value = word;
+  // goSearch();
+
+  // NEW LOGIC:
+  modalSearchWord.value = word;
+  showSuggestedWordModal.value = true;
+};
+
+const selectSynonym = (word: string) => {
+  modalSearchWord.value = word;
+  showSuggestedWordModal.value = true;
 };
 
 // Image modal functions
