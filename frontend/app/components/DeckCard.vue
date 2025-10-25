@@ -23,12 +23,12 @@
              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
         />
         <!-- Fallback Initials/Icon -->
-         <div class="w-6 h-6 rounded-full mr-2 bg-gray-700 flex-shrink-0 items-center justify-center text-xs font-bold" 
+         <div v-if="deck.authorName!=currentUserName" class="w-6 h-6 rounded-full mr-2 bg-gray-700 flex-shrink-0 items-center justify-center text-xs font-bold" 
               :style="{ display: (deck.nowAuthorImageUrl || deck.authorImageUrl) ? 'none' : 'flex' }">
               {{ getInitials(deck.nowAuthorName || deck.authorName) }}
          </div>
 
-        <span class="text-sm text-gray-300 truncate">{{ deck.nowAuthorName || deck.authorName }}</span>
+        <span v-if="deck.authorName!=currentUserName" class="text-sm text-gray-300 truncate">{{ deck.nowAuthorName || deck.authorName }}</span>
       </div>
     </div>
 

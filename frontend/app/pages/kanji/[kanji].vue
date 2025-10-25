@@ -662,7 +662,7 @@ function onNodeClick(node: GraphNode | null) {
 /* Container chính */
 .graph-page-container {
   width: 100%;
-  height: 120vh;
+  height: 160vh;
   display: flex;
   flex-direction: column;
   background-color: #0f172a;
