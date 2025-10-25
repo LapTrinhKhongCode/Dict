@@ -184,7 +184,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
         if (errorJson && errorJson.message) errorMessage = errorJson.message;
         else if (errorJson && errorJson.title) errorMessage = errorJson.title;
     } catch (e) {}
-    throw new Error(errorMessage || Yêu cầu thất bại: ${response.status});
+    throw new Error(errorMessage || `Yêu cầu thất bại: ${response.status}`);
   }
   if (response.status === 204) return {} as T; // Handle No Content
   const data = await response.json();
@@ -225,11 +225,11 @@ async function createDeck() {
 
   isSaving.value = true;
   try {
-    const response = await fetch(${BASE_URL}/api/decks, { // Added /api prefix
+    const response = await fetch(`${BASE_URL}/api/decks`, { // Added /api prefix
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            // 'Authorization': Bearer ${YOUR_AUTH_TOKEN} // Add auth if needed
+            // 'Authorization': `Bearer ${YOUR_AUTH_TOKEN}` // Add auth if needed
         },
         body: JSON.stringify(newDeck.value)
     });
@@ -242,7 +242,7 @@ async function createDeck() {
         emit('go-back');
     }
   } catch (err: any) {
-    alert(Lỗi tạo bộ thẻ: ${err.message});
+    alert(`Lỗi tạo bộ thẻ: ${err.message}`);
     console.error("createDeck Error:", err);
   } finally {
     isSaving.value = false;
@@ -326,3 +326,4 @@ function handleTab(event: KeyboardEvent) {
    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.4), 0 0 0 1px #0ea5e9;
 }
 </style>
+
