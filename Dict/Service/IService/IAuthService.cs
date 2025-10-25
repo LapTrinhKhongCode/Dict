@@ -12,5 +12,6 @@ namespace Dict.Service.IService
         // ✨ THÊM MỚI: Trả về LoginResponseDto (token) sau khi xác thực thành công
         Task<LoginResponseDto> VerifyEmailAsync(VerifyEmailDto verifyDto);
         Task<LoginResponseDto> LoginAsync(LoginRequestDto request);
+        Task LogoutAsync(int userId);
     }
 }
