@@ -138,7 +138,7 @@ const resettingCardId = ref<number | string | null>(null);
 const now = ref(new Date());
 let timer: ReturnType<typeof setInterval> | null = null;
 const config = useRuntimeConfig()
-const baseUrl = config.apiBaseUrl
+const baseUrl = config.public.apiBaseUrl
 
 const assumeDbIsUTC = true; // Nên là true nếu backend dùng UTC
 

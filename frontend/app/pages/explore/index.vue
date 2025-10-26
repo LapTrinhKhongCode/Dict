@@ -62,9 +62,9 @@ import SrsReviewPage from '~/components/FlashCardSet.vue';
 import QuizPage from '~/components/QuizPage.vue';
 import DeckEditor from '~/components/DeckEditor.vue';
 import DeckCreator from '~/components/DeckCreator.vue';
-const BASE_URL = 'https://localhost:7084'; // Ensure no trailing /api
 const config = useRuntimeConfig()
-const BASE_URL = config.apiBaseUrl
+const BASE_URL = config.public.apiBaseUrl
+
 
 import { useJwt } from '~/composables/useJwt';
 

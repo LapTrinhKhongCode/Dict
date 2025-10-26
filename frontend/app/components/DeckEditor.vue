@@ -120,7 +120,9 @@ const props = defineProps<{ initialSet: DeckDetailDto }>();
 const emit = defineEmits(['go-to-list', 'deck-updated']);
 
 const config = useRuntimeConfig()
-const BASE_URL = config.apiBaseUrl
+
+const BASE_URL = config.public.apiBaseUrl
+
 
 
 // Use reactive for easier nested updates
@@ -243,7 +245,7 @@ async function addCard() {
   const cardDto: CardCreateDto = {
     frontText: newCardInput.value.frontText,
     backText: newCardInput.value.backText,
-    tags: newCardInput.value.tags || null // Ensure null if empty
+    // tags: newCardInput.value.tags || null // Ensure null if empty
   };
 
   if (!cardDto.frontText?.trim() || !cardDto.backText?.trim()) {

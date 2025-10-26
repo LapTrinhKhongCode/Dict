@@ -145,7 +145,8 @@ const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
 const emit = defineEmits(['go-back', 'deck-created']);
 
 const config = useRuntimeConfig()
-const BASE_URL = config.apiBaseUrl
+const BASE_URL = config.public.apiBaseUrl
+
 
 
 const newDeck = ref<DeckCreateDto>({
