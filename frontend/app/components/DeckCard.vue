@@ -51,6 +51,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { DeckSummaryDto } from '~/types';
+import { useJwt } from '~/composables/useJwt';
+
+const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
 
 const props = defineProps<{
   deck: DeckSummaryDto;
@@ -59,6 +62,7 @@ const props = defineProps<{
   currentUserName: string;
 }>();
 
+console.log(props.deck.authorImageUrl)
 const emit = defineEmits(['select-set', 'save-deck']);
 
 const isSaving = ref(false);
@@ -79,4 +83,5 @@ function getInitials(name: string | null | undefined): string {
     if (parts.length === 1) return parts[0].substring(0, 1).toUpperCase();
     return (parts[0].substring(0, 1) + parts[parts.length - 1].substring(0, 1)).toUpperCase();
 }
+
 </script>

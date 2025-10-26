@@ -138,6 +138,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import type { DeckCreateDto, CardCreateDto } from '~/types';
+import { useJwt } from '~/composables/useJwt';
+
+const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
 
 const emit = defineEmits(['go-back', 'deck-created']);
 
@@ -229,7 +232,7 @@ async function createDeck() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            // 'Authorization': `Bearer ${YOUR_AUTH_TOKEN}` // Add auth if needed
+            'Authorization': `Bearer ${jwt.value}` // Add auth if needed
         },
         body: JSON.stringify(newDeck.value)
     });

@@ -62,15 +62,16 @@ import SrsReviewPage from '~/components/FlashCardSet.vue';
 import QuizPage from '~/components/QuizPage.vue';
 import DeckEditor from '~/components/DeckEditor.vue';
 import DeckCreator from '~/components/DeckCreator.vue';
-
 const BASE_URL = 'https://localhost:7084'; // Ensure no trailing /api
+import { useJwt } from '~/composables/useJwt';
 
+const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
 type View = 'home' | 'list' | 'review' | 'edit-deck' | 'create-deck'; // Simplified views for now
 type LearningMode = 'srs' | 'classic' | 'quiz';
 
 // --- User State (Replace with actual auth logic) ---
 const currentUserId = ref(1); 
-const currentUserName = ref("Anh"); // <-- Replace with actual username
+const currentUserName = ref(username); // <-- Replace with actual username
 // --------------------------------------------------
 
 const currentView = ref<View>('home');
@@ -105,7 +106,13 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // --- Data Fetching ---
 async function fetchDeckDetail(id: number): Promise<DeckDetailDto | null> {
     try {
-        const response = await fetch(`${BASE_URL}/api/decks/${id}`, { cache: 'no-store' });
+     const response = await fetch(`${BASE_URL}/api/decks/${id}`, {
+  cache: 'no-store',
+  headers: {
+    'Authorization': `Bearer ${jwt.value}`
+  }
+});
+
         // Assuming the API returns ResponseDTO<DeckDetailDto>
         return await handleResponse<DeckDetailDto>(response);
     } catch (error) {
