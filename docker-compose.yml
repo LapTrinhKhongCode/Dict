@@ -10,7 +10,7 @@ services:
       - ASPNETCORE_URLS=http://+:8080;https://+:8081
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
       - ASPNETCORE_Kestrel__Certificates__Default__Password=25102004
-      - CorsOrigins=http://localhost:3000
+      - CorsOrigins=http://${PI_IP}:3000
     volumes:
       - ./Dict/aspnetapp.pfx:/https/aspnetapp.pfx:ro
     restart: unless-stopped
@@ -21,6 +21,8 @@ services:
       dockerfile: ./frontend/Dockerfile
     ports:
       - "3000:3000"
+    environment:
+      - NUXT_PUBLIC_API_BASE_URL=${API_URL_CHO_FE}
     depends_on:
       - backend
     restart: unless-stopped
