@@ -44,7 +44,9 @@ const currentIndex = ref(0);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 
-const BASE_URL = 'https://localhost:7084/api';
+const config = useRuntimeConfig()
+const BASE_URL = config.apiBaseUrl
+
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -62,7 +64,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 onMounted(async () => {
   try {
     // ✨ SỬA: Cập nhật route API
-    const response = await fetch(`${BASE_URL}/review/GetQueue/${props.deckId}`);
+    const response = await fetch(`${BASE_URL}/api/review/GetQueue/${props.deckId}`);
     reviewQueue.value = await handleResponse<CardDto[]>(response);
     if (reviewQueue.value.length > 1) {
       shuffleQueue();

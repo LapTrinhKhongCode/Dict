@@ -361,6 +361,7 @@ const currentImages = ref<string[]>([]);
 const currentWord = ref("");
 const fullImageUrl = ref("");
 const fullImageIndex = ref(0);
+const config = useRuntimeConfig();
 
 // --- NEW: Watcher for searchWord to trigger autocomplete ---
 watch(searchWord, (newValue) => {
@@ -400,7 +401,7 @@ watch(searchWord, (newValue) => {
       const convertedWord = toKana(trimmed);
 
       // Call the autocomplete API
-      const res = await fetch(`https://localhost:7084/api/Search/autocomplete/${encodeURIComponent(convertedWord)}`);
+      const res = await fetch(`${config.public.apiBaseUrl}/api/Search/autocomplete/${encodeURIComponent(convertedWord)}`);
       if (!res.ok) throw new Error('Autocomplete fetch failed');
 
       const data = await res.json();
@@ -502,7 +503,7 @@ const fetchWord = async (word: string) => {
 
     if (isSingleKanji(word)) {
       // Use kanji API for single kanji
-      apiUrl = `https://localhost:7084/api/Kanji/GetKanjiJson/${encodeURIComponent(word)}`;
+      apiUrl = `${config.public.apiBaseUrl}/api/Kanji/GetKanjiJson/${encodeURIComponent(word)}`;
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error("Failed to fetch kanji");
       response = await res.json();
@@ -527,7 +528,7 @@ const fetchWord = async (word: string) => {
       const dictionaryForm = getDictionaryForm(word);
 
       // Use word API for regular words
-      apiUrl = `https://localhost:7084/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
+      apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error("Failed to fetch word");
       response = await res.json();

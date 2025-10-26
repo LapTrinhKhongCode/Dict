@@ -126,6 +126,7 @@ const result = ref<any | null>(null);
 const conjugationResult = ref<any | null>(null);
 const loading = ref(false);
 const error = ref("");
+const config = useRuntimeConfig();
 
 // --- Duplicated Helper Functions (needed for local fetch) ---
 const extractWordLeftOfSlash = (word: string): string => {
@@ -178,7 +179,7 @@ const fetchModalWord = async (word: string) => {
     
     const dictionaryForm = getDictionaryForm(word);
     
-    const apiUrl = `https://localhost:7084/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
+    const apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
     const res = await fetch(apiUrl);
     if (!res.ok) throw new Error("Failed to fetch word");
     const response = await res.json();

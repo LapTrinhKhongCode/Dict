@@ -33,6 +33,7 @@ const error = ref("");
 const conjugationResult = ref<any | null>(null);
 const searchedTerm = ref(searchWord.value);
 const hasSearched = ref(false); // <-- 1. ADD THIS STATE
+const config = useRuntimeConfig();
 
 // ... (helper functions isSingleKanji, extractWordLeftOfSlash, getDictionaryForm, checkConjugation are unchanged) ...
 const isSingleKanji = (text: string): boolean => {
@@ -91,7 +92,7 @@ const fetchWord = async (word: string) => {
 
     if (isSingleKanji(word)) {
       // Use kanji API
-      apiUrl = `https://localhost:7084/api/Kanji/GetKanjiJson/${encodeURIComponent(
+      apiUrl = `${config.public.apiBaseUrl}/api/Kanji/GetKanjiJson/${encodeURIComponent(
         word
       )}`;
       const res = await fetch(apiUrl);
@@ -120,7 +121,7 @@ const fetchWord = async (word: string) => {
         conjugationResult.value = conjugation;
       }
       const dictionaryForm = getDictionaryForm(word);
-      apiUrl = `https://localhost:7084/api/Word/GetWordJson/${encodeURIComponent(
+      apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(
         dictionaryForm
       )}`;
       const res = await fetch(apiUrl);

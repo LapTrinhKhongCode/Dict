@@ -137,7 +137,9 @@ const resettingCardId = ref<number | string | null>(null);
 
 const now = ref(new Date());
 let timer: ReturnType<typeof setInterval> | null = null;
-const BASE_URL = 'https://localhost:7084'; // Chỉ base URL
+const config = useRuntimeConfig()
+const baseUrl = config.public.apiBaseUrl
+
 const assumeDbIsUTC = true; // Nên là true nếu backend dùng UTC
 
 // --- Helper functions (giữ nguyên) ---
@@ -267,7 +269,7 @@ async function handleConfirmReset() {
   closeModal();
   resettingCardId.value = key;
   try {
-    const response = await fetch(`${BASE_URL}/api/review/cards/${key}/reset`, { // Thêm /api
+    const response = await fetch(`${baseUrl}/api/review/cards/${key}/reset`, { // Thêm /api
       method: 'POST',
            headers: { 'Authorization': `Bearer ${jwt.value}` } 
     });

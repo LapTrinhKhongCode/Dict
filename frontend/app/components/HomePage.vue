@@ -92,7 +92,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits(['select-set', 'go-to-create-deck', 'go-to-my-decks', 'go-to-explore']);
 
-const BASE_URL = 'https://localhost:7084'; // Base URL only
+const config = useRuntimeConfig()
+const BASE_URL = config.public.apiBaseUrl
 
 const myDecks = ref<DeckSummaryDto[]>([]);
 const exploreDecks = ref<DeckSummaryDto[]>([]);
