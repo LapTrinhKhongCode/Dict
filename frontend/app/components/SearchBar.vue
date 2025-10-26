@@ -77,6 +77,8 @@
     },
   });
   const emit = defineEmits(["update:modelValue", "search"]);
+
+  const config = useRuntimeConfig();
   
   // --- Internal State ---
   // This internal ref tracks the input's value.
@@ -130,7 +132,7 @@
       try {
         const convertedWord = toKana(trimmed);
         const res = await fetch(
-          `https://localhost:7084/api/Search/autocomplete/${encodeURIComponent(
+          `${config.public.apiBaseUrl}/api/Search/autocomplete/${encodeURIComponent(
             convertedWord
           )}`
         );
