@@ -88,81 +88,139 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import Papa from "papaparse";
 
-const kanjiList = ref([]);
+import { ref, computed, onMounted, watch } from "vue";
+
+// import Papa from "papaparse"; // <-- Không cần nữa
+
+import { useRouter } from "vue-router"; // <-- Thêm import này
+
+import { kanjiList, loadKanjiData } from "../../src/services/kanjiStore"; // <-- IMPORT KHO
+
+
+
+// const kanjiList = ref([]); // <-- Dùng kanjiList từ kho
+
 const itemsPerPage = ref(30);
+
 const currentPage = ref(1);
 
+
+
 const wordTypes = ["Từ vựng", "Ngữ pháp", "Hán tự"];
+
 const levels = ["N5", "N4", "N3", "N2", "N1"];
 
+
+
 const selectedType = ref("Hán tự");
+
 const selectedLevel = ref("N5");
+
 const router = useRouter();
+
 const isSelectedMeaning = ref(true)
 
+
+
 onMounted(async () => {
-  const response = await fetch("/kanji.csv");
-  const csvText = await response.text();
 
-  const result = Papa.parse(csvText, {
-    header: true,
-    skipEmptyLines: true,
-  });
+  // --- SỬA Ở ĐÂY ---
 
-  kanjiList.value = result.data.map((row) => {
-    const firstMeaning = row.Meaning.split(",")[0].trim();
+  // Chỉ cần gọi hàm load, nó sẽ tự biết chỉ load 1 lần
 
-    return {
-      id: row.Id,
-      char: row.Character,
-      jlpt: row.JlptLevel,
-      mean: firstMeaning,
-      strokes: row.StrokeCount,
-      freq: row.Freq,
-    };
-  });
+  await loadKanjiData();
+
+  // --- XÓA TOÀN BỘ LOGIC FETCH VÀ PAPA.PARSE CŨ ---
+
 });
+
+
 
 // --- FILTERED DATA THEO LEVEL ---
+
 const filteredList = computed(() => {
+
+  // Dùng kanjiList từ kho
+
   return kanjiList.value.filter((k) => k.jlpt === selectedLevel.value);
+
 });
+
+
 
 // --- PAGINATION ---
+
+// ... (Toàn bộ computed: totalPages, paginatedList, pageNumbers giữ nguyên) ...
+
 const totalPages = computed(() =>
+
   Math.ceil(filteredList.value.length / itemsPerPage.value)
+
 );
 
+
+
 const paginatedList = computed(() => {
+
   const start = (currentPage.value - 1) * itemsPerPage.value;
+
   return filteredList.value.slice(start, start + itemsPerPage.value);
+
 });
+
+
 
 const pageNumbers = computed(() => {
+
   const pages = [];
+
   const start = Math.max(1, currentPage.value - 1);
+
   const end = Math.min(totalPages.value, start + 2);
 
+
+
   for (let i = start; i <= end; i++) {
+
     pages.push(i);
+
   }
+
   return pages;
+
 });
+
+
+
+
 
 function goToPage(page) {
+
   if (page >= 1 && page <= totalPages.value) {
+
     currentPage.value = page;
+
   }
+
 }
 
+
+
+// Hàm này đã ĐÚNG, không cần sửa
+
 const goToKanji = (kanji) => {
+
   router.push(`/kanji/${kanji}`);
+
 };
 
+
+
 watch(selectedLevel, () => {
+
   currentPage.value = 1;
+
 });
+
 </script>

@@ -2,12 +2,13 @@
 using Dict.DTO;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Dict.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    // [Authorize] // Bật dòng này khi bạn đã có hệ thống đăng nhập
+     [Authorize] // Bật dòng này khi bạn đã có hệ thống đăng nhập
     public class ReviewController : ControllerBase
     {
         private readonly IReviewService _reviewService;
@@ -61,7 +62,17 @@ namespace Dict.Controllers
             }
             return Ok(_response);
         }
-        private int GetUserId() => 1;
+        private int GetUserId()
+        {
+            var userIdClaim = User.FindFirst("userId");
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
+                // mặc dù [Authorize] thường sẽ chặn các request này trước.
+                throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
+            }
+            return userId;
+        }
         [HttpPost]
         [Route("Cards/{cardId}/Reset")]
         public async Task<IActionResult> ResetCardProgress(int cardId)

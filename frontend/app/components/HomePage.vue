@@ -12,16 +12,16 @@
           </h2>
           <button @click="emit('go-to-my-decks')" class="text-sm text-sky-400 hover:text-sky-300">Xem thêm</button>
         </div>
-        <div class="flex flex-row">
-          <button @click="emit('go-to-create-deck')" class="bg-sky-600 hover:bg-sky-700 rounded-lg p-5 flex flex-col items-center justify-center h-48 text-center transition-colors mr-6 pr-5 w-70">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-            <span class="text-xl font-bold">Tạo sổ tay mới</span>
+        <div class="">
+          <button @click="emit('go-to-create-deck')" class="bg-sky-600 hover:bg-sky-700 rounded-lg p-5 flex flex-col items-center justify-center h-10 text-center transition-colors mr-6 pr-5 mb-5 w-10">
+            <!-- <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg> -->
+            <span class="text-xl font-bold">+</span>
           </button>
         <div v-if="isLoadingMy" class="text-center text-gray-400 py-10">Đang tải sổ tay...</div>
         <div v-else-if="errorMy" class="text-center text-red-400 p-4 bg-red-900/50 rounded-lg">{{ errorMy }}</div>
         <div v-else-if="myDecks.length === 0" class="text-center text-gray-500 py-10">Bạn chưa có sổ tay nào.</div>
         
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" >
           <DeckCard
             v-for="deck in myDecks.slice(0, 7)" 
             :key="`my-${deck.id}`"
@@ -82,6 +82,9 @@
 import { ref, onMounted } from 'vue';
 import type { DeckSummaryDto } from '~/types';
 import DeckCard from './DeckCard.vue';
+import { useJwt } from '~/composables/useJwt';
+
+const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
 
 const props = defineProps<{ 
   currentUserId: number, 
@@ -124,17 +127,19 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 const filteredExploreDecks = computed(() => {
   // Lọc ra những deck có authorName khác với tên người dùng hiện tại
+  
   return exploreDecks.value.filter(deck => deck.authorName !== props.currentUserName);
 });
 
 async function fetchMyDecks() {
+  console.log(props.currentUserName)
   isLoadingMy.value = true;
   errorMy.value = null;
   try {
     // Assuming GET /api/decks/my-decks requires authentication
-    const response = await fetch(`${BASE_URL}/api/decks/my-decks`, {
+    const response = await fetch(`${BASE_URL}/api/Decks/my-decks`, {
       cache: 'no-store',
-      // headers: { 'Authorization': `Bearer ${YOUR_AUTH_TOKEN}` } 
+      headers: { 'Authorization': `Bearer ${jwt.value}` } 
     });
     // Assuming API returns ResponseDTO<List<DeckSummaryDto>>
     myDecks.value = await handleResponse<DeckSummaryDto[]>(response);
@@ -178,7 +183,7 @@ async function saveDeck(deckId: number) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            // 'Authorization': `Bearer ${YOUR_AUTH_TOKEN}` 
+            'Authorization': `Bearer ${jwt.value}` 
         },
     });
     // API returns ResponseDTO<DeckSummaryDto> of the SAVED deck

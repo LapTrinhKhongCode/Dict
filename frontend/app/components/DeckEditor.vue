@@ -92,6 +92,9 @@ import ConfirmationModal from './ConfirmationModal.vue';
 
 const props = defineProps<{ initialSet: DeckDetailDto }>();
 const emit = defineEmits(['go-to-list', 'deck-updated']);
+import { useJwt } from '~/composables/useJwt';
+
+const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
 
 const BASE_URL = 'https://localhost:7084/api';
 
@@ -146,11 +149,11 @@ async function saveDeckInfo() {
     description: editableSet.value.description,
     isPublic: editableSet.value.isPublic
   };
-  
+
   try {
     const response = await fetch(`${BASE_URL}/decks/${deckId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' /* ...Auth header... */ },
+     headers: { 'Authorization': `Bearer ${jwt.value}` } ,
       body: JSON.stringify(deckDto)
     });
     await handleResponse(response);
@@ -178,7 +181,7 @@ async function addCard() {
   try {
     const response = await fetch(`${BASE_URL}/decks/${deckId}/cards`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' /* ...Auth header... */ },
+        headers: { 'Authorization': `Bearer ${jwt.value}` } ,
       body: JSON.stringify(cardDto)
     });
     const newCardsData = await handleResponse(response) as { result: CardDto[] }; 
@@ -207,7 +210,7 @@ async function updateCard(card: CardDto) {
   try {
     const response = await fetch(`${BASE_URL}/cards/${cardId}`, { 
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' /* ...Auth header... */ },
+         headers: { 'Authorization': `Bearer ${jwt.value}` } ,
       // Gửi đi DTO đã được map đúng tên trường
       body: JSON.stringify(cardUpdateDto) 
     });
@@ -225,7 +228,7 @@ async function deleteCard(cardId: number) {
   try {
     const response = await fetch(`${BASE_URL}/cards/${cardId}`, {
       method: 'DELETE',
-      headers: { /* ...Auth header... */ }
+     headers: { 'Authorization': `Bearer ${jwt.value}` } 
     });
     await handleResponse(response);
     editableSet.value.cards = editableSet.value.cards.filter(c => c.id !== cardId);
@@ -253,7 +256,7 @@ async function handleConfirmDeleteDeck() {
   try {
     const response = await fetch(`${BASE_URL}/decks/${deckId}`, {
       method: 'DELETE',
-      headers: { /* ...Auth header... */ }
+       headers: { 'Authorization': `Bearer ${jwt.value}` } 
     });
     await handleResponse(response);
     alert('Đã xóa Deck thành công.');

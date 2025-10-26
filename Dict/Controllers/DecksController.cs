@@ -9,7 +9,7 @@ namespace Dict.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize] // Bảo vệ toàn bộ controller
+    [Authorize] // Bảo vệ toàn bộ controller
     public class DecksController : ControllerBase
     {
         private readonly IDeckService _deckService;
@@ -26,16 +26,15 @@ namespace Dict.Controllers
         // SỬA LẠI: Lấy UserId động từ JWT token bằng ClaimTypes.NameIdentifier
         private int GetUserId()
     {
-        //var userIdClaim = User.FindFirst("userId");
-        //if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
-        //{
-        //    // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
-        //    // mặc dù [Authorize] thường sẽ chặn các request này trước.
-        //    throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
-        //}
-            return 3;
-        //return userId;
-    }
+            var userIdClaim = User.FindFirst("userId");
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
+                // mặc dù [Authorize] thường sẽ chặn các request này trước.
+                throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
+            }
+            return userId;
+        }
 
         #region Deck Read Endpoints
 

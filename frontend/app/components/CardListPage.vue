@@ -80,6 +80,9 @@
 import { ref, computed, watch, onUnmounted } from 'vue';
 import type { DeckDetailDto, CardDto } from '~/types';
 import ConfirmationModal from './ConfirmationModal.vue'; // Import modal
+import { useJwt } from '~/composables/useJwt';
+
+const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
 
 // ✅ SỬA: Thêm currentUserName vào props
 const props = defineProps<{
@@ -266,7 +269,7 @@ async function handleConfirmReset() {
   try {
     const response = await fetch(`${BASE_URL}/api/review/cards/${key}/reset`, { // Thêm /api
       method: 'POST',
-      // headers: { 'Authorization': `Bearer ${YOUR_TOKEN}` } 
+           headers: { 'Authorization': `Bearer ${jwt.value}` } 
     });
     await handleResponse(response);
     emit('card-updated'); // Thông báo cho App.vue để refresh
