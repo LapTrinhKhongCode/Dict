@@ -45,7 +45,7 @@ async function handleAuth() {
         ? JSON.stringify({ username: username.value, password: password.value })
         : JSON.stringify({ username: username.value, email: email.value, password: password.value })
     }
-    const url = mode.value === 'login' ? apiUrl('/Auth/login') : apiUrl('/Auth/register')
+    const url = mode.value === 'login' ? apiUrl('api/Auth/login') : apiUrl('api/Auth/register')
     response = await fetch(url, fetchOptions)
     const data = await response.json()
 

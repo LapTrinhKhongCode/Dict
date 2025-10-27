@@ -99,6 +99,8 @@ const canvasRef = ref(null); // Ref tới element <canvas>
 const ctx = ref(null);       // Context 2D của canvas
 const isDrawing = ref(false);
 
+const config = useRuntimeConfig();
+
 // --- (HÀM CŨ: XỬ LÝ CHỌN FILE) ---
 function handleFileChange(event) {
   file.value = event.target.files[0];
@@ -125,7 +127,7 @@ async function startOCR() {
     return;
   }
   try {
-    const response = await fetch('https://localhost:7084/api/Infer/stream', {
+    const response = await fetch(`${config.public.apiBaseUrl}/api/Infer/stream`, {
       method: 'POST',
       body: formData,
       headers: { 'Authorization': `Bearer ${token}` }
@@ -285,7 +287,7 @@ async function handleHandwritingPrediction() {
 
   try {
     // 2. Gọi C# endpoint MỚI
-    const response = await fetch('https://localhost:7084/api/infer/predict', {
+    const response = await fetch(`${config.public.apiBaseUrl}/api/infer/predict`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
