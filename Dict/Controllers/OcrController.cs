@@ -29,6 +29,7 @@ public class InferController : ControllerBase
     private readonly ILogger<InferController> _logger;
     private readonly IOcrProcessingService _ocrProcessingService; 
     private readonly ResponseDTO _response;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     // Định nghĩa form nhận file
     public class UploadForm
@@ -40,9 +41,11 @@ public class InferController : ControllerBase
     // Constructor được rút gọn
     public InferController(
         ILogger<InferController> logger,
-        IOcrProcessingService ocrProcessingService)
+        IOcrProcessingService ocrProcessingService,
+        IHttpClientFactory httpClientFactory)
         
     {
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
         _ocrProcessingService = ocrProcessingService;
         _response = new ResponseDTO();
@@ -60,6 +63,75 @@ public class InferController : ControllerBase
         }
         return userId;
     }
+
+    [HttpPost("stream")]
+    // Nhận file từ form, giống hệt [FromForm] IFormFile
+    public async Task StreamOcr(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            HttpContext.Response.StatusCode = 400; // BadRequest
+            await HttpContext.Response.WriteAsync("No file uploaded.");
+            return;
+        }
+
+        try
+        {
+            // 1. Dùng IHttpClientFactory (cách làm đúng trong dự án DI)
+            using var httpClient = _httpClientFactory.CreateClient();
+
+            // 2. Tạo form-data để gửi file (giữ nguyên logic)
+            using var formData = new MultipartFormDataContent();
+            var fileStreamContent = new StreamContent(file.OpenReadStream());
+            fileStreamContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            formData.Add(fileStreamContent, "file", file.FileName);
+
+            // 3. Tạo request POST đến Python (giữ nguyên logic)
+            var pythonRequest = new HttpRequestMessage(
+                HttpMethod.Post,
+                "http://127.0.0.1:8000/ocr-stream"
+            );
+            pythonRequest.Content = formData;
+
+            // 4. Gửi request và chỉ đọc HEADER (giữ nguyên logic)
+            using var pythonResponse = await httpClient.SendAsync(
+                pythonRequest,
+                HttpCompletionOption.ResponseHeadersRead, // Chìa khóa stream
+                HttpContext.RequestAborted // Ngắt nếu client ngắt
+            );
+
+            // 5. Cài đặt Header cho Vue (giữ nguyên logic)
+            HttpContext.Response.ContentType = "text/event-stream";
+            HttpContext.Response.StatusCode = (int)pythonResponse.StatusCode;
+
+            if (!pythonResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning($"Python API error: {pythonResponse.StatusCode}");
+                // Không cần làm gì thêm, Vue sẽ nhận được code lỗi
+                return;
+            }
+
+            // 6. Lấy stream từ Python (giữ nguyên logic)
+            using var pythonStream = await pythonResponse.Content.ReadAsStreamAsync();
+
+            // 7. Bơm stream từ Python về Vue (giữ nguyên logic)
+            await pythonStream.CopyToAsync(HttpContext.Response.Body, HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi khi stream OCR");
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.StatusCode = 500;
+                await HttpContext.Response.WriteAsync($"Lỗi server C#: {ex.Message}");
+            }
+        }
+    }
+
+
+
+
+
 
     [HttpGet("health")]
     [AllowAnonymous] // Cho phép kiểm tra health mà không cần đăng nhập
