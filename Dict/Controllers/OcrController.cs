@@ -1,25 +1,26 @@
-﻿using System;
-using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Dict.Data;
+﻿using Dict.Data;
 using Dict.DTO;
 using Dict.Models;
 using Dict.Service.IService;
-using System.Text;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -37,7 +38,11 @@ public class InferController : ControllerBase
         [FromForm(Name = "image")]
         public IFormFile image { get; set; }
     }
-
+    public class PredictionRequestDto
+    {
+        [JsonPropertyName("matrix")]
+        public List<List<int>> Matrix { get; set; }
+    }
     // Constructor được rút gọn
     public InferController(
         ILogger<InferController> logger,
@@ -130,7 +135,54 @@ public class InferController : ControllerBase
 
 
 
+    [HttpPost("predict")]
+    public async Task<IActionResult> PredictHandwriting([FromBody] PredictionRequestDto request)
+    {
+        // Kiểm tra dữ liệu đầu vào (đơn giản)
+        if (request == null || request.Matrix == null || request.Matrix.Count != 64)
+        {
+            return BadRequest("Input matrix must be 64x64.");
+        }
 
+        _logger.LogInformation("Nhận được request /predict");
+
+        try
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+
+            // URL đến endpoint MỚI của Python
+            var pythonUrl = "http://127.0.0.1:8000/predict";
+
+            // Gửi request.
+            // Đây là request-response JSON bình thường, KHÔNG stream.
+            // Dùng PostAsJsonAsync để tự động serialize 'request' thành JSON
+            using var response = await httpClient.PostAsJsonAsync(
+                pythonUrl,
+                request, // Gửi thẳng DTO (C# sẽ tự convert sang JSON)
+                HttpContext.RequestAborted
+            );
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // Nếu Python lỗi, trả lỗi đó về cho Vue
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Python /predict API error: {StatusCode} - {Body}", response.StatusCode, errorBody);
+                return StatusCode((int)response.StatusCode, errorBody);
+            }
+
+            // Đọc kết quả (JSON) từ Python
+            var predictionResult = await response.Content.ReadFromJsonAsync<object>();
+
+            _logger.LogInformation("/predict thành công");
+            // Trả kết quả (JSON) về cho Vue
+            return Ok(predictionResult);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi nghiêm trọng khi gọi /predict");
+            return StatusCode(500, $"Lỗi server C#: {ex.Message}");
+        }
+    }
 
 
     [HttpGet("health")]
