@@ -108,7 +108,7 @@ namespace Dict.Service
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 Role = "USER",
-                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/default_avatar_2ed7dd9d-82f6-46bf-b9ea-486b3a3c1b0a.jpg"
+                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/106449882_p0.png"
             };
 
             // BƯỚC 5: Lưu vào DB

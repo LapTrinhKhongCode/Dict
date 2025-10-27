@@ -11,14 +11,13 @@
         </div>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <button v-if="jwt!" @click="emit('start-review', 'srs')" :disabled="dueCardCount === 0" class="learn-button bg-sky-500 hover:bg-sky-600 disabled:bg-gray-600">
+          <button v-if="isOwner" @click="emit('start-review', 'srs')" :disabled="dueCardCount === 0" class="learn-button bg-sky-500 hover:bg-sky-600 disabled:bg-gray-600">
             FlashCard ({{ dueCardCount }})
           </button>
-          <button v-if="jwt!" @click="emit('start-review', 'quiz')" class="learn-button bg-emerald-500 hover:bg-emerald-600">
+          <button v-if="isOwner" @click="emit('start-review', 'quiz')" class="learn-button bg-emerald-500 hover:bg-emerald-600">
             Học trắc nghiệm
           </button>
 
-          <!-- Nút Chỉnh sửa (hiển thị nếu isOwner là true) -->
           <button
             v-if="isOwner"
             @click="emit('go-to-edit')"
@@ -37,18 +36,17 @@
         <div
           v-for="(card, idx) in set.cards"
           :key="getCardKey(card) ?? idx"
-          class="bg-gray-800 rounded-lg p-4 flex flex-col justify-between h-40 relative group" 
+          class="bg-gray-800 rounded-lg p-4 flex flex-col justify-between h-40 relative group"
         >
           <div>
             <div class="text-4xl font-semibold mb-2">{{ card.charBig }}</div>
             <p class="text-gray-300 truncate">{{ card.meaning }}</p>
           </div>
-          <div class="flex justify-between items-center mt-auto"> <!-- Use mt-auto to push to bottom -->
+          <div class="flex justify-between items-center mt-auto">
             <div class="text-xs text-sky-500">
               Lần ôn tới: {{ getCountdownString(card, idx) }}
             </div>
 
-            <!-- Nút Reset (hiển thị nếu isOwner là true) -->
             <button
               v-if="isOwner"
               @click.stop="promptResetCard(card)"
@@ -64,7 +62,6 @@
       </div>
     </div>
 
-    <!-- Confirmation Modal for Reset -->
     <ConfirmationModal
       :is-open="isModalOpen"
       title="Xác nhận đặt lại"
@@ -77,213 +74,179 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue';
-import type { DeckDetailDto, CardDto } from '~/types';
-import ConfirmationModal from './ConfirmationModal.vue'; // Import modal
-import { useJwt } from '~/composables/useJwt';
+import { ref, computed, watch, onUnmounted } from 'vue'
+import type { DeckDetailDto, CardDto } from '~/types'
+import ConfirmationModal from './ConfirmationModal.vue'
+import { useJwt } from '~/composables/useJwt'
 
-const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
+const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt()
 
-// ✅ SỬA: Thêm currentUserName vào props
 const props = defineProps<{
   set: DeckDetailDto | null,
-  currentUserId: number, // Vẫn giữ lại IDเผื่อ dùng
-  currentUserName: string // Tên người dùng đang đăng nhập
-}>();
+  currentUserId: number,
+  currentUserName: string
+}>()
 
-// ✅ SỬA: Thêm emit 'go-to-edit'
 const emit = defineEmits<{
   (e: 'go-home'): void,
-  (e: 'start-review', mode: 'srs' | 'quiz'): void, // Bỏ 'classic'
-  (e: 'card-updated'): void, // Giữ lại cho reset
+  (e: 'start-review', mode: 'srs' | 'quiz'): void,
+  (e: 'card-updated'): void,
   (e: 'go-to-edit'): void
-}>();
+}>()
 
-// ✅ SỬA: Logic isOwner so sánh tên (YÊU CẦU BACKEND CUNG CẤP authorName)
 const isOwner = computed(() => {
-  if (!props.set || !props.currentUserName) {
-      console.warn('isOwner check: Missing set data or currentUserName');
-      return false;
-  }
-  // --- QUAN TRỌNG ---
-  // Dòng này SẼ KHÔNG HOẠT ĐỘNG ĐÚNG nếu DeckDetailDto từ backend
-  // không có trường 'authorName'. Nó hiện chỉ có 'userId'.
-  // Bạn cần cập nhật backend để thêm 'authorName' vào DeckDetailDto.
-  // @ts-ignore // Tạm thời bỏ qua lỗi TS vì biết DTO đang thiếu trường
-  const authorNameFromDto = props.set.authorName; 
-  // ------------------
+  if (!props.set || !props.currentUserName) return false
+  // @ts-ignore
+  const authorNameFromDto = props.set.authorName
+  if (authorNameFromDto === undefined) return props.set.userId === props.currentUserId
+  return authorNameFromDto === props.currentUserName
+})
 
-  // if (authorNameFromDto === undefined) {
-  //     console.warn("isOwner check: DeckDetailDto is missing 'authorName' field. Falling back to ID check.");
-  //     // Fallback: Check using userId if authorName is missing
-  //      return props.set.userId === props.currentUserId;
-  // }
-  
-  // So sánh tên (sau khi backend đã cung cấp)
-  const isMatch = authorNameFromDto === props.currentUserName;
-  console.log(`isOwner check (name): DTO Author='${authorNameFromDto}', Current User='${props.currentUserName}', Match=${isMatch}`);
-  return isMatch;
-});
-
-// --- State cho modal và reset (đã thêm lại) ---
-const isModalOpen = ref(false);
-const cardToReset = ref<CardDto | null>(null);
+const isModalOpen = ref(false)
+const cardToReset = ref<CardDto | null>(null)
 const modalMessage = computed(() => {
-  if (!cardToReset.value) return '';
-  return `Bạn có chắc muốn đặt lại tiến độ cho thẻ "${cardToReset.value.meaning}" không?`;
-});
-const resettingCardId = ref<number | string | null>(null);
-// ------------------------------------------------
+  if (!cardToReset.value) return ''
+  return `Bạn có chắc muốn đặt lại tiến độ cho thẻ "${cardToReset.value.meaning}" không?`
+})
+const resettingCardId = ref<number | string | null>(null)
 
-const now = ref(new Date());
-let timer: ReturnType<typeof setInterval> | null = null;
+const now = ref(new Date())
+let timer: ReturnType<typeof setInterval> | null = null
 const config = useRuntimeConfig()
 const baseUrl = config.public.apiBaseUrl
 
-const assumeDbIsUTC = true; // Nên là true nếu backend dùng UTC
-
-// --- Helper functions (giữ nguyên) ---
 function getCardKey(card: any): number | null {
-  if (typeof card?.id === 'number') return card.id;
-  return null; // Đơn giản hóa
+  if (typeof card?.id === 'number') return card.id
+  return null
 }
 function getNextReviewRaw(card: any): string | undefined {
-  return card?.nextReviewAt; // Chỉ cần kiểm tra trường chuẩn
+  return card?.nextReviewAt
 }
 function parseDbDate(dateString?: string | null): Date | null {
-  if (!dateString) return null;
-  const s = dateString.toString().trim();
-  if (!s || s.startsWith('0001-01-01')) return null;
+  if (!dateString) return null
+  const s = dateString.toString().trim()
+  if (!s || s.startsWith('0001-01-01')) return null
 
-  // Cố gắng parse trực tiếp, sau đó thêm 'Z' nếu cần
-  let dNative = new Date(s);
-  if (!isNaN(dNative.getTime())) return dNative;
+  let d = new Date(s)
+  if (!isNaN(d.getTime())) return d
 
-  // Thử thêm 'Z' nếu không có thông tin timezone
-  if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-')) {
-      dNative = new Date(s.replace(' ', 'T') + 'Z');
-      if (!isNaN(dNative.getTime())) return dNative;
-  }
-  
-  // Logic cũ dự phòng (ít khả năng cần)
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?Z?$/);
-  if (!m) return null;
-  const [, Y, M, D, hh, mm, ss, frac = "0"] = m;
-  const yearNum = Number(Y);
-  if (yearNum <= 1) return null;
-  const milli = Number((frac + "000").slice(0, 3));
-  // Luôn giả định là UTC nếu parse theo regex thành công
-  return new Date(Date.UTC(Number(Y), Number(M) - 1, Number(D), Number(hh), Number(mm), Number(ss), milli));
+  let s2 = s.replace(' ', 'T')
+  if (!/[zZ]|[+\-]\d{2}(:?\d{2})?$/.test(s2)) s2 = s2 + 'Z'
+  d = new Date(s2)
+  if (!isNaN(d.getTime())) return d
+
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?Z?$/)
+  if (!m) return null
+  const [, Y, M, D, hh, mm, ss, frac = '0'] = m
+  const yearNum = Number(Y)
+  if (yearNum <= 1) return null
+  const milli = Number((frac + '000').slice(0, 3))
+  return new Date(Date.UTC(Number(Y), Number(M) - 1, Number(D), Number(hh), Number(mm), Number(ss), milli))
 }
-function pad(n: number) { return n.toString().padStart(2, '0'); }
+function pad(n: number) { return n.toString().padStart(2, '0') }
 function formatDuration(secondsTotal: number): string {
-  const sAbs = Math.abs(secondsTotal);
+  const sAbs = Math.abs(secondsTotal)
+  const days = Math.floor(sAbs / 86400)
+  let s = sAbs % 86400
+  const hours = Math.floor(s / 3600)
+  s = s % 3600
+  const minutes = Math.floor(s / 60)
+  const seconds = Math.round(s % 60)
 
-  const days = Math.floor(sAbs / 86400);
-  let s = sAbs % 86400; // 🟢 Khai báo biến s ở đây
-
-  const hours = Math.floor(s / 3600);
-  s = s % 3600;
-
-  const minutes = Math.floor(s / 60);
-  const seconds = Math.round(s % 60); // Làm tròn giây
-  if (days >= 2) return `trong ${days} ngày`;
-  if (days === 1) return `trong 1 ngày`;
-  if (hours > 0) return `trong ${hours} giờ`;
-  if (minutes > 0) return `trong ${minutes} phút`;
-  return `trong ${seconds} giây`; // Hiển thị giây nếu < 1 phút
+  if (days >= 2) return `trong ${days} ngày`
+  if (days === 1) return `trong 1 ngày`
+  if (hours > 0) return `trong ${hours} giờ ${minutes} phút`
+  if (minutes > 0) return `trong ${minutes} phút ${seconds} giây`
+  return `trong ${seconds} giây`
 }
 
-// --- Computed properties (giữ nguyên dueCardCount) ---
-const dueCardCount = computed(() => { /* ... giữ nguyên logic ... */
-  if (!props.set) return 0;
-  const n = now.value.getTime(); // So sánh mili giây cho chính xác
+const dueCardCount = computed(() => {
+  if (!props.set) return 0
+  const n = now.value.getTime()
   return props.set.cards.filter(card => {
-    const raw = getNextReviewRaw(card);
-    const dueDate = parseDbDate(raw);
-    if (!dueDate) return true; 
-    return dueDate.getTime() <= n;
-  }).length;
-});
+    const raw = getNextReviewRaw(card)
+    const dueDate = parseDbDate(raw)
+    if (!dueDate) return true
+    return dueDate.getTime() <= n
+  }).length
+})
 
-// --- Countdown logic (giữ nguyên) ---
-function getCountdownString(card: any, idx: number): string { /* ... giữ nguyên logic ... */ 
-  const raw = getNextReviewRaw(card);
-  const dueDate = parseDbDate(raw);
-  const n = now.value;
-  if (!dueDate) return 'Thẻ mới';
-  const diffSeconds = Math.floor((dueDate.getTime() - n.getTime()) / 1000);
-  if (diffSeconds <= 0) return 'Sẵn sàng ôn tập';
-  return formatDuration(diffSeconds);
+function getCountdownString(card: any, idx: number): string {
+  const raw = getNextReviewRaw(card)
+  const dueDate = parseDbDate(raw)
+  const n = now.value
+  if (!dueDate) return 'Thẻ mới'
+  const diffSeconds = Math.floor((dueDate.getTime() - n.getTime()) / 1000)
+  if (diffSeconds <= 0) return 'Sẵn sàng ôn tập'
+  return formatDuration(diffSeconds)
 }
-const setupRealtimeNow = () => { /* ... giữ nguyên logic ... */ 
-  if (timer) clearInterval(timer);
-  now.value = new Date();
-  timer = setInterval(() => { now.value = new Date(); }, 1000);
-};
 
-// --- Watchers and Lifecycle (giữ nguyên) ---
-watch(() => props.set, (newSet) => { /* ... giữ nguyên logic ... */ 
-  if (newSet && newSet.cards) { setupRealtimeNow(); } 
-  else { if (timer) { clearInterval(timer); timer = null; } }
-}, { immediate: true, deep: true });
-onUnmounted(() => { if (timer) clearInterval(timer); });
+const setupRealtimeNow = () => {
+  if (timer) clearInterval(timer)
+  now.value = new Date()
+  timer = setInterval(() => { now.value = new Date() }, 1000)
+}
 
-// --- API Interaction & Modal Handling (Đã thêm lại) ---
-async function handleResponse(response: Response) { 
+watch(() => props.set, (newSet) => {
+  if (newSet && newSet.cards) { setupRealtimeNow() }
+  else { if (timer) { clearInterval(timer); timer = null } }
+}, { immediate: true, deep: true })
+
+onUnmounted(() => { if (timer) clearInterval(timer) })
+
+async function handleResponse(response: Response) {
   if (!response.ok) {
-    const errorText = await response.text();
-    let errorMessage = errorText;
+    const errorText = await response.text()
+    let errorMessage = errorText
     try {
-        const errorJson = JSON.parse(errorText);
-        if (errorJson && errorJson.message) errorMessage = errorJson.message;
-        else if (errorJson && errorJson.title) errorMessage = errorJson.title;
+      const errorJson = JSON.parse(errorText)
+      if (errorJson && errorJson.message) errorMessage = errorJson.message
+      else if (errorJson && errorJson.title) errorMessage = errorJson.title
     } catch (e) {}
-    throw new Error(errorMessage || `Yêu cầu thất bại: ${response.status}`);
+    throw new Error(errorMessage || `Yêu cầu thất bại: ${response.status}`)
   }
-  if (response.status === 204) return {}; // Handle No Content
-  const data = await response.json();
+  if (response.status === 204) return {}
+  const data = await response.json()
   if (data.isSuccess === false) {
-    throw new Error(data.message || 'Lỗi từ API');
+    throw new Error(data.message || 'Lỗi từ API')
   }
-  return (data.result === undefined ? data : data.result);
+  return (data.result === undefined ? data : data.result)
 }
 
 function promptResetCard(card: CardDto) {
-  cardToReset.value = card;
-  isModalOpen.value = true;
+  cardToReset.value = card
+  isModalOpen.value = true
 }
 
 function closeModal() {
-  isModalOpen.value = false;
-  cardToReset.value = null;
+  isModalOpen.value = false
+  cardToReset.value = null
 }
 
 async function handleConfirmReset() {
-  if (!cardToReset.value || resettingCardId.value !== null) return;
-  const key = getCardKey(cardToReset.value); 
+  if (!cardToReset.value || resettingCardId.value !== null) return
+  const key = getCardKey(cardToReset.value)
   if (key === null) {
-    alert("Không thể tìm thấy ID của thẻ.");
-    return;
+    alert("Không thể tìm thấy ID của thẻ.")
+    return
   }
-  closeModal();
-  resettingCardId.value = key;
+  closeModal()
+  resettingCardId.value = key
   try {
-    const response = await fetch(`${baseUrl}/api/review/cards/${key}/reset`, { // Thêm /api
+    const response = await fetch(`${baseUrl}/api/review/cards/${key}/reset`, {
       method: 'POST',
-           headers: { 'Authorization': `Bearer ${jwt.value}` } 
-    });
-    await handleResponse(response);
-    emit('card-updated'); // Thông báo cho App.vue để refresh
-    alert('Đặt lại tiến độ thành công!');
+      headers: { 'Authorization': `Bearer ${jwt.value}` }
+    })
+    await handleResponse(response)
+    emit('card-updated')
+    alert('Đặt lại tiến độ thành công!')
   } catch (err: any) {
-    console.error("Lỗi khi reset thẻ:", err);
-    alert(`Thẻ đã sẵn sàng học`);
+    console.error("Lỗi khi reset thẻ:", err)
+    alert(`Lỗi khi đặt lại thẻ: ${err?.message ?? err}`)
   } finally {
-    resettingCardId.value = null;
+    resettingCardId.value = null
   }
 }
-
 </script>
 
 <style>
@@ -298,4 +261,3 @@ async function handleConfirmReset() {
   cursor: not-allowed;
 }
 </style>
-

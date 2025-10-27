@@ -13,19 +13,19 @@
     <!-- Author Info -->
     <div class="flex items-center justify-between mt-4">
       <div class="flex items-center overflow-hidden mr-2">
-        <img v-if="deck.nowAuthorImageUrl || deck.authorImageUrl" 
-             :src="deck.nowAuthorImageUrl || deck.authorImageUrl" 
+        <img v-if="deck.authorImageUrl||deck.avatar" 
+             :src="deck.authorImageUrl||deck.avatar" 
              alt="Avatar" 
              class="w-6 h-6 rounded-full mr-2 bg-gray-700 flex-shrink-0 object-cover"
              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
         />
         <!-- Fallback Initials/Icon -->
-         <div v-if="deck.authorName!=currentUserName" class="w-6 h-6 rounded-full mr-2 bg-gray-700 flex-shrink-0 items-center justify-center text-xs font-bold" 
+         <!-- <div v-if="deck.authorName!=currentUserName" class="w-6 h-6 rounded-full mr-2 bg-gray-700 flex-shrink-0 items-center justify-center text-xs font-bold" 
               :style="{ display: (deck.nowAuthorImageUrl || deck.authorImageUrl) ? 'none' : 'flex' }">
               {{ getInitials(deck.nowAuthorName || deck.authorName) }}
-         </div>
+         </div> -->
 
-       <span v-if="deck.authorName!=currentUserName" class="text-sm text-gray-300 truncate">{{ deck.nowAuthorName || deck.authorName }}</span>
+       <span v-if="deck.authorName!=currentUserName" class="text-sm text-gray-300 truncate">{{ deck.authorName || deck.authorUsername }}</span>
       </div>
     </div>
 

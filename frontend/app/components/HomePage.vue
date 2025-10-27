@@ -1,17 +1,15 @@
-<!-- components/HomePage.vue -->
 <template>
   <div class="min-h-screen text-white p-4 sm:p-8 relative">
 
-    <div v-if="showLoginNotice" class="fixed top-5 right-5 bg-blue-300 text-gray-900 py-2 px-4 rounded-lg shadow-lg z-50 animate-fade-in-out">
-        Đăng nhập để lưu bộ thẻ!
+    <div v-if="showLoginNotice" class="fixed top-5 right-5 bg-yellow-500 text-gray-900 py-2 px-4 rounded-lg shadow-lg z-50 animate-fade-in-out">
+        Vui lòng đăng nhập để lưu bộ thẻ!
     </div>
     <div v-if="showSaveSuccess" class="fixed bottom-5 right-5 bg-green-600 text-white py-2 px-4 rounded-lg shadow-lg animate-bounce z-50">
       Đã lưu vào Sổ tay!
     </div>
 
     <div class="max-w-7xl mx-auto">
-      <!-- Section: Sổ tay -->
-           <section v-if="jwt!" class="mb-12">
+      <section v-if="isAuthenticated" class="mb-12">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-3xl font-bold text-sky-400 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 16c1.255 0 2.443-.29 3.5-.804V4.804zM14.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 0114.5 16c1.255 0 2.443-.29 3.5.804v-10A7.968 7.968 0 0014.5 4z" /></svg>
@@ -19,30 +17,30 @@
           </h2>
           <button @click="emit('go-to-my-decks')" class="text-sm text-sky-400 hover:text-sky-300">Xem thêm</button>
         </div>
-        <div class="">
-          <button @click="emit('go-to-create-deck')" class="bg-sky-600 hover:bg-sky-700 rounded-lg p-5 flex flex-col items-center justify-center h-10 text-center transition-colors mr-6 pr-5 mb-5 w-10">
-            <!-- <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg> -->
-            <span class="text-xl font-bold">+</span>
+        <div class="flex flex-wrap flex-col">
+          <button @click="emit('go-to-create-deck')" class="bg-sky-600 hover:bg-sky-700 rounded-lg p-0 flex items-center justify-center h-10 w-10 text-center transition-colors mb-5 mr-6 shrink-0">
+            <span class="text-2xl font-bold leading-none">+</span>
           </button>
-        <div v-if="isLoadingMy" class="text-center text-gray-400 py-10">Đang tải sổ tay...</div>
-        <div v-else-if="errorMy" class="text-center text-red-400 p-4 bg-red-900/50 rounded-lg">{{ errorMy }}</div>
-        <div v-else-if="myDecks.length === 0" class="text-center text-gray-500 py-10">Bạn chưa có sổ tay nào.</div>
-        
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" >
-          <DeckCard
-            v-for="deck in myDecks.slice(0, 7)" 
-            :key="`my-${deck.id}`"
-            :deck="deck"
-            :current-user-id="currentUserId"
-            :current-user-name="currentUserName"
-            variant="my"
-            @select-set="emit('select-set', deck.id)"
-          />
-        </div>
+          <div class="flex-grow">
+            <div v-if="isLoadingMy" class="text-center text-gray-400 py-10">Đang tải sổ tay...</div>
+            <div v-else-if="errorMy" class="text-center text-red-400 p-4 bg-red-900/50 rounded-lg">{{ errorMy }}</div>
+            <div v-else-if="myDecksInternal.length === 0" class="text-center text-gray-500 py-10">Bạn chưa có sổ tay nào.</div>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <DeckCard
+                v-for="deck in myDecksInternal.slice(0, 7)"
+                :key="`my-${deck.id}`"
+                :deck="deck"
+                :current-user-id="currentUserId"
+                :current-user-name="currentUserName"
+                variant="my"
+                @select-set="emit('select-set', deck.id)"
+                @show-login-notice="displayLoginNotice"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      <!-- Section: Khám phá -->
       <section>
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-3xl font-bold text-emerald-400 flex items-center">
@@ -82,154 +80,113 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import type { DeckSummaryDto } from '~/types';
 import DeckCard from './DeckCard.vue';
-import { useJwt } from '~/composables/useJwt'; // Import composable
+import { useJwt } from '~/composables/useJwt';
 
-// Get auth status
 const { isAuthenticated, jwt } = useJwt();
 
 const props = defineProps<{
   currentUserId: number,
   currentUserName: string
 }>();
-const emit = defineEmits(['select-set', 'go-to-create-deck', 'go-to-my-decks', 'go-to-explore']);
+const emit = defineEmits([
+    'select-set',
+    'go-to-create-deck',
+    'go-to-my-decks',
+    'go-to-explore',
+    'show-login-notice',
+    'update:my-decks',
+    'update:explore-decks'
+]);
 
 const config = useRuntimeConfig()
-const BASE_URL = config.public.apiBaseUrl
+const BASE_URL = config.public.apiBaseUrl || 'https://localhost:7084';
 
-const myDecks = ref<DeckSummaryDto[]>([]);
-const exploreDecks = ref<DeckSummaryDto[]>([]);
+const myDecksInternal = ref<DeckSummaryDto[]>([]);
+const exploreDecksInternal = ref<DeckSummaryDto[]>([]);
 const isLoadingMy = ref(true);
 const isLoadingExplore = ref(true);
 const errorMy = ref<string | null>(null);
 const errorExplore = ref<string | null>(null);
 const searchTerm = ref('');
 const showSaveSuccess = ref(false);
-const showLoginNotice = ref(false); // State for login notice
+const showLoginNotice = ref(false);
 
 const filteredExploreDecks = computed(() => {
-  return exploreDecks.value.filter(deck => deck.authorName !== props.currentUserName);
+  return exploreDecksInternal.value.filter(deck => deck.authorName !== props.currentUserName);
 });
 
-// --- API Handling ---
 async function handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = errorText;
-        try {
-            const errorJson = JSON.parse(errorText);
-            if (errorJson && errorJson.message) errorMessage = errorJson.message;
-            else if (errorJson && errorJson.title) errorMessage = errorJson.title;
-        } catch (e) {}
+        try { const errorJson = JSON.parse(errorText); if (errorJson?.message) errorMessage = errorJson.message; else if (errorJson?.title) errorMessage = errorJson.title;} catch (e) {}
         throw new Error(errorMessage || `Yêu cầu thất bại: ${response.status}`);
     }
     if (response.status === 204) return {} as T;
-    const data = await response.json();
-    if (data.isSuccess === false) {
-        throw new Error(data.message || 'Lỗi từ API');
-    }
-    return (data.result === undefined ? data : data.result) as T;
+     try { const data = await response.json(); if (data.isSuccess === false) { throw new Error(data.message || 'Lỗi từ API'); } return (data.result === undefined ? data : data.result) as T; }
+     catch (e) { console.error("JSON Parse Error:", e); throw new Error("Invalid response from server."); }
 }
-// --------------------
 
 async function fetchMyDecks() {
-  // Only fetch if authenticated
-  if (!isAuthenticated.value) {
-      myDecks.value = [];
-      isLoadingMy.value = false;
-      return;
-  }
-  isLoadingMy.value = true;
-  errorMy.value = null;
+  if (!isAuthenticated.value) { myDecksInternal.value = []; isLoadingMy.value = false; emit('update:my-decks', []); return; } // Emit empty on logout
+  isLoadingMy.value = true; errorMy.value = null;
   try {
-    const response = await fetch(`${BASE_URL}/api/Decks/my-decks`, {
-      cache: 'no-store',
-      headers: { 'Authorization': `Bearer ${jwt.value}` }
-    });
-    myDecks.value = await handleResponse<DeckSummaryDto[]>(response);
-  } catch (err: any) {
-    errorMy.value = `Lỗi tải Sổ tay: ${err.message}`;
-    console.error("fetchMyDecks Error:", err);
-  } finally {
-    isLoadingMy.value = false;
-  }
+    const response = await fetch(`${BASE_URL}/api/Decks/my-decks`, { cache: 'no-store', headers: { 'Authorization': `Bearer ${jwt.value}` } });
+    const decks = await handleResponse<DeckSummaryDto[]>(response);
+    myDecksInternal.value = decks;
+    emit('update:my-decks', decks);
+  } catch (err: any) { errorMy.value = `Lỗi tải Sổ tay: ${err.message}`; console.error("fetchMyDecks Error:", err); myDecksInternal.value = []; emit('update:my-decks', []);} // Emit empty on error
+  finally { isLoadingMy.value = false; }
 }
 
 async function fetchExploreDecks(query: string = '') {
-  isLoadingExplore.value = true;
-  errorExplore.value = null;
+  isLoadingExplore.value = true; errorExplore.value = null;
   let url = `${BASE_URL}/api/decks/public`;
-  if (query.trim()) {
-      url = `${BASE_URL}/api/decks/search?name=${encodeURIComponent(query.trim())}`;
-  }
-
+  if (query.trim()) { url = `${BASE_URL}/api/decks/search?name=${encodeURIComponent(query.trim())}`; }
   try {
     const response = await fetch(url, { cache: 'no-store' });
-    exploreDecks.value = await handleResponse<DeckSummaryDto[]>(response);
-  } catch (err: any) {
-    errorExplore.value = `Lỗi tải Khám phá: ${err.message}`;
-    console.error("fetchExploreDecks Error:", err);
-    exploreDecks.value = [];
-  } finally {
-    isLoadingExplore.value = false;
-  }
+    const decks = await handleResponse<DeckSummaryDto[]>(response);
+    exploreDecksInternal.value = decks;
+    emit('update:explore-decks', decks);
+  } catch (err: any) { errorExplore.value = `Lỗi tải Khám phá: ${err.message}`; console.error("fetchExploreDecks Error:", err); exploreDecksInternal.value = []; emit('update:explore-decks', []);} // Emit empty on error
+  finally { isLoadingExplore.value = false; }
 }
 
-function searchDecks() {
-    fetchExploreDecks(searchTerm.value);
-}
+function searchDecks() { fetchExploreDecks(searchTerm.value); }
 
 async function saveDeck(deckId: number) {
-  // Authentication check happens in DeckCard, this function assumes user is logged in
   try {
-    const response = await fetch(`${BASE_URL}/api/decks/${deckId}/save`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${jwt.value}` // Send token
-        },
-    });
+    const response = await fetch(`${BASE_URL}/api/decks/${deckId}/save`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.value}` } });
     await handleResponse<DeckSummaryDto>(response);
-
-    showSaveSuccess.value = true;
-    setTimeout(() => { showSaveSuccess.value = false; }, 2500);
-
-    fetchMyDecks();
-  } catch (err: any) {
-      alert(`Lưu thất bại: ${err.message}`);
-      console.error("saveDeck Error:", err);
-  }
+    showSaveSuccess.value = true; setTimeout(() => { showSaveSuccess.value = false; }, 2500);
+    fetchMyDecks(); // Refresh "Sổ tay" list and emit update
+  } catch (err: any) { alert(`Lưu thất bại: ${err.message}`); console.error("saveDeck Error:", err); }
 }
 
-// Function to display login notice
 let noticeTimeout: ReturnType<typeof setTimeout> | null = null;
 function displayLoginNotice() {
     if (noticeTimeout) clearTimeout(noticeTimeout);
     showLoginNotice.value = true;
-    noticeTimeout = setTimeout(() => {
-        showLoginNotice.value = false;
-        noticeTimeout = null;
-         showLoginNotice.value = true
-    }, 3000); // Show for 3 seconds
-   
+    noticeTimeout = setTimeout(() => { showLoginNotice.value = false; noticeTimeout = null; }, 3000);
 }
 
+watch(isAuthenticated, (loggedIn) => {
+    // Refetch myDecks when login status changes
+    fetchMyDecks();
+}, { immediate: true }); // Use immediate: true if you want it to run on initial load too
+
+// No need to fetch explore decks on auth change unless required
 
 onMounted(() => {
-  fetchMyDecks();
-  fetchExploreDecks();
+  // fetchMyDecks() is called by the watcher now
+  fetchExploreDecks(); // Fetch explore decks on mount
 });
 </script>
 
 <style>
-@keyframes fadeInOut {
-  0%, 100% { opacity: 0; transform: translateY(-10px); }
-  10%, 90% { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-in-out {
-  animation: fadeInOut 3s ease-in-out forwards;
-}
+@keyframes fadeInOut { 0%, 100% { opacity: 0; transform: translateY(-10px); } 10%, 90% { opacity: 1; transform: translateY(0); } }
+.animate-fade-in-out { animation: fadeInOut 3s ease-in-out forwards; }
 </style>
-

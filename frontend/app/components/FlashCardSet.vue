@@ -35,6 +35,9 @@
 import { ref, computed, onMounted } from 'vue';
 import FlashCard from './FlashCard.vue';
 import type { CardDto, AnswerRequestDto } from '~/types/index';
+import { useJwt } from '~/composables/useJwt';
+
+const { jwt } = useJwt();
 
 const props = defineProps<{ deckId: number }>();
 const emit = defineEmits(['go-to-list']);
@@ -45,7 +48,7 @@ const isLoading = ref(true);
 const error = ref<string | null>(null);
 
 const config = useRuntimeConfig()
-const BASE_URL = config.apiBaseUrl
+const BASE_URL = config.public.apiBaseUrl
 
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -64,7 +67,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
 onMounted(async () => {
   try {
     // ✨ SỬA: Cập nhật route API
-    const response = await fetch(`${BASE_URL}/api/review/GetQueue/${props.deckId}`);
+    const response = await fetch(`${BASE_URL}/api/review/GetQueue/${props.deckId}`,
+       { cache: 'no-store', headers: { 'Authorization': `Bearer ${jwt.value}` } }
+    );
     reviewQueue.value = await handleResponse<CardDto[]>(response);
     if (reviewQueue.value.length > 1) {
       shuffleQueue();
@@ -109,9 +114,11 @@ async function onAnswer(difficulty: 'again' | 'hard' | 'good' | 'easy') {
 
   try {
     // ✨ SỬA: Cập nhật route API
-    const response = await fetch(`${BASE_URL}/review/PostAnswer`, {
+    const response = await fetch(`${BASE_URL}/api/review/PostAnswer`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' ,
+           'Authorization': `Bearer ${jwt.value}`
+        },
         body: JSON.stringify(answer)
     });
 

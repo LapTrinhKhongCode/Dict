@@ -1,3 +1,4 @@
+# text_detection_updated.py
 import os
 import importlib.util
 import sys
@@ -8,19 +9,23 @@ import re
 import base64
 import json
 
+# --- CẤU HÌNH (Sử dụng đường dẫn mới của bạn) ---
 TRAIN_PY_PATH = r"G:\GPT\OCR\SourceCode.py"
 CHECKPOINT_PATH = r"G:\GPT\OCR\checkpoints_seq\best_seq.pt"
 CRAFT_WEIGHTS = r"G:\GPT\CRAFT-pytorch\craft_mlt_25k.pth"
-OUTPUT_JSON = r"G:\GPT\OCR\checkpoints_seq\infer_results.json"
 CRAFT_PATH = r"G:\GPT\CRAFT-pytorch"
 CHARSET_PATH = os.path.join(os.path.dirname(TRAIN_PY_PATH), "charsett.txt")
 INFER_HEIGHT = 32
+
+# Cấu hình từ file 'trimmed_infer.py'
 TEXT_THRESHOLD = 0.5
 LINK_THRESHOLD = 0.4
 LOW_TEXT = 0.22
 MSER_DELTA = 4
 MSER_MIN_AREA = 7
 MSER_MAX_AREA = 1000
+DEBUG_INFER = os.environ.get("DEBUG_INFER", "0") == "1"
+# ---------------------------------------------------------------
 
 sys.path.insert(0, CRAFT_PATH)
 
@@ -54,23 +59,35 @@ def load_charset(path):
     with open(path, encoding='utf-8') as f:
         return [line.strip() for line in f if line.strip()]
 
-
+# --- checkpoint loader (PHIÊN BẢN CHUẨN TỪ trimmed_infer.py) ---
 def load_ckpt_into_model(model, ckpt_path, device):
+    if DEBUG_INFER: print("DEBUG: Loading checkpoint:", ckpt_path)
     ck = None
     try:
-        ck = torch.load(ckpt_path, map_location=device, weights_only=False)
-    except Exception:
+        ck = torch.load(ckpt_path, map_location=device, weights_only=True)
+        if DEBUG_INFER: print("DEBUG: Loaded checkpoint with weights_only=True")
+    except TypeError:
         try:
             ck = torch.load(ckpt_path, map_location=device)
-        except Exception:
-            try:
-                ck = torch.load(ckpt_path, map_location=device, weights_only=True)
-            except Exception as e:
-                raise RuntimeError(f"Failed to load checkpoint {ckpt_path}: {e}")
+            if DEBUG_INFER: print("DEBUG: Loaded checkpoint without weights_only arg")
+        except Exception as e:
+            if DEBUG_INFER: print("DEBUG: torch.load failed (no weights_only):", e)
+            raise
+    except Exception as e:
+        if DEBUG_INFER: print("DEBUG: weights_only=True failed:", e)
+        if DEBUG_INFER: print("DEBUG: Retrying with weights_only=False (UNSAFE - only if you trust file).")
+        try:
+            ck = torch.load(ckpt_path, map_location=device, weights_only=False)
+            if DEBUG_INFER: print("DEBUG: Loaded checkpoint with weights_only=False")
+        except Exception as e2:
+            if DEBUG_INFER: print("DEBUG: Failed to load checkpoint even with weights_only=False:", e2)
+            raise
+
     if isinstance(ck, dict):
         model_state = ck.get('model_state') or ck.get('state_dict') or ck
     else:
         model_state = ck
+
     new_state_dict = {}
     if isinstance(model_state, dict):
         for k, v in model_state.items():
@@ -80,10 +97,12 @@ def load_ckpt_into_model(model, ckpt_path, device):
                 new_state_dict[k] = v
     else:
         new_state_dict = model_state
+
     try:
         model.load_state_dict(new_state_dict, strict=False)
-    except Exception:
-        pass
+    except Exception as e:
+        if DEBUG_INFER: print("DEBUG: model.load_state_dict warning:", e)
+
     model.to(device)
     model.eval()
     return model
@@ -204,26 +223,35 @@ def save_heatmap(img_rgb, mat, path, normalize=True):
         heat_color = cv2.applyColorMap(heat_resized, cv2.COLORMAP_JET)
         overlay = cv2.addWeighted(cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR), 0.6, heat_color, 0.4, 0)
         cv2.imwrite(path, overlay)
-    except Exception:
-        pass
+    except Exception as e:
+        if DEBUG_INFER: print("DEBUG: save_heatmap failed:", e)
 
 
 def debug_print_detres(det_res):
     try:
+        if DEBUG_INFER: print("DEBUG: getDetBoxes return type:", type(det_res))
         if isinstance(det_res, (list, tuple)):
+            if DEBUG_INFER: print(" DEBUG: length:", len(det_res))
             for i, item in enumerate(det_res):
-                pass
-    except Exception:
-        pass
+                t = type(item)
+                try:
+                    l = len(item)
+                except Exception:
+                    l = "NA"
+                if DEBUG_INFER: print(f"  item[{i}] type={t} len={l}")
+    except Exception as e:
+        if DEBUG_INFER: print("DEBUG: debug_print_detres failed:", e)
 
-
-def get_text_boxes(image, craft_model, device, text_threshold=TEXT_THRESHOLD, link_threshold=LINK_THRESHOLD, low_text=LOW_TEXT, save_debug_dir=None):
-    if save_debug_dir is None:
-        save_debug_dir = None
-    if save_debug_dir:
+# --- get_text_boxes (PHIÊN BẢN CHUẨN TỪ trimmed_infer.py) ---
+def get_text_boxes(image, craft_model, device,
+                   text_threshold=TEXT_THRESHOLD, link_threshold=LINK_THRESHOLD, low_text=LOW_TEXT,
+                   save_debug_dir=None):
+    if DEBUG_INFER and save_debug_dir:
         os.makedirs(save_debug_dir, exist_ok=True)
 
-    image_resized, target_ratio, size_heatmap = imgproc.resize_aspect_ratio(image, 1280, interpolation=cv2.INTER_LINEAR, mag_ratio=1.5)
+    image_resized, target_ratio, size_heatmap = imgproc.resize_aspect_ratio(
+        image, 1280, interpolation=cv2.INTER_LINEAR, mag_ratio=1.5
+    )
     ratio_h = ratio_w = 1 / target_ratio
 
     x = imgproc.normalizeMeanVariance(image_resized)
@@ -236,12 +264,25 @@ def get_text_boxes(image, craft_model, device, text_threshold=TEXT_THRESHOLD, li
     score_text = y[0, :, :, 0].cpu().data.numpy()
     score_link = y[0, :, :, 1].cpu().data.numpy()
 
+    if DEBUG_INFER and save_debug_dir:
+        try:
+            save_heatmap(image_resized, score_text, os.path.join(save_debug_dir, "debug_score_text.png"))
+            save_heatmap(image_resized, score_link, os.path.join(save_debug_dir, "debug_score_link.png"))
+            np.save(os.path.join(save_debug_dir, "debug_score_text.npy"), score_text)
+            np.save(os.path.join(save_debug_dir, "debug_score_link.npy"), score_link)
+            print(f"DEBUG: Saved debug heatmaps to {save_debug_dir}")
+            print("DEBUG: score_text min/max:", float(score_text.min()), float(score_text.max()))
+            print("DEBUG: score_link min/max:", float(score_link.min()), float(score_link.max()))
+        except Exception as e:
+            print("DEBUG: Failed to save heatmaps:", e)
+
     try:
         det_res = craft_utils.getDetBoxes(score_text, score_link, text_threshold, link_threshold, low_text)
-    except Exception:
+    except Exception as e:
+        if DEBUG_INFER: print("DEBUG: getDetBoxes threw exception:", e)
         det_res = None
 
-    debug_print_detres(det_res)
+    if DEBUG_INFER: debug_print_detres(det_res)
 
     boxes = None
     polys = None
@@ -255,8 +296,10 @@ def get_text_boxes(image, craft_model, device, text_threshold=TEXT_THRESHOLD, li
         flat_polys = flatten_polys(boxes)
 
     if len(flat_polys) == 0:
+        if DEBUG_INFER: print("DEBUG: No valid polygons after cleaning. Trying MSER fallback.")
         gray_resized = cv2.cvtColor(image_resized, cv2.COLOR_RGB2GRAY)
         mser_polys = mser_fallback_regions(gray_resized)
+        if DEBUG_INFER: print("DEBUG: MSER produced", len(mser_polys), "regions")
         scaled = []
         for p in mser_polys:
             arr = np.array(p, dtype=np.float32)
@@ -265,7 +308,8 @@ def get_text_boxes(image, craft_model, device, text_threshold=TEXT_THRESHOLD, li
 
     try:
         boxes_out = craft_utils.adjustResultCoordinates([p.tolist() for p in flat_polys], ratio_w, ratio_h)
-    except Exception:
+    except Exception as e:
+        if DEBUG_INFER: print("DEBUG: adjustResultCoordinates threw exception:", e)
         boxes_out = []
         for arr in flat_polys:
             scaled = arr * np.array([ratio_w, ratio_h], dtype=np.float32)
@@ -278,8 +322,10 @@ def get_text_boxes(image, craft_model, device, text_threshold=TEXT_THRESHOLD, li
             if p_arr.ndim == 1 and p_arr.size % 2 == 0:
                 p_arr = p_arr.reshape(-1, 2)
             final_polys.append(p_arr)
-        except Exception:
-            pass
+        except Exception as e:
+            if DEBUG_INFER: print("DEBUG: Failed converting poly to array:", e)
+
+    if DEBUG_INFER: print(f"DEBUG: Detected {len(final_polys)} polygons after postprocessing.")
     return final_polys
 
 
@@ -294,10 +340,8 @@ def crop_text_region(image, poly):
     except Exception:
         return np.array([], dtype=image.dtype), (0, 0, 0, 0)
     h_img, w_img = image.shape[:2]
-    x = max(0, x)
-    y = max(0, y)
-    x2 = min(w_img, x + w)
-    y2 = min(h_img, y + h)
+    x = max(0, x); y = max(0, y)
+    x2 = min(w_img, x + w); y2 = min(h_img, y + h)
     if x2 <= x or y2 <= y:
         return np.array([], dtype=image.dtype), (x, y, 0, 0)
     cropped = image[y:y2, x:x2]
@@ -311,70 +355,256 @@ def imencode_to_dataurl(img_bgr):
     b64 = base64.b64encode(buf.tobytes()).decode('ascii')
     return f"data:image/png;base64,{b64}"
 
+# --- (THÊM MỚI) CÁC HÀM HELPER TỪ FILE CHUẨN ---
 
+KEEP_CHARS = r"[。、,.!?]"
+
+def clean_text(s: str, remove_chars=r"[^ぁ-んァ-ン一-龯0-9A-Za-z" + KEEP_CHARS + "]", collapse_spaces=True):
+    out = re.sub(remove_chars, "", s)
+    if collapse_spaces:
+        out = re.sub(r"\s+", " ", out).strip()
+    return out
+
+def is_kana_string(s, min_kana_ratio=0.7):
+    if not s:
+        return False
+    kana_count = 0
+    total = 0
+    for ch in s:
+        total += 1
+        code = ord(ch)
+        if (0x3040 <= code <= 0x309F) or (0x30A0 <= code <= 0x30FF) or (0x31F0 <= code <= 0x31FF):
+            kana_count += 1
+    return (kana_count / total) >= min_kana_ratio
+
+def recognize_small_region(crop_gray, rec_model, device, charset, blank_idx, height_for_small=20):
+    if crop_gray is None or crop_gray.size == 0:
+        return ''
+    if crop_gray.ndim == 3:
+        crop_gray = cv2.cvtColor(crop_gray, cv2.COLOR_BGR2GRAY)
+    try:
+        txt = infer_image_array(crop_gray, rec_model, device, charset, blank_idx, height=height_for_small)
+        return clean_text(txt)
+    except Exception:
+        return ''
+
+def enhanced_furigana_detection(polys, image_gray, image_rgb=None,
+                                rec_model=None, charset=None, blank_idx=None, device=None,
+                                debug=False):
+    if not polys:
+        return [], []
+    items = []
+    for p in polys:
+        p = np.array(p, dtype=np.int32)
+        x, y, w, h = cv2.boundingRect(p)
+        items.append({
+            "poly": p, "x": x, "y": y, "w": w, "h": h,
+            "center_y": y + h / 2,
+            "area": w * h,
+            "aspect_ratio": w / max(h, 1)
+        })
+    heights = np.array([it["h"] for it in items])
+    areas = np.array([it["area"] for it in items])
+    med_h = np.median(heights)
+    furigana_candidates = []
+    normal_text = []
+    for i, it in enumerate(items):
+        furigana_score = 0
+        size_ratio = it["h"] / med_h if med_h > 0 else 1.0
+        if size_ratio < 0.6:
+            furigana_score += 3
+        elif size_ratio < 0.8:
+            furigana_score += 0
+        relative_position = it["y"] / image_gray.shape[0]
+        if relative_position < 0.3:
+            furigana_score += 2
+        if it["aspect_ratio"] > 2.0:
+            furigana_score += 1
+        area_ratio = it["area"] / np.median(areas) if areas.size else 1.0
+        if area_ratio < 0.4:
+            furigana_score += 2
+        if rec_model is not None and furigana_score >= 3:
+            x0, y0 = max(0, it["x"] - 2), max(0, it["y"] - 2)
+            x1, y1 = it["x"] + it["w"] + 2, it["y"] + it["h"] + 2
+            crop = image_gray[y0:y1, x0:x1]
+            if crop.size > 0:
+                txt = recognize_small_region(crop, rec_model, device, charset, blank_idx, height_for_small=max(18, it["h"]))
+                if txt and is_kana_string(txt, min_kana_ratio=0.8):
+                    furigana_score += 2
+        if furigana_score >= 6:
+            furigana_candidates.append(it)
+        else:
+            normal_text.append(it)
+    if debug or DEBUG_INFER:
+        print(f"DEBUG: Furigana detection - Total: {len(items)}, Furigana: {len(furigana_candidates)}, Normal: {len(normal_text)}")
+    return [it["poly"] for it in normal_text], [it["poly"] for it in furigana_candidates]
+
+def merge_lines_by_adjacency(polys, y_tolerance_factor=0.5, x_gap_tolerance_factor=4, debug=False):
+    if len(polys) < 2:
+        return polys
+    items = []
+    for i, p in enumerate(polys):
+        p_arr = np.array(p, dtype=np.int32)
+        x, y, w, h = cv2.boundingRect(p_arr)
+        items.append({
+            'id': i, 'poly': p_arr, 'x': x, 'y': y, 'w': w, 'h': h,
+            'cx': x + w / 2, 'cy': y + h / 2
+        })
+    heights = [it['h'] for it in items if it['h'] > 0]
+    med_h = np.median(heights) if heights else 10
+    adj = [[] for _ in range(len(items))]
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a = items[i]; b = items[j]
+            is_vertically_aligned = abs(a['cy'] - b['cy']) < med_h * y_tolerance_factor
+            if is_vertically_aligned:
+                gap = max(0, b['x'] - (a['x'] + a['w']), a['x'] - (b['x'] + b['w']))
+                max_gap = med_h * x_gap_tolerance_factor
+                if gap < max_gap:
+                    adj[i].append(j); adj[j].append(i)
+    visited = [False] * len(items)
+    groups = []
+    for i in range(len(items)):
+        if not visited[i]:
+            component = []
+            q = [i]; visited[i] = True
+            while q:
+                u = q.pop(0)
+                component.append(items[u])
+                for v in adj[u]:
+                    if not visited[v]:
+                        visited[v] = True; q.append(v)
+            groups.append(component)
+    merged_polys = []
+    for group in groups:
+        if not group: continue
+        all_points = np.vstack([it['poly'] for it in group])
+        x_min, y_min = np.min(all_points, axis=0)
+        x_max, y_max = np.max(all_points, axis=0)
+        merged_poly = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]], dtype=np.int32)
+        merged_polys.append(merged_poly)
+    if debug or DEBUG_INFER:
+        print(f"DEBUG: Merged {len(polys)} boxes into {len(merged_polys)} final lines using adjacency.")
+    return merged_polys
+
+# --- (CẬP NHẬT) HÀM PROCESS_IMAGE VỚI LOGIC CHUẨN ---
 def process_image(image_bgr, craft_model, rec_model, device, charset, blank_idx, infer_height=INFER_HEIGHT):
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     image_gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-    text_boxes = get_text_boxes(image_rgb, craft_model, device, text_threshold=TEXT_THRESHOLD, link_threshold=LINK_THRESHOLD, low_text=LOW_TEXT)
+    
+    # 1. Phát hiện text boxes
+    text_boxes = get_text_boxes(image_rgb, craft_model, device, 
+                                text_threshold=TEXT_THRESHOLD, 
+                                link_threshold=LINK_THRESHOLD, 
+                                low_text=LOW_TEXT)
+    
+    # 2. Fallback hoặc Gộp dòng (LOGIC CHUẨN)
     if text_boxes is None or len(text_boxes) == 0:
+        if DEBUG_INFER: print("DEBUG: No text boxes detected by CRAFT. Using direct line detection.")
         text_boxes = detect_lines_directly(image_gray)
     else:
-        text_boxes = merge_polygons_into_lines(text_boxes, image_gray, max_line_gap=20, min_x_overlap_ratio=0.02, split_min_line_height=12, split_min_blank_height=6, debug=False)
+        if DEBUG_INFER: print("DEBUG: Using adjacency-based line merging...")
+        text_boxes = merge_lines_by_adjacency(text_boxes, x_gap_tolerance_factor=0.5, debug=DEBUG_INFER)
+
+    # 3. Phát hiện Furigana (LOGIC CHUẨN)
+    normal_polys, furigana_polys = enhanced_furigana_detection(
+        text_boxes, image_gray, image_rgb,
+        rec_model=rec_model, charset=charset, blank_idx=blank_idx, device=device,
+        debug=DEBUG_INFER
+    )
+    
+    # 4. Mask furigana khỏi ảnh xám (LOGIC CHUẨN)
+    masked_gray = image_gray.copy()
+    for poly in furigana_polys:
+        x, y, w, h = cv2.boundingRect(np.array(poly, dtype=np.int32))
+        cv2.rectangle(masked_gray, (x, y), (x + w, y + h), 255, -1) # Tô trắng
+        
+    # 5. Nhận dạng văn bản chính (từ ảnh đã mask)
     results = []
-    sorted_boxes = sorted(text_boxes, key=lambda p: cv2.boundingRect(p)[1])
+    sorted_boxes = sorted(normal_polys, key=lambda p: cv2.boundingRect(p)[1])
     for idx, poly in enumerate(sorted_boxes, start=1):
-        cropped_region, bbox = crop_text_region(image_gray, poly)
+        cropped_region, bbox = crop_text_region(masked_gray, poly)
         if cropped_region.size == 0:
             continue
         pred_text = infer_image_array(cropped_region, rec_model, device, charset, blank_idx, height=infer_height)
-        pred_text = re.sub(r'\s+', ' ', pred_text).strip()
+        pred_text = clean_text(re.sub(r'\s+', ' ', pred_text).strip())
         box_list = poly.tolist() if isinstance(poly, np.ndarray) else list(map(list, poly))
-        results.append({"line_number": idx, "text": pred_text, "bbox": bbox, "box_points": box_list})
-    return results
+        results.append({"bbox": bbox, "text": pred_text, "box_points": box_list, "type": "main_text"})
+        
+    # 6. Nhận dạng Furigana (từ ảnh gốc)
+    furigana_results = []
+    for poly in furigana_polys:
+        x, y, w, h = cv2.boundingRect(np.array(poly, dtype=np.int32))
+        x0, y0 = max(0, x - 1), max(0, y - 1)
+        x1, y1 = min(image_gray.shape[1], x + w + 1), min(image_gray.shape[0], y + h + 1)
+        crop = image_gray[y0:y1, x0:x1]
+        
+        fur_text = recognize_small_region(crop, rec_model, device, charset, blank_idx, height_for_small=max(18, h))
+        if fur_text and is_kana_string(fur_text, min_kana_ratio=0.7):
+            furigana_results.append({"text": fur_text, "position": (x, y, w, h), "type": "furigana"})
+            
+    return {"main_text": results, "furigana": furigana_results, "image_info": {"width": image_gray.shape[1], "height": image_gray.shape[0]}}
 
 
-# Sửa lại hàm process_image_stream
+# --- (CẬP NHẬT) HÀM PROCESS_IMAGE_STREAM VỚI LOGIC CHUẨN + GIỮ TRẠNG THÁI YIELD ---
 
 def process_image_stream(image_bgr, craft_model, rec_model, device, charset, blank_idx, infer_height=INFER_HEIGHT):
     
-    # --- BƯỚC 1: YIELD TRẠNG THÁI "BẮT ĐẦU" NGAY LẬP TỨC ---
+    # --- BƯỚC 1: YIELD TRẠNG THÁI "BẮT ĐẦU" ---
     yield {"status": "processing", "message": "Bắt đầu xử lý ảnh..."}
 
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     image_gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 
     # --- BƯỚC 2: YIELD TRẠNG THÁI "ĐANG PHÁT HIỆN" ---
-    # Dòng này sẽ được gửi đi ngay, trước khi chạy hàm 5 giây
     yield {"status": "detecting", "message": "Đang phát hiện văn bản (CRAFT)..."}
 
-    # Đây là hàm nặng 5 giây (Blocking call)
+    # Đây là hàm nặng (Blocking call) - SỬ DỤNG LOGIC CHUẨN
     text_boxes = get_text_boxes(image_rgb, craft_model, device, text_threshold=TEXT_THRESHOLD, link_threshold=LINK_THRESHOLD, low_text=LOW_TEXT)
     
+    # SỬ DỤNG LOGIC GỘP DÒNG CHUẨN
     if text_boxes is None or len(text_boxes) == 0:
+        if DEBUG_INFER: print("DEBUG: No text boxes detected by CRAFT. Using direct line detection.")
         text_boxes = detect_lines_directly(image_gray)
     else:
-        text_boxes = merge_polygons_into_lines(text_boxes, image_gray, max_line_gap=20, min_x_overlap_ratio=0.02, split_min_line_height=12, split_min_blank_height=6, debug=False)
+        if DEBUG_INFER: print("DEBUG: Using adjacency-based line merging...")
+        text_boxes = merge_lines_by_adjacency(text_boxes, x_gap_tolerance_factor=0.5, debug=DEBUG_INFER)
 
-    sorted_boxes = sorted(text_boxes, key=lambda p: cv2.boundingRect(p)[1])
+    # SỬ DỤNG LOGIC PHÁT HIỆN FURIGANA CHUẨN
+    normal_polys, furigana_polys = enhanced_furigana_detection(
+        text_boxes, image_gray, image_rgb,
+        rec_model=rec_model, charset=charset, blank_idx=blank_idx, device=device,
+        debug=DEBUG_INFER
+    )
+
+    sorted_boxes = sorted(normal_polys, key=lambda p: cv2.boundingRect(p)[1])
     base_vis = cv2.cvtColor(image_rgb.copy(), cv2.COLOR_RGB2BGR)
 
     # --- BƯỚC 3: YIELD TRẠNG THÁI "BẮT ĐẦU NHẬN DIỆN" ---
-    # Báo cho client biết đã phát hiện xong, chuẩn bị stream kết quả
     total_lines = len(sorted_boxes)
-    yield {"status": "recognizing", "message": f"Phát hiện xong. Bắt đầu nhận diện {total_lines} dòng...", "total_lines": total_lines}
+    furigana_count = len(furigana_polys)
+    yield {"status": "recognizing", 
+           "message": f"Phát hiện xong. Bắt đầu nhận diện {total_lines} dòng chính và {furigana_count} furigana...", 
+           "total_lines": total_lines,
+           "furigana_count": furigana_count}
 
-    # --- BƯỚC 4: STREAM KẾT QUẢ (Như code cũ) ---
+    # SỬ DỤNG LOGIC MASKING CHUẨN
+    masked_gray = image_gray.copy()
+    for poly in furigana_polys:
+        x, y, w, h = cv2.boundingRect(np.array(poly, dtype=np.int32))
+        cv2.rectangle(masked_gray, (x, y), (x + w, y + h), 255, -1) # Tô trắng
+
+    # --- BƯỚC 4A: STREAM KẾT QUẢ VĂN BẢN CHÍNH ---
     for idx, poly in enumerate(sorted_boxes, start=1):
-        cropped_region_gray, bbox = crop_text_region(image_gray, poly)
+        # Nhận dạng từ ảnh đã mask
+        cropped_region_gray, bbox = crop_text_region(masked_gray, poly)
         if cropped_region_gray.size == 0:
             continue
         
-        # Hàm này cũng là 1 blocking call nhỏ (nhưng nhanh vì crop nhỏ)
         pred_text = infer_image_array(cropped_region_gray, rec_model, device, charset, blank_idx, height=infer_height)
-        pred_text = re.sub(r'\s+', ' ', pred_text).strip()
+        pred_text = clean_text(re.sub(r'\s+', ' ', pred_text).strip())
         
         # ... (Tất cả code để lấy bbox_py, box_points_py, dataurl...) ...
-        # (Tôi giữ nguyên logic của bạn)
         x, y, w, h = bbox
         crop_color = image_bgr[y:y + h, x:x + w] if (h > 0 and w > 0) else np.zeros((10, 10, 3), dtype=np.uint8)
         vis_copy = base_vis.copy()
@@ -391,7 +621,8 @@ def process_image_stream(image_bgr, craft_model, rec_model, device, charset, bla
             bbox_py = (0, 0, 0, 0)
         try:
             box_points_py = []
-            for p in (poly.tolist() if isinstance(poly, np.ndarray) else list(map(list, poly))):
+            box_list = poly.tolist() if isinstance(poly, np.ndarray) else list(map(list, poly))
+            for p in box_list:
                 if isinstance(p, (list, tuple)):
                     box_points_py.append([int(x) for x in p])
                 elif isinstance(p, np.ndarray):
@@ -401,10 +632,10 @@ def process_image_stream(image_bgr, craft_model, rec_model, device, charset, bla
         except Exception:
             box_points_py = []
 
-
-        # Đây là YIELD KẾT QUẢ
+        # Đây là YIELD KẾT QUẢ (main_text)
         yield {
-            "status": "result",  # Thêm trạng thái "result"
+            "status": "result", 
+            "type": "main_text", # Thêm type
             "line_number": int(idx),
             "text": str(pred_text),
             "bbox": bbox_py,
@@ -413,8 +644,41 @@ def process_image_stream(image_bgr, craft_model, rec_model, device, charset, bla
             "vis_dataurl": vis_dataurl
         }
 
+    # --- BƯỚC 4B: STREAM KẾT QUẢ FURIGANA ---
+    for idx, poly in enumerate(furigana_polys, start=1):
+        x, y, w, h = cv2.boundingRect(np.array(poly, dtype=np.int32))
+        
+        # Nhận dạng từ ảnh gray gốc
+        x0, y0 = max(0, x - 1), max(0, y - 1)
+        x1, y1 = min(image_gray.shape[1], x + w + 1), min(image_gray.shape[0], y + h + 1)
+        crop = image_gray[y0:y1, x0:x1]
+        
+        fur_text = recognize_small_region(crop, rec_model, device, charset, blank_idx, height_for_small=max(18, h))
+        
+        if fur_text and is_kana_string(fur_text, min_kana_ratio=0.7):
+            try:
+                crop_color = image_bgr[y:y + h, x:x + w] if (h > 0 and w > 0) else np.zeros((10, 10, 3), dtype=np.uint8)
+                vis_copy = base_vis.copy()
+                cv2.rectangle(vis_copy, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                crop_dataurl = imencode_to_dataurl(crop_color)
+                vis_dataurl = imencode_to_dataurl(vis_copy)
+                
+                # Đây là YIELD KẾT QUẢ (furigana)
+                yield {
+                    "status": "result", 
+                    "type": "furigana", # Thêm type
+                    "line_number": int(idx),
+                    "text": str(fur_text),
+                    "bbox": (int(x), int(y), int(w), int(h)),
+                    "box_points": [[int(x), int(y)], [int(x + w), int(y)], [int(x + w), int(y + h)], [int(x), int(y + h)]],
+                    "crop_dataurl": crop_dataurl,
+                    "vis_dataurl": vis_dataurl
+                }
+            except Exception:
+                continue
+
     # --- BƯỚC 5: YIELD TRẠNG THÁI "HOÀN THÀNH" ---
-    yield {"status": "done", "message": "Hoàn thành.", "total_lines": total_lines}
+    yield {"status": "done", "message": "Hoàn thành.", "total_lines": total_lines, "furigana_count": furigana_count}
 
 
 def detect_lines_directly(image_gray):
@@ -442,134 +706,8 @@ def detect_lines_directly(image_gray):
     return lines
 
 
-def split_by_newline_projection(cropped_region, min_line_height=15, min_blank_height=8, blank_threshold_ratio=0.08, debug=False):
-    if len(cropped_region.shape) == 3:
-        gray = cv2.cvtColor(cropped_region, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = cropped_region
-    h, w = gray.shape
-    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 4)
-    kernel_x = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1, w // 15), 1))
-    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_x)
-    kernel_y = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 3))
-    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel_y)
-    projection = np.sum(binary, axis=1)
-    if np.max(projection) > 0:
-        projection_norm = projection / np.max(projection)
-    else:
-        projection_norm = projection
-    strong_blank_threshold = blank_threshold_ratio
-    weak_blank_threshold = blank_threshold_ratio * 0.5
-    text_regions = []
-    in_text = False
-    start_idx = 0
-    for i, val in enumerate(projection_norm):
-        if val > strong_blank_threshold and not in_text:
-            in_text = True
-            start_idx = i
-        elif val <= strong_blank_threshold and in_text:
-            gap_size = 0
-            j = i
-            while j < len(projection_norm) and projection_norm[j] <= weak_blank_threshold:
-                gap_size += 1
-                j += 1
-                if gap_size >= min_blank_height:
-                    break
-            if gap_size >= min_blank_height:
-                in_text = False
-                end_idx = i
-                height = end_idx - start_idx
-                if height >= min_line_height:
-                    text_regions.append((start_idx, end_idx))
-    if in_text and (h - start_idx) >= min_line_height:
-        text_regions.append((start_idx, h))
-    if not text_regions:
-        return []
-    merged_regions = [text_regions[0]]
-    for i in range(1, len(text_regions)):
-        prev_start, prev_end = merged_regions[-1]
-        curr_start, curr_end = text_regions[i]
-        gap = curr_start - prev_end
-        if gap < min_blank_height // 2:
-            merged_regions[-1] = (prev_start, curr_end)
-        else:
-            merged_regions.append((curr_start, curr_end))
-    lines = []
-    for start, end in merged_regions:
-        padding = max(1, int((end - start) * 0.02))
-        y_start = max(0, start - padding)
-        y_end = min(h, end + padding)
-        line_img = cropped_region[y_start:y_end, :]
-        lines.append((line_img, y_start, y_end))
-    return lines
+# --- (ĐÃ XÓA) các hàm split_by_newline_projection và merge_polygons_into_lines ---
 
-
-def merge_polygons_into_lines(polygons, image_gray, max_line_gap=15, min_x_overlap_ratio=0.01, split_min_line_height=12, split_min_blank_height=6, debug=False):
-    if len(polygons) <= 1:
-        return [np.array(p, dtype=np.int32) for p in polygons]
-    items = []
-    for p in polygons:
-        x, y, w, h = cv2.boundingRect(p)
-        cx, cy = x + w / 2, y + h / 2
-        items.append({"poly": p, "x": x, "y": y, "w": w, "h": h, "cx": cx, "cy": cy})
-    items = sorted(items, key=lambda it: it["cy"])
-    lines, current_group = [], [items[0]]
-    for it in items[1:]:
-        last = current_group[-1]
-        vertical_gap = it["y"] - (last["y"] + last["h"])
-        x1, x1r = last["x"], last["x"] + last["w"]
-        x2, x2r = it["x"], it["x"] + it["w"]
-        overlap = max(0, min(x1r, x2r) - max(x1, x2))
-        min_w = min(last["w"], it["w"])
-        x_overlap_ratio = overlap / (min_w + 1e-6)
-        horizontal_gap = max(0, x2 - x1r, x1 - x2r)
-        if (vertical_gap <= max_line_gap and (x_overlap_ratio >= min_x_overlap_ratio or horizontal_gap < last["w"] * 0.5)):
-            current_group.append(it)
-        else:
-            lines.append(current_group)
-            current_group = [it]
-    if current_group:
-        lines.append(current_group)
-    merged_lines = []
-    for group in lines:
-        if not merged_lines:
-            merged_lines.append(group)
-            continue
-        last_group = merged_lines[-1]
-        last_bottom = max(g["y"] + g["h"] for g in last_group)
-        current_top = min(g["y"] for g in group)
-        vertical_gap = current_top - last_bottom
-        avg_h = np.mean([g["h"] for g in last_group])
-        if vertical_gap < avg_h * 0.3 and vertical_gap < max_line_gap:
-            merged_lines[-1].extend(group)
-        else:
-            merged_lines.append(group)
-    merged_polys = []
-    for group in merged_lines:
-        group = sorted(group, key=lambda g: g["x"])
-        all_points = np.vstack([g["poly"] for g in group])
-        x_min, y_min = int(np.min(all_points[:, 0])), int(np.min(all_points[:, 1]))
-        x_max, y_max = int(np.max(all_points[:, 0])), int(np.max(all_points[:, 1]))
-        merged_poly = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]], dtype=np.int32)
-        merged_polys.append(merged_poly)
-    final_polys = []
-    H, W = image_gray.shape[:2]
-    for mpoly in merged_polys:
-        x_min, y_min = max(0, int(np.min(mpoly[:, 0]))), max(0, int(np.min(mpoly[:, 1])))
-        x_max, y_max = min(W, int(np.max(mpoly[:, 0]))), min(H, int(np.max(mpoly[:, 1])))
-        if y_max <= y_min or x_max <= x_min:
-            continue
-        crop = image_gray[y_min:y_max, x_min:x_max]
-        sub_lines = split_by_newline_projection(crop, min_line_height=split_min_line_height, min_blank_height=split_min_blank_height, blank_threshold_ratio=0.05, debug=debug)
-        if len(sub_lines) <= 1:
-            final_polys.append(mpoly)
-        else:
-            for (_, sy, ey) in sub_lines:
-                abs_y1 = y_min + max(0, int(sy))
-                abs_y2 = y_min + min(crop.shape[0], int(ey))
-                new_poly = np.array([[x_min, abs_y1], [x_max, abs_y1], [x_max, abs_y2], [x_min, abs_y2]], dtype=np.int32)
-                final_polys.append(new_poly)
-    return final_polys
 
 def init_models(train_py_path=TRAIN_PY_PATH, ckpt_path=CHECKPOINT_PATH, craft_weights_path=CRAFT_WEIGHTS):
     """
@@ -597,4 +735,3 @@ def init_models(train_py_path=TRAIN_PY_PATH, ckpt_path=CHECKPOINT_PATH, craft_we
     craft_model = load_ckpt_into_model(craft_model, craft_weights_path, device)
 
     return craft_model, rec_model, device, charset, blank_idx
-

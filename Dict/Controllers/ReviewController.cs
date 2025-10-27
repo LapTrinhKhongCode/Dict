@@ -57,7 +57,7 @@ namespace Dict.Controllers
         {
             try
             {
-                var userId = 1; // Tạm thời hardcode
+                var userId = GetUserId(); // Tạm thời hardcode
 
                 var success = await _reviewService.ProcessAnswerAsync(answer, userId);
                 if (!success)

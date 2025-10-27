@@ -265,7 +265,8 @@ namespace Dict.Service
                     Name = deck.Name,
                     Description = deck.Description,
                     CardCount = deck.Cards.Count(),
-                    AuthorUsername = deck.User.Username
+                    AuthorUsername = deck.User.Username,
+                    Avatar = deck.User.AvatarUrl
                 })
                 .ToListAsync();
 
