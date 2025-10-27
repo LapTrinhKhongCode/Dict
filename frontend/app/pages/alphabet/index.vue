@@ -30,7 +30,7 @@
     v-for="(item, index) in row"
     :key="index"
     class="border rounded-lg h-28 flex flex-col items-center justify-center p-6 
-           hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md w-48"
+           hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md  sm:w-20 lg:w-35"
     @click="selectedCharacter = { ...item, src: `/hiragana/${item.romaji}.png` }"
   >
     <span class="text-2xl sm:text-3xl md:text-=4xl lg:text-5xl font-japanese text-sky-200">{{ item.char }}</span>

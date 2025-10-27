@@ -19,6 +19,17 @@ namespace Dict.Controllers
             _reviewService = reviewService;
             _response = new ResponseDTO();
         }
+        private int GetUserId()
+        {
+            var userIdClaim = User.FindFirst("userId");
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
+                // mặc dù [Authorize] thường sẽ chặn các request này trước.
+                throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
+            }
+            return userId;
+        }
 
         [HttpGet]
         [Route("GetQueue/{deckId}")]
@@ -28,7 +39,7 @@ namespace Dict.Controllers
             {
                 // Tạm thời hardcode UserId. Trong thực tế, bạn sẽ lấy từ JWT token
                 // var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-                var userId = 1;
+                var userId = GetUserId();
 
                 _response.Result = await _reviewService.GetReviewQueueAsync(deckId, userId);
             }
@@ -61,17 +72,6 @@ namespace Dict.Controllers
                 _response.Message = ex.Message;
             }
             return Ok(_response);
-        }
-        private int GetUserId()
-        {
-            var userIdClaim = User.FindFirst("userId");
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
-            {
-                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
-                // mặc dù [Authorize] thường sẽ chặn các request này trước.
-                throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
-            }
-            return userId;
         }
         [HttpPost]
         [Route("Cards/{cardId}/Reset")]

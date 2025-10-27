@@ -72,7 +72,7 @@ namespace Dict.Service
                         Meaning = c.BackText,
                         Pinyin = "",
                         NextReviewAt = c.CardStates
-                            .Where(cs => cs.UserId == userId)
+                            //.Where(cs => cs.UserId == userId)
                             .Select(cs => cs.DueDate)
                             .FirstOrDefault() ?? DateTime.MinValue
                     }).ToList()

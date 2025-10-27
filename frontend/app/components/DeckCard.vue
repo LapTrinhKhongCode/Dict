@@ -1,4 +1,3 @@
-<!-- components/DeckCard.vue -->
 <template>
   <div
     class="bg-gray-800 rounded-lg p-5 flex flex-col justify-between h-48 cursor-pointer transition-transform transform hover:-translate-y-1 hover:shadow-lg hover:shadow-sky-500/10 group relative"
@@ -6,16 +5,14 @@
   >
     <!-- Card Content -->
     <div>
-      <!-- Use deck.name from DeckSummaryDto -->
       <h3 class="text-xl font-bold text-gray-100 truncate mb-1">{{ deck.name }}</h3>
-      <p class="text-sm text-gray-400">{{ deck.cardCount }} từ</p>
-      <p v-if="deck.description" class="text-xs text-gray-500 mt-1 truncate">{{ deck.description }}</p>
+      <p class="text-lg text-gray-400">{{ deck.cardCount }} từ</p>
+      <p v-if="deck.description" class="text-bs text-gray-500 mt-1 truncate">{{ deck.description }}</p>
     </div>
 
     <!-- Author Info -->
     <div class="flex items-center justify-between mt-4">
       <div class="flex items-center overflow-hidden mr-2">
-        <!-- Display NowAuthor if it exists (for saved decks), otherwise original Author -->
         <img v-if="deck.nowAuthorImageUrl || deck.authorImageUrl" 
              :src="deck.nowAuthorImageUrl || deck.authorImageUrl" 
              alt="Avatar" 
@@ -28,11 +25,11 @@
               {{ getInitials(deck.nowAuthorName || deck.authorName) }}
          </div>
 
-        <span v-if="deck.authorName!=currentUserName" class="text-sm text-gray-300 truncate">{{ deck.nowAuthorName || deck.authorName }}</span>
+       <span v-if="deck.authorName!=currentUserName" class="text-sm text-gray-300 truncate">{{ deck.nowAuthorName || deck.authorName }}</span>
       </div>
     </div>
 
-    <!-- Save Button (Only on Explore, if not current user's deck) -->
+    <!-- Save Button -->
     <button
       v-if="variant === 'explore' && deck.authorName !== currentUserName"
       @click.stop="handleSave"
@@ -51,31 +48,41 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { DeckSummaryDto } from '~/types';
-import { useJwt } from '~/composables/useJwt';
+import { useJwt } from '~/composables/useJwt'; // Import composable
 
-const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
+// Get authentication status
+const { isAuthenticated } = useJwt();
 
 const props = defineProps<{
   deck: DeckSummaryDto;
   variant: 'my' | 'explore';
-  currentUserId: number; // Keep for potential future use, but check uses username
+  currentUserId: number;
   currentUserName: string;
 }>();
 
-console.log(props.deck.authorImageUrl)
-const emit = defineEmits(['select-set', 'save-deck']);
+// Emit the new event
+const emit = defineEmits(['select-set', 'save-deck', 'show-login-notice']);
 
 const isSaving = ref(false);
 
 function handleSave() {
   if (isSaving.value) return;
+
+  // Check authentication
+  if (!isAuthenticated.value) {
+    emit('show-login-notice'); // Emit notice event if not logged in
+    return; // Stop execution
+  }
+
+  // Proceed if authenticated
   isSaving.value = true;
   emit('save-deck', props.deck.id);
-  // Reset loading state after a short delay in the parent (HomePage)
-  setTimeout(() => { isSaving.value = false; }, 1500); // Reset after 1.5s regardless of API result
+  // Reset loading state - Parent should ideally control this based on API response
+  // Keeping timeout here for simplicity as per previous code
+  setTimeout(() => { isSaving.value = false; }, 1500);
 }
 
-// Helper to get initials from name
+// Helper to get initials
 function getInitials(name: string | null | undefined): string {
     if (!name) return '?';
     const parts = name.split(' ').filter(Boolean);
@@ -84,4 +91,15 @@ function getInitials(name: string | null | undefined): string {
     return (parts[0].substring(0, 1) + parts[parts.length - 1].substring(0, 1)).toUpperCase();
 }
 
+// Image error handler (more robust)
+function onImageError(event: Event) {
+    const imgElement = event.target as HTMLImageElement;
+    imgElement.style.display = 'none'; // Hide broken image
+    // Find the next sibling (the fallback div) and display it
+    const fallback = imgElement.nextElementSibling;
+    if (fallback instanceof HTMLElement) {
+        fallback.style.display = 'flex';
+    }
+}
 </script>
+

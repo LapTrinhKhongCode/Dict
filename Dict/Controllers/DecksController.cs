@@ -84,10 +84,10 @@ namespace Dict.Controllers
         {
             try
             {
-                int userId = GetUserId();
+                //int userId = GetUserId();
                               
 
-                var deck = await _deckService.GetDeckDetailsAsync(deckId, userId);
+                var deck = await _deckService.GetDeckDetailsAsync(deckId, 1);
                 if (deck == null)
                 {
                     _response.IsSuccess = false;

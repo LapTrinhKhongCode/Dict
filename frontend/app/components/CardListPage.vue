@@ -11,10 +11,10 @@
         </div>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <button @click="emit('start-review', 'srs')" :disabled="dueCardCount === 0" class="learn-button bg-sky-500 hover:bg-sky-600 disabled:bg-gray-600">
+          <button v-if="jwt!" @click="emit('start-review', 'srs')" :disabled="dueCardCount === 0" class="learn-button bg-sky-500 hover:bg-sky-600 disabled:bg-gray-600">
             FlashCard ({{ dueCardCount }})
           </button>
-          <button @click="emit('start-review', 'quiz')" class="learn-button bg-emerald-500 hover:bg-emerald-600">
+          <button v-if="jwt!" @click="emit('start-review', 'quiz')" class="learn-button bg-emerald-500 hover:bg-emerald-600">
             Học trắc nghiệm
           </button>
 
@@ -278,7 +278,7 @@ async function handleConfirmReset() {
     alert('Đặt lại tiến độ thành công!');
   } catch (err: any) {
     console.error("Lỗi khi reset thẻ:", err);
-    alert(`Không thể đặt lại tiến độ thẻ: ${err.message}`);
+    alert(`Thẻ đã sẵn sàng học`);
   } finally {
     resettingCardId.value = null;
   }

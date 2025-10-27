@@ -1,10 +1,17 @@
 <!-- components/HomePage.vue -->
 <template>
-  <div class="min-h-screen text-white p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto">
+  <div class="min-h-screen text-white p-4 sm:p-8 relative">
 
+    <div v-if="showLoginNotice" class="fixed top-5 right-5 bg-blue-300 text-gray-900 py-2 px-4 rounded-lg shadow-lg z-50 animate-fade-in-out">
+        Đăng nhập để lưu bộ thẻ!
+    </div>
+    <div v-if="showSaveSuccess" class="fixed bottom-5 right-5 bg-green-600 text-white py-2 px-4 rounded-lg shadow-lg animate-bounce z-50">
+      Đã lưu vào Sổ tay!
+    </div>
+
+    <div class="max-w-7xl mx-auto">
       <!-- Section: Sổ tay -->
-      <section class="mb-12">
+           <section v-if="jwt!" class="mb-12">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-3xl font-bold text-sky-400 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 16c1.255 0 2.443-.29 3.5-.804V4.804zM14.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 0114.5 16c1.255 0 2.443-.29 3.5.804v-10A7.968 7.968 0 0014.5 4z" /></svg>
@@ -55,9 +62,9 @@
         </div>
         <div v-if="isLoadingExplore" class="text-center text-gray-400 py-10">Đang tìm kiếm...</div>
         <div v-else-if="errorExplore" class="text-center text-red-400 p-4 bg-red-900/50 rounded-lg">{{ errorExplore }}</div>
-        <div v-else-if="exploreDecks.length === 0" class="text-center text-gray-500 py-10">Không tìm thấy bộ thẻ nào khớp.</div>
+        <div v-else-if="filteredExploreDecks.length === 0" class="text-center text-gray-500 py-10">Không tìm thấy bộ thẻ nào khớp.</div>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-     <DeckCard
+          <DeckCard
             v-for="deck in filteredExploreDecks.slice(0, 8)"
             :key="`exp-${deck.id}`"
             :deck="deck"
@@ -66,29 +73,26 @@
             variant="explore"
             @select-set="emit('select-set', deck.id)"
             @save-deck="saveDeck"
+            @show-login-notice="displayLoginNotice"
           />
         </div>
       </section>
-    </div>
-
-    <!-- Save Success Notification -->
-    <div v-if="showSaveSuccess" class="fixed bottom-5 right-5 bg-green-600 text-white py-2 px-4 rounded-lg shadow-lg animate-bounce z-50">
-      Đã lưu vào Sổ tay!
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import type { DeckSummaryDto } from '~/types';
 import DeckCard from './DeckCard.vue';
-import { useJwt } from '~/composables/useJwt';
+import { useJwt } from '~/composables/useJwt'; // Import composable
 
-const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
+// Get auth status
+const { isAuthenticated, jwt } = useJwt();
 
-const props = defineProps<{ 
-  currentUserId: number, 
-  currentUserName: string 
+const props = defineProps<{
+  currentUserId: number,
+  currentUserName: string
 }>();
 const emit = defineEmits(['select-set', 'go-to-create-deck', 'go-to-my-decks', 'go-to-explore']);
 
@@ -103,10 +107,14 @@ const errorMy = ref<string | null>(null);
 const errorExplore = ref<string | null>(null);
 const searchTerm = ref('');
 const showSaveSuccess = ref(false);
+const showLoginNotice = ref(false); // State for login notice
 
-// --- API Handling (Should be centralized in a service/util) ---
+const filteredExploreDecks = computed(() => {
+  return exploreDecks.value.filter(deck => deck.authorName !== props.currentUserName);
+});
+
+// --- API Handling ---
 async function handleResponse<T>(response: Response): Promise<T> {
-  // ... (Same implementation as in App.vue) ...
     if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = errorText;
@@ -124,25 +132,22 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
     return (data.result === undefined ? data : data.result) as T;
 }
-// -----------------------------------------------------------------
-
-const filteredExploreDecks = computed(() => {
-  // Lọc ra những deck có authorName khác với tên người dùng hiện tại
-  
-  return exploreDecks.value.filter(deck => deck.authorName !== props.currentUserName);
-});
+// --------------------
 
 async function fetchMyDecks() {
-  console.log(props.currentUserName)
+  // Only fetch if authenticated
+  if (!isAuthenticated.value) {
+      myDecks.value = [];
+      isLoadingMy.value = false;
+      return;
+  }
   isLoadingMy.value = true;
   errorMy.value = null;
   try {
-    // Assuming GET /api/decks/my-decks requires authentication
     const response = await fetch(`${BASE_URL}/api/Decks/my-decks`, {
       cache: 'no-store',
-      headers: { 'Authorization': `Bearer ${jwt.value}` } 
+      headers: { 'Authorization': `Bearer ${jwt.value}` }
     });
-    // Assuming API returns ResponseDTO<List<DeckSummaryDto>>
     myDecks.value = await handleResponse<DeckSummaryDto[]>(response);
   } catch (err: any) {
     errorMy.value = `Lỗi tải Sổ tay: ${err.message}`;
@@ -155,19 +160,18 @@ async function fetchMyDecks() {
 async function fetchExploreDecks(query: string = '') {
   isLoadingExplore.value = true;
   errorExplore.value = null;
-  let url = `${BASE_URL}/api/decks/public`; // API for public decks
+  let url = `${BASE_URL}/api/decks/public`;
   if (query.trim()) {
       url = `${BASE_URL}/api/decks/search?name=${encodeURIComponent(query.trim())}`;
   }
 
   try {
     const response = await fetch(url, { cache: 'no-store' });
-     // Assuming API returns ResponseDTO<List<DeckSummaryDto>>
     exploreDecks.value = await handleResponse<DeckSummaryDto[]>(response);
   } catch (err: any) {
     errorExplore.value = `Lỗi tải Khám phá: ${err.message}`;
     console.error("fetchExploreDecks Error:", err);
-    exploreDecks.value = []; // Clear results on error
+    exploreDecks.value = [];
   } finally {
     isLoadingExplore.value = false;
   }
@@ -178,30 +182,54 @@ function searchDecks() {
 }
 
 async function saveDeck(deckId: number) {
+  // Authentication check happens in DeckCard, this function assumes user is logged in
   try {
-    // Assuming POST /api/decks/{deckId}/save requires authentication
     const response = await fetch(`${BASE_URL}/api/decks/${deckId}/save`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${jwt.value}` 
+            'Authorization': `Bearer ${jwt.value}` // Send token
         },
     });
-    // API returns ResponseDTO<DeckSummaryDto> of the SAVED deck
-    await handleResponse<DeckSummaryDto>(response); 
-    
+    await handleResponse<DeckSummaryDto>(response);
+
     showSaveSuccess.value = true;
-    setTimeout(() => { showSaveSuccess.value = false; }, 2500); // Show longer
-    
-    fetchMyDecks(); // Refresh "Sổ tay" list
+    setTimeout(() => { showSaveSuccess.value = false; }, 2500);
+
+    fetchMyDecks();
   } catch (err: any) {
       alert(`Lưu thất bại: ${err.message}`);
       console.error("saveDeck Error:", err);
   }
 }
 
+// Function to display login notice
+let noticeTimeout: ReturnType<typeof setTimeout> | null = null;
+function displayLoginNotice() {
+    if (noticeTimeout) clearTimeout(noticeTimeout);
+    showLoginNotice.value = true;
+    noticeTimeout = setTimeout(() => {
+        showLoginNotice.value = false;
+        noticeTimeout = null;
+         showLoginNotice.value = true
+    }, 3000); // Show for 3 seconds
+   
+}
+
+
 onMounted(() => {
   fetchMyDecks();
-  fetchExploreDecks(); // Load initial public decks
+  fetchExploreDecks();
 });
 </script>
+
+<style>
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; transform: translateY(-10px); }
+  10%, 90% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-out {
+  animation: fadeInOut 3s ease-in-out forwards;
+}
+</style>
+

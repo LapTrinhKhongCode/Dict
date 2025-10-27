@@ -60,7 +60,7 @@
 
   
 
-  <div class="bg-[#1e293b] text-white p-6 rounded-lg shadow-lg w-[380px]">
+  <div class="bg-[#1e293b] text-white p-6 rounded-lg shadow-lg w-[440px]">
 
     <h2 class="text-lg font-bold mb-4">
 
@@ -82,7 +82,7 @@
 
 
 
-        <div class="flex items-center space-x-2">
+        <div v-if="selectedKanji.onyomi!"class="flex items-center space-x-2">
 
       <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Kunyomi</span>
 
@@ -92,7 +92,7 @@
 
 
 
-        <div class="flex items-center space-x-2">
+        <div v-if="selectedKanji.onyomi!" class="flex items-center space-x-2">
 
       <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Onyomi</span>
 
@@ -102,7 +102,7 @@
 
 
 
-        <div class="flex items-center space-x-2">
+        <div v-if="parseInt(selectedKanji.strokes) > 0" class="flex items-center space-x-2">
 
       <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Số nét</span>
 
@@ -130,12 +130,24 @@
 
     </div>
 
-       <div class="flex items-center space-x-2">
+<div class="flex items-start flex-col">
+      
+      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm flex-shrink-0">
+        Nghĩa
+      </span>
+      
+    <div class="flex flex-col space-y-2 mt-5">
 
-      <span class="bg-[#1e40af] text-white px-3 py-1 rounded-full text-sm">Nghĩa</span>
+  <span 
+    v-for="(meaningBlock, index) in selectedKanji.meanlong.split('\n')" 
+    :key="index"
+    
+    class="block border-2 border-blue-300 p-2 rounded-md"
+  >
+    {{ meaningBlock }}
+  </span>
 
-      <span>{{ selectedKanji.meanlong }}</span>
-
+</div>
     </div>
 
   </div>
@@ -285,7 +297,7 @@ watch([() => props.kanji, writerTarget], ([newKanji, targetEl]) => {
 
       showCharacter: true,
 
-      strokeAnimationSpeed: 0.5,
+      strokeAnimationSpeed: 1.2,
 
     });
 
