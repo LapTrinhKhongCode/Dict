@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJwt } from '@/composables/useJwt'
-import { apiUrl } from '@/utils/api'
 import { useToast } from '@/composables/useToast'
 
 const mode = ref<'login' | 'register'>('login')
@@ -16,6 +15,7 @@ const touched = ref(false)
 const router = useRouter()
 const { login } = useJwt()
 const { showToast } = useToast()
+const config = useRuntimeConfig()
 
 // Field error state
 const fieldErrors = ref<{ [k: string]: string }>({})
@@ -45,7 +45,7 @@ async function handleAuth() {
         ? JSON.stringify({ username: username.value, password: password.value })
         : JSON.stringify({ username: username.value, email: email.value, password: password.value })
     }
-    const url = mode.value === 'login' ? apiUrl('api/Auth/login') : apiUrl('api/Auth/register')
+    const url = mode.value === 'login' ? `${config.public.apiBaseUrl}/api/Auth/login` : `${config.public.apiBaseUrl}/api/Auth/register`
     response = await fetch(url, fetchOptions)
     const data = await response.json()
 
