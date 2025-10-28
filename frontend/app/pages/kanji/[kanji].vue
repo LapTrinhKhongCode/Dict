@@ -946,7 +946,7 @@ function onNodeClick(node: GraphNode | null) {
 .graph-page-container {
   width: 100%;
 
-  height: 160vh;
+  height: 200vh;
 
   display: flex;
 
@@ -1058,6 +1058,7 @@ function onNodeClick(node: GraphNode | null) {
   height: 100%;
 
   display: flex;
+  width: 60vh;
 
   flex-direction: column;
 }
@@ -1246,6 +1247,12 @@ button.active {
 
   .kanji-card {
     padding: 1rem;
+  }
+  
+}
+@media (max-width: 768px) {
+  .graph-page-container {
+    height: 300vh;
   }
 }
 </style>

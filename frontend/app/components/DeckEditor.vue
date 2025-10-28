@@ -3,11 +3,17 @@
     <div class="max-w-3xl mx-auto">
 
       <!-- Header -->
-      <div class="mb-6">
-        <button @click="emit('go-to-list')" class="flex items-center text-sm text-sky-400 hover:text-sky-300 transition-colors mb-2">
-          &larr; Quay lại danh sách
+      <div class="mb-6 flex justify-between items-center">
+        <div>
+          <button @click="emit('go-to-list')" class="flex items-center text-sm text-sky-400 hover:text-sky-300 transition-colors mb-2">
+            &larr; Quay lại danh sách
+          </button>
+          <h1 class="text-3xl font-bold text-sky-400">Chỉnh sửa bộ thẻ</h1>
+        </div>
+        <button @click="openImportModal" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center ml-4">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          Import Thẻ
         </button>
-        <h1 class="text-3xl font-bold text-sky-400">Chỉnh sửa bộ thẻ</h1>
       </div>
 
       <!-- Vùng nguy hiểm: Xóa Deck -->
@@ -34,48 +40,45 @@
             <textarea id="deckDesc" v-model="editableSet.description" rows="3" class="form-input"></textarea>
           </div>
           <div class="flex items-center justify-between">
-            <button @click="saveDeckInfo" :disabled="isSavingDeck" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-5 rounded-lg disabled:bg-gray-500 disabled:cursor-not-allowed">
-              <span v-if="isSavingDeck">Đang lưu...</span>
-              <span v-else>Lưu thông tin</span>
+            <button @click="saveAllChanges" :disabled="isSavingDeck || isAddingCard" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-5 rounded-lg disabled:bg-gray-500 disabled:cursor-not-allowed">
+              <span v-if="isSavingDeck || isAddingCard">Đang lưu...</span>
+              <span v-else>Lưu tất cả thay đổi</span>
             </button>
             <div class="flex items-center">
-              <input id="isPublic" type="checkbox" v-model="editableSet.isPublic" @change="saveDeckInfo" class="h-4 w-4 rounded bg-gray-700 border-gray-600 text-sky-500 focus:ring-sky-500">
+              <input id="isPublic" type="checkbox" v-model="editableSet.isPublic" class="h-4 w-4 rounded bg-gray-700 border-gray-600 text-sky-500 focus:ring-sky-500">
               <label for="isPublic" class="ml-2 block text-sm text-gray-300">Công khai</label>
             </div>
           </div>
         </div>
       </div>
 
+
       <!-- Quản lý Cards -->
       <div class="bg-gray-800 rounded-lg p-5">
         <h2 class="text-xl font-bold text-gray-100 mb-4">Quản lý thẻ ({{ editableSet.cards.length }})</h2>
 
-        <!-- ✅ SỬA: Form thêm thẻ mới (dùng frontText, backText) -->
+        <!-- Form thêm thẻ mới (vào danh sách tạm) -->
         <div class="flex flex-col sm:flex-row gap-4 mb-4 pb-4 border-b border-gray-700">
           <input type="text" v-model="newCardInput.frontText" placeholder="Mặt trước (Ký tự *)" class="form-input flex-1">
           <input type="text" v-model="newCardInput.backText" placeholder="Mặt sau (Nghĩa *)" class="form-input flex-1">
-          <!-- <input type="text" v-model="newCardInput.tags" placeholder="Tags (Pinyin, optional)" class="form-input flex-1"> -->
-          <button @click="addCard" :disabled="isAddingCard" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg mt-2 sm:mt-0 sm:ml-auto disabled:bg-gray-500 disabled:cursor-not-allowed">
-             <span v-if="isAddingCard">Đang thêm...</span>
-             <span v-else>Thêm</span>
+          <input type="text" v-model="newCardInput.tags" placeholder="Tags (Pinyin, optional)" class="form-input flex-1">
+          <button @click="addCardToList" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg mt-2 sm:mt-0 sm:ml-auto">
+             Thêm vào danh sách
           </button>
         </div>
 
         <!-- Danh sách thẻ hiện tại -->
         <div class="space-y-2 max-h-96 overflow-y-auto">
           <div v-if="editableSet.cards.length === 0" class="text-center text-gray-500 text-sm py-4">Chưa có thẻ nào trong bộ này.</div>
-          <!-- ✅ SỬA: v-model vẫn dùng charBig, meaning, pinyin (từ CardDto) -->
-          <div v-for="card in editableSet.cards" :key="card.id" class="flex items-center gap-4 p-2 bg-gray-700 rounded-lg">
+          <div v-for="(card, index) in editableSet.cards" :key="card.tempId || card.id" class="flex items-center gap-4 p-2 rounded-lg" :class="card.isNew ? 'bg-blue-900/50 border border-blue-700' : 'bg-gray-700'">
             <input type="text" v-model="card.charBig" placeholder="Ký tự" class="form-input-sm w-1/4">
             <input type="text" v-model="card.meaning" placeholder="Nghĩa" class="form-input-sm w-1/3">
             <input type="text" v-model="card.pinyin" placeholder="Pinyin" class="form-input-sm w-1/3">
-            <!-- Nút Lưu thẻ (update) -->
-            <button @click="updateCard(card)" :disabled="card.isSaving" class="p-2 text-sky-400 hover:text-sky-300 disabled:text-gray-500 disabled:cursor-not-allowed" title="Lưu thẻ">
+            <button v-if="!card.isNew" @click="updateCard(card)" :disabled="card.isSaving" class="p-2 text-sky-400 hover:text-sky-300 disabled:text-gray-500 disabled:cursor-not-allowed" title="Lưu thẻ này">
                 <svg v-if="card.isSaving" class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6a1 1 0 10-2 0v5.586L7.707 10.293zM3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" /></svg>
             </button>
-            <!-- Nút Xóa thẻ -->
-            <button @click="deleteCard(card)" :disabled="card.isDeleting" class="p-2 text-red-400 hover:text-red-300 disabled:text-gray-500 disabled:cursor-not-allowed" title="Xóa thẻ">
+            <button @click="removeOrDeleteCard(card, index)" :disabled="card.isDeleting" class="p-2 text-red-400 hover:text-red-300 disabled:text-gray-500 disabled:cursor-not-allowed" title="Xóa thẻ">
                <svg v-if="card.isDeleting" class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
             </button>
@@ -84,34 +87,49 @@
       </div>
     </div>
 
-    <!-- Modal xác nhận xóa Deck -->
+    <!-- Modals (Delete Deck, Delete Card, Import) -->
     <ConfirmationModal
       :is-open="isDeleteDeckModalOpen"
       title="Xác nhận XÓA Bộ Thẻ"
       :message="deleteDeckModalMessage"
-      confirmation-text="delete"
       @confirm="handleConfirmDeleteDeck"
       @cancel="closeDeleteDeckModal"
     />
-     <!-- Modal xác nhận xóa Card -->
     <ConfirmationModal
       :is-open="isDeleteCardModalOpen"
       title="Xác nhận XÓA Thẻ"
       :message="deleteCardModalMessage"
-      confirmation-text="delete"
       @confirm="handleConfirmDeleteCard"
       @cancel="closeDeleteCardModal"
     />
+    <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
+      <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center p-4 border-b border-gray-700"> <h2 class="text-xl font-bold text-sky-400">Import dữ liệu thẻ</h2> <button @click="closeImportModal" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button> </div>
+        <div class="p-6 overflow-y-auto space-y-4">
+           <p class="text-sm text-gray-400">Dán dữ liệu. Mỗi thẻ trên một dòng.</p>
+           <textarea v-model="importText" @keydown.tab.prevent="handleTab" rows="8" class="form-input" placeholder="apple, quả táo..."></textarea>
+           <div> <label class="block text-sm font-medium text-gray-300 mb-2">Phân cách:</label> <div class="flex gap-4"> <label class="flex items-center"> <input type="radio" v-model="importDelimiter" value="tab" class="form-radio"> <span class="ml-2">Tab</span> </label> <label class="flex items-center"> <input type="radio" v-model="importDelimiter" value="comma" class="form-radio"> <span class="ml-2">Dấu phẩy</span> </label> </div> </div>
+           <div> <h3 class="text-lg font-semibold text-gray-200 mb-2">Xem trước ({{ parsedCards.length }} thẻ)</h3> <div class="space-y-1 max-h-40 overflow-y-auto bg-gray-900 p-3 rounded"> <div v-if="parsedCards.length === 0" class="text-center text-gray-500 text-sm py-2">...</div> <div v-for="(card, index) in parsedCards" :key="`preview-${index}`" class="flex gap-4 text-sm p-1 border-b border-gray-700 last:border-b-0"> <div class="w-1/2 font-mono bg-gray-700 px-2 py-1 rounded truncate" :title="card.frontText">{{ card.frontText || '...' }}</div> <div class="w-1/2 font-mono bg-gray-700 px-2 py-1 rounded truncate" :title="card.backText">{{ card.backText || '...' }}</div> </div> </div> <p v-if="parseError" class="text-red-400 text-xs mt-1">{{ parseError }}</p> </div>
+        </div>
+        <div class="flex justify-end gap-4 p-4 border-t border-gray-700"> <button @click="closeImportModal" class="px-5 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 font-semibold transition-colors"> Hủy </button> <button @click="importCardsToList" :disabled="parsedCards.length === 0" class="px-5 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 font-semibold transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"> Thêm {{ parsedCards.length }} thẻ vào danh sách </button> </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'; // Import reactive
-import type { DeckDetailDto, CardDto, DeckUpdateDto, CardCreateDto, CardUpdateDto } from '~/types'; // Import necessary types
+import { ref, reactive, computed } from 'vue';
+import type { DeckDetailDto, CardDto, DeckUpdateDto, CardCreateDto, CardUpdateDto } from '~/types';
 import ConfirmationModal from './ConfirmationModal.vue';
+import { useJwt } from '~/composables/useJwt';
 
-// Define CardDto with optional saving/deleting state for UI feedback
-interface EditableCardDto extends CardDto {
+const { jwt } = useJwt();
+
+interface EditableCardDto extends Omit<CardDto, 'id'> {
+  id?: number;
+  tempId: string;
+  isNew?: boolean;
   isSaving?: boolean;
   isDeleting?: boolean;
 }
@@ -120,92 +138,77 @@ const props = defineProps<{ initialSet: DeckDetailDto }>();
 const emit = defineEmits(['go-to-list', 'deck-updated']);
 
 const config = useRuntimeConfig()
-
 const BASE_URL = config.public.apiBaseUrl
 
+const editableSet = reactive<Omit<DeckDetailDto, 'cards'> & { cards: EditableCardDto[] }>({
+    ...props.initialSet,
+    cards: props.initialSet.cards.map(card => ({
+        ...card,
+        tempId: `card-${card.id}`,
+        isNew: false
+    }))
+});
 
-
-// Use reactive for easier nested updates
-const editableSet = reactive<DeckDetailDto>(JSON.parse(JSON.stringify(props.initialSet)));
-// Initialize cards with saving/deleting state
-editableSet.cards = editableSet.cards.map(card => ({ ...card, isSaving: false, isDeleting: false }));
-
-
-// ✅ SỬA: newCardInput dùng frontText, backText, tags
 const newCardInput = ref<CardCreateDto>({ frontText: '', backText: '', tags: '' });
 
-// State flags for loading indicators
 const isSavingDeck = ref(false);
 const isAddingCard = ref(false);
 
-// State for Delete Deck Modal
 const isDeleteDeckModalOpen = ref(false);
 const deleteDeckModalMessage = ref('');
 
-// State for Delete Card Modal
 const isDeleteCardModalOpen = ref(false);
 const deleteCardModalMessage = ref('');
 const cardToDelete = ref<EditableCardDto | null>(null);
+const cardIndexToDelete = ref<number | null>(null);
 
+const showImportModal = ref(false);
+const importText = ref('');
+const importDelimiter = ref<'tab' | 'comma'>('comma');
+const parseError = ref<string | null>(null);
 
-// handleResponse (centralized error handling)
+// handleResponse
 async function handleResponse<T>(response: Response): Promise<T> {
    if (!response.ok) {
     const errorText = await response.text();
     let errorMessage = errorText;
     try {
         const errorJson = JSON.parse(errorText);
-        // Prioritize specific backend messages if available
-        if (errorJson?.errors) { // Handle ASP.NET Core validation errors
-            errorMessage = Object.values(errorJson.errors).flat().join(' ');
-        } else if (errorJson?.message) {
-            errorMessage = errorJson.message;
-        } else if (errorJson?.title) { // Handle problem details title
-            errorMessage = errorJson.title;
-        }
-    } catch (e) { /* Ignore parsing errors, keep original text */ }
+        if (errorJson?.errors) { errorMessage = Object.values(errorJson.errors).flat().join(' '); }
+        else if (errorJson?.message) { errorMessage = errorJson.message; }
+        else if (errorJson?.title) { errorMessage = errorJson.title; }
+    } catch (e) { /* Ignore */ }
     throw new Error(errorMessage || `Yêu cầu thất bại: ${response.status}`);
   }
-  if (response.status === 204) return {} as T; // Handle No Content
+  if (response.status === 204) return {} as T;
   const data = await response.json();
-  // Assuming backend wrapper { isSuccess: bool, message: string, result: T }
-  if (data.isSuccess === false) {
-    throw new Error(data.message || 'Lỗi không xác định từ API');
-  }
-  // Return the actual result if nested, otherwise the whole data object
+  if (data.isSuccess === false) { throw new Error(data.message || 'Lỗi không xác định từ API'); }
   return (data.result === undefined ? data : data.result) as T;
 }
 
-
 // --- Deck Operations ---
-async function saveDeckInfo() {
+async function saveDeckInfoOnly() {
   isSavingDeck.value = true;
   const deckId = editableSet.id;
-  // Use DeckUpdateDto type
   const deckDto: DeckUpdateDto = {
-    title: editableSet.title,
-    description: editableSet.description,
-    isPublic: editableSet.isPublic ?? false // Handle null
+    Title: editableSet.title,
+    Description: editableSet.description,
+    IsPublic: editableSet.isPublic ?? false
   };
-
   try {
-    const response = await fetch(`${BASE_URL}/api/decks/${deckId}`, { // Added /api
+    const response = await fetch(`${BASE_URL}/api/decks/${deckId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', /* 'Authorization': `Bearer ${TOKEN}` */ },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.value}` },
       body: JSON.stringify(deckDto)
     });
     await handleResponse(response);
-    alert('Đã cập nhật thông tin Deck!');
-    // No need to emit deck-updated if only toggling public? Depends on desired UX.
-    // If title/desc change, emitting is good.
-    // emit('deck-updated');
+    return true;
   } catch (err: any) {
     alert(`Lỗi cập nhật Deck: ${err.message}`);
-    console.error("saveDeckInfo Error:", err);
-    // Revert checkbox on error? Optional.
-    // editableSet.isPublic = !editableSet.isPublic;
+    console.error("saveDeckInfoOnly Error:", err);
+    return false;
   } finally {
-      isSavingDeck.value = false;
+      // Don't reset isSavingDeck here, let saveAllChanges do it
   }
 }
 
@@ -214,22 +217,20 @@ function promptDeleteDeck() {
   isDeleteDeckModalOpen.value = true;
 }
 
-function closeDeleteDeckModal() {
-  isDeleteDeckModalOpen.value = false;
-}
+function closeDeleteDeckModal() { isDeleteDeckModalOpen.value = false; }
 
 async function handleConfirmDeleteDeck() {
   closeDeleteDeckModal();
-  isSavingDeck.value = true; // Use general saving flag or a specific deleting flag
+  isSavingDeck.value = true;
   const deckId = editableSet.id;
   try {
-    const response = await fetch(`${BASE_URL}/api/decks/${deckId}`, { // Added /api
+    const response = await fetch(`${BASE_URL}/api/decks/${deckId}`, {
       method: 'DELETE',
-      headers: { /* 'Authorization': `Bearer ${TOKEN}` */ }
+      headers: { 'Authorization': `Bearer ${jwt.value}` }
     });
     await handleResponse(response);
     alert('Đã xóa Deck thành công.');
-    emit('go-to-list'); // Go back, App.vue will handle refresh implicitly
+    emit('go-to-list');
   } catch (err: any) {
     alert(`Lỗi xóa Deck: ${err.message}`);
     console.error("handleConfirmDeleteDeck Error:", err);
@@ -239,144 +240,209 @@ async function handleConfirmDeleteDeck() {
 }
 
 // --- Card Operations ---
-async function addCard() {
-  const deckId = editableSet.id;
-  // Use CardCreateDto type for input
-  const cardDto: CardCreateDto = {
-    frontText: newCardInput.value.frontText,
-    backText: newCardInput.value.backText,
-    // tags: newCardInput.value.tags || null // Ensure null if empty
-  };
-
-  if (!cardDto.frontText?.trim() || !cardDto.backText?.trim()) {
-    alert("Mặt trước và Mặt sau là bắt buộc.");
-    return;
-  }
-  isAddingCard.value = true;
-  try {
-    const response = await fetch(`${BASE_URL}/api/decks/${deckId}/cards`, { // Added /api
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', /* 'Authorization': `Bearer ${TOKEN}` */ },
-      body: JSON.stringify([cardDto]) // Send as an array as per backend? Check API. If single: JSON.stringify(cardDto)
-    });
-    // Assuming API returns the created CardDto(s) in the result field
-    const newCardsData = await handleResponse<{ result?: CardDto[] }>(response); // Adjust expected type
-
-    if (newCardsData.result && newCardsData.result.length > 0) {
-        // Add the new card(s) returned by API (with correct ID and structure)
-        newCardsData.result.forEach(newApiCard => {
-            editableSet.cards.push({ ...newApiCard, isSaving: false, isDeleting: false });
-        });
-    } else {
-        // Fallback if API doesn't return created card - less ideal
-        // editableSet.cards.push({ id: Date.now(), charBig: cardDto.frontText, meaning: cardDto.backText, pinyin: cardDto.tags, nextReviewAt: '', isSaving: false, isDeleting: false });
-        console.warn("API did not return created card data. Added optimistically.");
-         // Re-fetch the whole deck for consistency if needed: emit('deck-updated');
-    }
-
-    newCardInput.value = { frontText: '', backText: '', tags: '' }; // Reset form
-  } catch (err: any) {
-    alert(`Lỗi thêm thẻ: ${err.message}`);
-    console.error("addCard Error:", err);
-  } finally {
-      isAddingCard.value = false;
-  }
+function addCardToList() {
+    const front = newCardInput.value.frontText?.trim();
+    const back = newCardInput.value.backText?.trim();
+    if (!front || !back) { alert("Mặt trước và Mặt sau là bắt buộc."); return; }
+    const tempCard: EditableCardDto = {
+        tempId: `new-${Date.now()}-${Math.random()}`,
+        charBig: front,
+        meaning: back,
+        pinyin: newCardInput.value.tags || '',
+        nextReviewAt: '',
+        isNew: true,
+    };
+    editableSet.cards.push(tempCard);
+    newCardInput.value = { frontText: '', backText: '', tags: '' };
 }
 
 async function updateCard(card: EditableCardDto) {
-  if (card.isSaving) return;
-  card.isSaving = true; // Set loading state for this specific card
+  if (card.isNew || card.isSaving || !card.id) return;
+  card.isSaving = true;
   const cardId = card.id;
-  // Use CardUpdateDto type, map fields
   const cardDto: CardUpdateDto = {
-    FrontText: card.charBig, // Map from CardDto field used in v-model
-    BackText: card.meaning,  // Map from CardDto field used in v-model
-    Tags: card.pinyin       // Map from CardDto field used in v-model
+    FrontText: card.charBig,
+    BackText: card.meaning,
+    Tags: card.pinyin
   };
-
   try {
-    const response = await fetch(`${BASE_URL}/api/cards/${cardId}`, { // Correct endpoint
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', /* 'Authorization': `Bearer ${TOKEN}` */ },
-      body: JSON.stringify(cardDto)
-    });
+    const response = await fetch(`${BASE_URL}/api/cards/${cardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.value}` },
+        body: JSON.stringify(cardDto)
+     });
     await handleResponse(response);
-    // Optionally show a temporary success indicator on the card itself
-    // alert('Đã cập nhật thẻ!'); // Avoid alerts for each card save
-  } catch (err: any) {
-    alert(`Lỗi cập nhật thẻ ${cardId}: ${err.message}`);
-    console.error("updateCard Error:", err);
-    // Optionally revert changes in UI if save fails? More complex.
-  } finally {
-      card.isSaving = false; // Reset loading state for this card
-  }
+  } catch (err: any) { alert(`Lỗi cập nhật thẻ ${cardId}: ${err.message}`); }
+  finally { card.isSaving = false; }
 }
 
-function promptDeleteCard(card: EditableCardDto) {
+function removeOrDeleteCard(card: EditableCardDto, index: number) {
+    if (card.isNew) {
+        editableSet.cards.splice(index, 1);
+    } else {
+        promptDeleteCard(card, index);
+    }
+}
+
+function promptDeleteCard(card: EditableCardDto, index: number) {
+  if (!card.id) { console.error("Invalid card for deletion:", card); return; }
   deleteCardModalMessage.value = `Bạn có chắc muốn xóa thẻ "${card.meaning || card.charBig}" không?`;
   cardToDelete.value = card;
+  cardIndexToDelete.value = index;
   isDeleteCardModalOpen.value = true;
 }
 
 function closeDeleteCardModal() {
     isDeleteCardModalOpen.value = false;
     cardToDelete.value = null;
+    cardIndexToDelete.value = null;
 }
 
 async function handleConfirmDeleteCard() {
-    if (!cardToDelete.value || cardToDelete.value.isDeleting) return;
+    if (!cardToDelete.value || cardToDelete.value.isDeleting || !cardToDelete.value.id) return;
     const card = cardToDelete.value;
     const cardId = card.id;
-    
+    const indexToRemove = cardIndexToDelete.value;
+
     closeDeleteCardModal();
-    card.isDeleting = true; // Set loading state
+    card.isDeleting = true;
 
     try {
-        const response = await fetch(`${BASE_URL}/api/cards/${cardId}`, { // Correct endpoint
-            method: 'DELETE',
-            headers: { /* 'Authorization': `Bearer ${TOKEN}` */ }
-        });
+        const response = await fetch(`${BASE_URL}/api/cards/${cardId}`, {
+             method: 'DELETE',
+             headers: { 'Authorization': `Bearer ${jwt.value}` }
+         });
         await handleResponse(response);
-        // Remove from UI list
-        editableSet.cards = editableSet.cards.filter(c => c.id !== cardId);
-        // alert('Đã xóa thẻ.'); // Avoid alert
+        if (indexToRemove !== null) {
+            editableSet.cards.splice(indexToRemove, 1);
+        }
     } catch (err: any) {
-        alert(`Lỗi xóa thẻ ${cardId}: ${err.message}`);
-        console.error("deleteCard Error:", err);
-        card.isDeleting = false; // Reset loading state only on error
+         alert(`Lỗi xóa thẻ ${cardId}: ${err.message}`);
+         console.error("deleteCard Error:", err);
+         if(card) card.isDeleting = false;
     }
-    // No finally block needed here, card is removed on success
 }
 
+// --- Import Logic ---
+const parsedCards = computed(() => {
+  parseError.value = null;
+  const lines = importText.value.split('\n').filter(line => line.trim() !== '');
+  const delimiter = importDelimiter.value === 'tab' ? '\t' : ',';
+  const cards: CardCreateDto[] = [];
+  let lineErrors = 0;
+  lines.forEach((line) => {
+    const parts = line.split(delimiter);
+    if (parts.length >= 2) {
+        const front = parts[0]?.trim() ?? '';
+        const back = parts[1]?.trim() ?? '';
+        const tags = parts.slice(2).join(delimiter).trim() || null;
+        if (front && back) {
+            cards.push({ frontText: front, backText: back, tags: tags });
+        } else { lineErrors++; }
+    } else if (line.trim()) { lineErrors++; }
+  });
+  if(lineErrors > 0) { parseError.value = `Đã bỏ qua ${lineErrors} dòng không đúng định dạng.`; }
+  return cards;
+});
+
+function importCardsToList() {
+    const cardsToImport = parsedCards.value;
+    if (cardsToImport.length === 0) { alert("Không có thẻ hợp lệ nào để import."); return; }
+    cardsToImport.forEach(parsedCard => {
+         const tempCard: EditableCardDto = {
+            tempId: `new-${Date.now()}-${Math.random()}`,
+            charBig: parsedCard.frontText,
+            meaning: parsedCard.backText,
+            pinyin: parsedCard.tags || '',
+            nextReviewAt: '',
+            isNew: true,
+         };
+         editableSet.cards.push(tempCard);
+    });
+    closeImportModal();
+    alert(`Đã thêm ${cardsToImport.length} thẻ vào danh sách chờ lưu.`);
+}
+
+function openImportModal() {
+  importText.value = '';
+  parseError.value = null;
+  showImportModal.value = true;
+}
+function closeImportModal() { showImportModal.value = false; }
+function handleTab(event: KeyboardEvent) {
+  const target = event.target as HTMLTextAreaElement;
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
+  target.value = target.value.substring(0, start) + "\t" + target.value.substring(end);
+  target.selectionStart = target.selectionEnd = start + 1;
+}
+
+// --- Save All ---
+async function saveAllChanges() {
+    isSavingDeck.value = true;
+    const deckSaveSuccess = await saveDeckInfoOnly();
+    if (!deckSaveSuccess) { isSavingDeck.value = false; return; }
+
+    const newCardsToApi = editableSet.cards
+        .filter(card => card.isNew)
+        .map(tempCard => ({
+            frontText: tempCard.charBig,
+            backText: tempCard.meaning,
+            tags: tempCard.pinyin || null
+        } as CardCreateDto));
+
+    let cardAddSuccess = true;
+    if (newCardsToApi.length > 0) {
+        isAddingCard.value = true;
+        const deckId = editableSet.id;
+        try {
+            const response = await fetch(`${BASE_URL}/api/decks/${deckId}/cards`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.value}` },
+                body: JSON.stringify(newCardsToApi)
+            });
+            const addedCardsData = await handleResponse<{ result?: CardDto[] }>(response);
+            if (addedCardsData.result && addedCardsData.result.length > 0) {
+                const existingCards = editableSet.cards.filter(card => !card.isNew);
+                const newApiCards = addedCardsData.result.map(newApiCard => ({
+                    ...newApiCard,
+                    tempId: `card-${newApiCard.id}`,
+                    isNew: false
+                }));
+                editableSet.cards = [...existingCards, ...newApiCards];
+            } else {
+                 console.warn("API did not return created card data after bulk add.");
+                 cardAddSuccess = false;
+            }
+        } catch (err: any) {
+            alert(`Lỗi khi lưu các thẻ mới: ${err.message}`);
+            cardAddSuccess = false;
+        } finally {
+            isAddingCard.value = false;
+        }
+    }
+
+    isSavingDeck.value = false;
+
+    if (deckSaveSuccess && cardAddSuccess) {
+        alert('Đã lưu tất cả thay đổi thành công!');
+        emit('deck-updated');
+    } else if (deckSaveSuccess && !cardAddSuccess) {
+        //  alert('Đã lưu thông tin deck, nhưng có lỗi khi lưu thẻ mới. Vui lòng tải lại trang.');
+         emit('deck-updated');
+    }
+}
 </script>
 
 <style scoped>
-.form-input {
-  width: 100%;
-  background-color: #1f2937;
-  border: 1px solid #4b5563;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  color: white;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.form-input:focus {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.4);
-}
-.form-input-sm {
-  background-color: #1f2937; /* Adjusted to match form-input */
-  border: 1px solid #4b5563;
-  border-radius: 0.375rem; /* rounded-md often looks better than rounded */
-  padding: 0.25rem 0.5rem; /* py-1 px-2 */
-  color: white;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.form-input-sm:focus {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 1px #0ea5e9; /* focus:ring-1 */
-}
+/* ... styles ... */
+.form-input { width: 100%; background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.5rem 0.75rem; color: white; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.form-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.4); }
+.form-input-sm { background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.375rem; padding: 0.25rem 0.5rem; color: white; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.form-input-sm:focus { border-color: #0ea5e9; box-shadow: 0 0 0 1px #0ea5e9; }
+.form-radio { height: 1rem; width: 1rem; color: #0369a1; background-color: #374151; border-color: #4b5563; border-radius: 100%; vertical-align: middle; appearance: none; position: relative; }
+.form-radio:checked { background-color: #0ea5e9; border-color: #0ea5e9; }
+.form-radio:checked::before { content: ''; display: block; width: 0.5rem; height: 0.5rem; border-radius: 50%; background-color: white; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.form-radio:focus { outline: none; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.4), 0 0 0 1px #0ea5e9; }
 </style>
 

@@ -72,7 +72,7 @@ namespace Dict.Service
                         Meaning = c.BackText,
                         Pinyin = "",
                         NextReviewAt = c.CardStates
-                            .Where(cs => cs.UserId == userId)
+                            //.Where(cs => cs.UserId == userId)
                             .Select(cs => cs.DueDate)
                             .FirstOrDefault() ?? DateTime.MinValue
                     }).ToList()
@@ -265,7 +265,8 @@ namespace Dict.Service
                     Name = deck.Name,
                     Description = deck.Description,
                     CardCount = deck.Cards.Count(),
-                    AuthorUsername = deck.User.Username
+                    AuthorUsername = deck.User.Username,
+                    Avatar = deck.User.AvatarUrl
                 })
                 .ToListAsync();
 

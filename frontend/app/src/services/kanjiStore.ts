@@ -14,7 +14,7 @@ export interface KanjiItem {
 
   char: string;
 
-  meanlong: string;
+  meanlong: string[];
 
   jlpt: string;
 
@@ -143,27 +143,37 @@ function extractFreqAndAllRebs(freqRaw?: string, allRebsRaw?: string) {
 }
 
 function cleanMeanLongAndJlpt(meanRaw?: string, jlptRaw?: string) {
+  // Lấy chuỗi gốc một cách an toàn
+  const rawMeanString = (meanRaw ?? "").toString();
 
-  let mean = (meanRaw ?? "").toString().trim()
+  // ----- PHẦN THAY ĐỔI CHÍNH -----
+  // TRƯỚC ĐÂY:
+  // let mean = meanRaw.replace(/##/g, " ").replace(/\s+/g, " ").trim()
 
-  mean = mean.replace(/##/g, " ").replace(/\s+/g, " ").trim()
+  // BÂY GIỜ:
+  // 1. Tách chuỗi bằng '##' để tạo một mảng các nghĩa.
+  // 2. Với mỗi nghĩa, dùng map để dọn dẹp khoảng trắng thừa bên trong nó.
+  // 3. Nối các nghĩa đã được làm sạch lại với nhau bằng ký tự xuống dòng '\n'.
+  let mean = rawMeanString
+    .split('##')
+    .map(part => part.replace(/\s+/g, ' ').trim())
+    .join('\n');
+  // --------------------------------
 
-  let jlpt = (jlptRaw ?? "").toString().trim()
+  let jlpt = (jlptRaw ?? "").toString().trim();
 
-  const m = (mean || "").match(/(.*?)[\.\,]?\s*(N[1-5])\s*$/)
-
+  // Phần logic trích xuất JLPT vẫn giữ nguyên, nó vẫn hoạt động chính xác
+  // vì nó chỉ tìm kiếm ở cuối toàn bộ chuỗi.
+  const m = mean.match(/(.*?)[\.\,]?\s*(N[1-5])\s*$/);
   if (m) {
-
-    mean = m[1].trim()
-
-    if (!jlpt) jlpt = m[2]
-
+    mean = m[1].trim(); // Lấy phần nghĩa trước JLPT
+    if (!jlpt) {
+      jlpt = m[2]; // Nếu chưa có JLPT, gán giá trị tìm thấy
+    }
   }
 
-  return { mean, jlpt }
-
+  return { mean, jlpt };
 }
-
 
 
 // 5. Hàm load chính (DÙNG import.meta.glob)
@@ -190,11 +200,11 @@ export async function loadKanjiData(): Promise<KanjiItem[]> {
 
       // Dùng logic load file của Kanjistroke.vue vì nó chi tiết hơn
 
-      const csvFiles = import.meta.glob("/src/assets/kanji_fixed.csv", { as: "raw" });
+      const csvFiles = import.meta.glob("/src/assets/kanji_fixed_v2.csv", { as: "raw" });
 
-      const loadCsv = csvFiles["/src/assets/kanji_fixed.csv"];
+      const loadCsv = csvFiles["/src/assets/kanji_fixed_v2.csv"];
 
-      if (!loadCsv) throw new Error("Không tìm thấy file /src/assets/kanji_fixed.csv");
+      if (!loadCsv) throw new Error("Không tìm thấy file /src/assets/kanji_fixed_v2.csv");
 
       
 

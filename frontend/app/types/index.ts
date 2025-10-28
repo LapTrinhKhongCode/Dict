@@ -6,6 +6,8 @@ export interface DeckSummaryDto {
     name: string;        // ✨ SỬA: từ 'title' thành 'name'
     description: string;
     cardCount: number;
+    avatar?: string; 
+    authorUsername?: string,
     isPublic: boolean;
     authorName: string; 
     authorImageUrl: string; // ✨ SỬA: từ 'creatorName' thành 'authorName'
