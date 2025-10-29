@@ -28,7 +28,7 @@ function handleLogout() {
     <!-- Left: Logo -->
     <div class="flex items-center space-x-10">
       <NuxtLink to="/">
-        <img src="/logo.png" alt="Logo" class="h-10 w-auto" />
+        <img src="/miyo.png" alt="Logo" class="h-auto w-35" />
       </NuxtLink>
 
       <div class="relative flex items-center cursor-pointer group">
