@@ -81,11 +81,9 @@ namespace Dict.Service
                 .Distinct()
                 .ToList();
 
-            // 2. Chạy MỘT truy vấn phụ duy nhất để lấy dữ liệu cho TẤT CẢ Kanji đó
-            var kanjiEntryDataMap = await GetKanjiEntryDataForMappingAsync(allKanjiChars!);
 
             // 3. Map kết quả chính
-            data.Words = mainEntries.Select(entry => MapEntryToJsonWord(entry, kanjiEntryDataMap))
+            data.Words = mainEntries.Select(entry => MapEntryToJsonWord(entry))
                                    .Where(w => w != null)
                                    .ToList()!;
 
@@ -112,48 +110,66 @@ namespace Dict.Service
         /// <summary>
         /// Truy vấn và xây dựng chuỗi JSON hoàn chỉnh cho một Hán tự.
         /// </summary>
-        public async Task<string> RebuildJsonForKanjiAsync(string kanjiCharacter)
+        public async Task<string> RebuildJsonForKanjiAsync(string kanjiTerm)
         {
-            if (string.IsNullOrEmpty(kanjiCharacter) || kanjiCharacter.Length != 1)
+            var kanjiChars = ExtractKanji(kanjiTerm);
+
+            if (!kanjiChars.Any())
             {
-                return JsonConvert.SerializeObject(new { status = 404, error = "Invalid Kanji character" });
+                return JsonConvert.SerializeObject(new { status = 404, error = "No valid Kanji characters found in term" });
             }
 
-            // 1. Truy vấn Entry (lấy cách đọc, nghĩa...)
-            var entryFromDb = await _db.Entries
+            // Bước 2: Chạy các truy vấn tuần tự (ĐÃ SỬA LỖI ĐA LUỒNG)
+
+            // Truy vấn 1: Lấy TẤT CẢ các Entry (Kanji) liên quan
+            var entryFromDbList = await _db.Entries
                 .AsNoTracking()
-                .Where(e => e.Type == "kanji" && e.Label == kanjiCharacter)
+                .Where(e => e.Type == "kanji" && kanjiChars.Contains(e.Label)) // Dùng Contains
                 .Include(e => e.ReadingElements)
                 .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.Glosses)
-                .FirstOrDefaultAsync();
+                .AsSplitQuery()
+                .ToListAsync(); // Dùng ToListAsync
 
-            // 2. Truy vấn Kanji (lấy số nét, ví dụ lồng nhau...)
-            var kanjiFromDb = await _db.Kanji
+            // Truy vấn 2: Lấy TẤT CẢ các Kanji liên quan
+            var kanjiFromDbList = await _db.Kanji
                 .AsNoTracking()
-                .Where(k => k.Character == kanjiCharacter)
-                .Include(k => k.KanjiExamples.OrderBy(ex => ex.Id)) // Nạp TẤT CẢ các ví dụ liên quan
-                .FirstOrDefaultAsync();
+                .Where(k => kanjiChars.Contains(k.Character))
+                .Include(k => k.KanjiExamples.OrderBy(ex => ex.Id))
+                .ToListAsync(); // Dùng ToListAsync
 
-            if (entryFromDb == null || kanjiFromDb == null)
+            // Bước 3: Kiểm tra kết quả
+            if (!entryFromDbList.Any() || !kanjiFromDbList.Any())
             {
-                var rawJsonEntry = await _db.Entries
-                    .AsNoTracking()
-                    .Where(e => e.Type == "kanji" && e.Label == kanjiCharacter)
-                    .Select(e => e.RawJson)
-                    .FirstOrDefaultAsync();
-
-                if (!string.IsNullOrEmpty(rawJsonEntry)) return rawJsonEntry;
-
+                // (Chốt chặn cuối cùng: thử tìm RawJson nếu chỉ có 1 ký tự)
+                if (kanjiChars.Length == 1)
+                {
+                    var rawJsonEntry = await _db.Entries
+                        .AsNoTracking()
+                        .Where(e => e.Type == "kanji" && e.Label == kanjiChars[0].ToString())
+                        .Select(e => e.RawJson)
+                        .FirstOrDefaultAsync();
+                    if (!string.IsNullOrEmpty(rawJsonEntry)) return rawJsonEntry;
+                }
                 return JsonConvert.SerializeObject(new { status = 404, error = "Kanji data not found in database" });
             }
 
-            // 3. Ánh xạ (Map) sang Model JSON
-            var kanjiResult = MapKanjiDataToJson(entryFromDb, kanjiFromDb);
+            // Bước 4: Ánh xạ (Map) từng Hán tự sang Model JSON
+            var resultsList = new List<KanjiResult>();
+            foreach (var charToFind in kanjiChars)
+            {
+                var entry = entryFromDbList.FirstOrDefault(e => e.Label == charToFind.ToString());
+                var kanji = kanjiFromDbList.FirstOrDefault(k => k.Character == charToFind.ToString());
+
+                if (entry != null && kanji != null)
+                {
+                    resultsList.Add(MapKanjiDataToJson(entry, kanji)); // Gọi hàm helper
+                }
+            }
 
             var rootObject = new KanjiRootObject
             {
-                Results = new List<KanjiResult> { kanjiResult },
-                Total = 10000 // Giả lập giá trị total như file gốc
+                Results = resultsList, // Gán danh sách kết quả
+                Total = 10000
             };
 
             return JsonConvert.SerializeObject(rootObject, Formatting.Indented, new JsonSerializerSettings
@@ -241,7 +257,7 @@ namespace Dict.Service
         /// <summary>
         /// (Helper cho WORD) Ánh xạ Entry sang JSON Word đầy đủ
         /// </summary>
-        private Dict.Models.JsonModels.Word? MapEntryToJsonWord(Entry entryFromDb, Dictionary<string, Entry> kanjiEntryDataMap)
+        private Dict.Models.JsonModels.Word? MapEntryToJsonWord(Entry entryFromDb)
         {
             var mainWordRecord = entryFromDb.Words?.FirstOrDefault();
             if (mainWordRecord == null) return null;
@@ -308,22 +324,6 @@ namespace Dict.Service
                 });
             }
 
-            // THÊM LOGIC MAPPING KANJI TỪ DỮ LIỆU ĐÃ TẢI SẴN
-            if (mainWordRecord.WordKanji != null)
-            {
-                foreach (var wordKanjiLink in mainWordRecord.WordKanji.OrderBy(wk => wk.KanjiId))
-                {
-                    var kanji = wordKanjiLink.Kanji;
-                    // Kiểm tra xem đã lấy được Entry của Kanji này chưa
-                    if (kanji != null && kanjiEntryDataMap.TryGetValue(kanji.Character, out var kanjiEntry))
-                    {
-                        // Tái sử dụng helper 'MapKanjiDataToJson'
-                        var kanjiResult = MapKanjiDataToJson(kanjiEntry, kanji);
-                        wordObject.RelatedKanji.Add(kanjiResult);
-                    }
-                }
-            }
-
             return wordObject;
         }
 
@@ -350,25 +350,6 @@ namespace Dict.Service
                                 Examples = new List<Dict.Models.JsonModels.Example>()
                             }).ToList() ?? new List<Dict.Models.JsonModels.Mean>()
             };
-        }
-
-        /// <summary>
-        /// (Helper) Tải trước dữ liệu Entry (cách đọc, nghĩa) cho các Hán tự liên quan
-        /// </summary>
-        private async Task<Dictionary<string, Entry>> GetKanjiEntryDataForMappingAsync(List<string> kanjiChars)
-        {
-            if (kanjiChars == null || !kanjiChars.Any())
-            {
-                return new Dictionary<string, Entry>();
-            }
-
-            // Truy vấn các Entry (loại 'kanji') có Label nằm trong danh sách
-            return await _db.Entries
-                .AsNoTracking()
-                .Where(e => e.Type == "kanji" && kanjiChars.Contains(e.Label))
-                .Include(e => e.ReadingElements) // Tải cách đọc
-                .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.Glosses) // Tải nghĩa
-                .ToDictionaryAsync(e => e.Label); // Trả về Dictionary để tra cứu nhanh
         }
 
 

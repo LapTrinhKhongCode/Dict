@@ -100,9 +100,6 @@ namespace Dict.Models.JsonModels
         // Các trường khác có thể có trong JSON gốc
         [JsonProperty("type")]
         public string Type { get; set; } = "word";
-
-        [JsonProperty("related_kanji")]
-        public List<KanjiResult> RelatedKanji { get; set; } = new List<KanjiResult>();
     }
 
     /// <summary>
