@@ -11,7 +11,7 @@ namespace Dict.Models
         public virtual Card Card { get; set; }
 
         public int? UserId { get; set; }
-        public virtual User User { get; set; }
+        public virtual ApplicationUser User { get; set; }
 
         public DateTime? DueDate { get; set; }
         public int? Interval { get; set; }

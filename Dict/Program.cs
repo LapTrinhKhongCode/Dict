@@ -1,31 +1,4 @@
-﻿//var builder = WebApplication.CreateBuilder(args);
-
-//// Add services to the container.
-
-//builder.Services.AddControllers();
-//// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-//builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen();
-
-//var app = builder.Build();
-
-//// Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
-//    app.UseSwagger();
-//    app.UseSwaggerUI();
-//}
-
-//app.UseHttpsRedirection();
-
-//app.UseAuthorization();
-
-//app.MapControllers();
-
-//app.Run();
-
-
-using Dict.Data;
+﻿using Dict.Data;
 using Dict.Models;
 using Dict.Service;
 using Dict.Service.IService;
@@ -76,23 +49,69 @@ builder.Services.AddSwaggerGen(c =>
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAnyOrigin", policy =>
     {
         policy.AllowAnyOrigin()  // Cho phép tất cả các domain
               .AllowAnyMethod()  // Cho phép tất cả các phương thức HTTP
-              .AllowAnyHeader();  // Cho phép tất cả các headers
+              .AllowAnyHeader(); // Cho phép tất cả các headers
     });
 });
 builder.Services.AddHttpContextAccessor();
 
+// --- Cấu hình Identity và Authentication (KHỐI CHUẨN) ---
+builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+{
+    // Cấu hình mật khẩu (tùy chọn)
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequiredLength = 6;
+
+    // Cấu hình người dùng
+    options.User.RequireUniqueEmail = true;
+
+    // Cấu hình đăng nhập
+    options.SignIn.RequireConfirmedAccount = false; // Tắt nếu bạn không dùng xác thực email
+})
+.AddEntityFrameworkStores<ApplicationDbContext>() // Chỉ định DbContext
+.AddDefaultTokenProviders(); // Thêm dịch vụ tạo token (ví dụ: reset mật khẩu)
+
+// 2. Cấu hình Xác thực (Authentication) để dùng JWT
+// Chúng ta cần AddAuthentication SAU KHI AddIdentity
+// và cấu hình nó để sử dụng JWT làm mặc định, thay vì Cookie
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options => // Giữ nguyên cấu hình AddJwtBearer cũ của bạn
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
+// --- Kết thúc khối Identity/Auth ---
+
 builder.Services.AddControllers();
 builder.Services.AddMemoryCache();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// ĐÃ XÓA: builder.Services.AddSwaggerGen(); (bị lặp)
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<KanjiImportService>();
+
+// --- Đăng ký các dịch vụ (Services) của ứng dụng ---
 builder.Services.AddScoped<KanjiImportService>();
 builder.Services.AddScoped<JsonService>();
 builder.Services.AddScoped<WordImportService>();
@@ -108,113 +127,15 @@ builder.Services.AddScoped<IOcrProcessingService, OcrProcessingService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-        };
-    });
+// << --- ĐÃ XÓA KHỐI AddAuthentication BỊ LẶP Ở ĐÂY --- >>
+
 builder.Services.AddScoped<IJsonBuilderService, JsonBuilder>();
 builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddScoped<IKanjiService, KanjiService>();
 builder.Services.AddScoped<IWordService, WordService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
+
 var app = builder.Build();
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var json = scope.ServiceProvider.GetRequiredService<JsonService>();
-//    await json.Serialize();
-//}
-
-// tạo scope để dùng DbContext và Service
-//using (var scope = app.Services.CreateScope())
-//{
-//    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-//    var importer = scope.ServiceProvider.GetRequiredService<KanjiImportService>();
-
-//    int total = await db.Entries.CountAsync();
-//    int bigBatch = 500;
-
-//    // Lấy toàn bộ Kanji
-//    var allKanji = await db.Kanji
-//        .OrderBy(x => x.Id) // quan trọng: đảm bảo offset đúng
-//        .Select(x => x.Character)
-//        .Distinct()
-//        .ToListAsync();
-
-//    for (int offset = 0; offset < total; offset += bigBatch)
-//    {
-//        var chunk = allKanji.Skip(offset).Take(bigBatch).ToArray();
-
-//        try
-//        {
-//            await importer.RehydrateExamplesFromRawJsonAsync(
-//                specificKanji: chunk,
-//                batchLimit: chunk.Length
-//            );
-//            Console.WriteLine($"✅ Batch {offset} → {offset + bigBatch} done");
-//        }
-//        catch (Exception ex)
-//        {
-//            Console.WriteLine($"⚠️ Lỗi batch {offset} → {offset + bigBatch}, fallback từng entry...");
-
-//            for (int i = 0; i < chunk.Length; i++)
-//            {
-//                try
-//                {
-//                    await importer.RehydrateExamplesFromRawJsonAsync(
-//                        specificKanji: new[] { chunk[i] },
-//                        batchLimit: 1
-//                    );
-//                    Console.WriteLine($"   ✅ Entry {offset + i} done");
-//                }
-//                catch (Exception innerEx)
-//                {
-//                    Console.WriteLine($"   ❌ Entry lỗi {offset + i}: {innerEx.Message}");
-//                    // TODO: log ra file nếu cần
-//                }
-//            }
-//        }
-//    }
-//}
-//----------------------------------------------
-//var tsvPath = args.Length > 0 ? args[0] : @"G:\N2\CODE\out.tsv";
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-//    var importer = scope.ServiceProvider.GetRequiredService<WordImportService>();
-
-//    logger.LogInformation("Starting word import from TSV: {tsv}", tsvPath);
-
-//    try
-//    {
-//        // Pass the application stopping token so import cancels when host is stopping
-//        var token = app.Lifetime.ApplicationStopping;
-
-//        // IMPORTANT: await the async call so the scope/DbContext stays alive for the duration
-//        await importer.ImportWordsFromTsvAsync(tsvPath, token);
-
-//        logger.LogInformation("Import finished successfully.");
-//    }
-//    catch (OperationCanceledException)
-//    {
-//        logger.LogWarning("Import cancelled by cancellation token.");
-//    }
-//    catch (Exception ex)
-//    {
-//        logger.LogError(ex, "Unhandled exception during import.");
-//    }
-//}
 
 // Configure the HTTP request pipeline.
 app.UseSwagger();
@@ -227,9 +148,32 @@ app.UseStaticFiles();
 //app.UseHttpsRedirection();
 app.UseCors("AllowAnyOrigin");
 
-// SỬA LẠI THỨ TỰ Ở ĐÂY
+// Thứ tự này là CHUẨN XÁC
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+//using (var scope = app.Services.CreateScope())
+//{
+//    var services = scope.ServiceProvider;
+//    var logger = services.GetRequiredService<ILogger<Program>>();
+//    try
+//    {
+//        // (Tùy chọn: Tự động chạy Migration nếu DB chưa được cập nhật)
+//        // var dbContext = services.GetRequiredService<ApplicationDbContext>();
+//        // await dbContext.Database.MigrateAsync();
+
+//        // Gọi hàm Seed Data và chờ nó hoàn thành
+//        // Chúng ta dùng GetAwaiter().GetResult() để chạy async trong ngữ cảnh sync
+//        DbSeeder.SeedRolesAndAdminAsync(services).GetAwaiter().GetResult();
+
+//        logger.LogInformation("Khởi tạo (Seed) Database thành công.");
+//    }
+//    catch (Exception ex)
+//    {
+//        // Log lỗi nghiêm trọng nếu Seed Data thất bại
+//        logger.LogError(ex, "Đã xảy ra lỗi nghiêm trọng khi Khởi tạo (Seed) Database.");
+//    }
+//}
 app.Run();
+public partial class Program { }

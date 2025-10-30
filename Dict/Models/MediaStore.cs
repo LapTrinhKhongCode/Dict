@@ -8,7 +8,7 @@ namespace Dict.Models
         public int Id { get; set; }
 
         public int? OwnerId { get; set; }
-        public virtual User Owner { get; set; }
+        public virtual ApplicationUser Owner { get; set; }
 
         public string FileName { get; set; }
 
