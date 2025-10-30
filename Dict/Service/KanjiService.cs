@@ -1,27 +1,55 @@
-﻿using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Dict.Data;
+﻿using Dict.Data;
 using Dict.DTO;
+using Dict.Service.IService;
 using EllipticCurve.Utils;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 public class KanjiService : IKanjiService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IJsonBuilderService _jsonBuilderService;
 
-    public KanjiService(ApplicationDbContext db)
+    public KanjiService(ApplicationDbContext db, IJsonBuilderService jsonBuilderService)
     {
         _db = db;
+        _jsonBuilderService = jsonBuilderService;
     }
 
     public async Task<string?> GetKanjiJson(string label)
     {
-        return await _db.Entries
-            .AsNoTracking()
-            .Where(k => k.Type == "kanji" && (k.Label == label || k.Phonetic == label))
-            .Select(k => k.RawJson)
-            .FirstOrDefaultAsync();
+        string kanjiChars = new string(label.Where(c => c >= 0x4E00 && c <= 0x9FFF).ToArray());
+
+        if (string.IsNullOrEmpty(kanjiChars))
+        {
+            var phoneticMatch = await _db.Entries
+                .AsNoTracking()
+                .Where(k => k.Type == "kanji" && k.Phonetic == label)
+                .Select(k => k.RawJson)
+                .FirstOrDefaultAsync();
+
+            if (!string.IsNullOrEmpty(phoneticMatch)) return phoneticMatch;
+
+            return JsonConvert.SerializeObject(new { status = 404, error = "No Kanji found in search term" });
+        }
+
+        if (kanjiChars.Length == 1)
+        {
+            var rawJson = await _db.Entries
+                .AsNoTracking()
+                .Where(k => k.Type == "kanji" && k.Label == kanjiChars)
+                .Select(k => k.RawJson)
+                .FirstOrDefaultAsync();
+
+            if (!string.IsNullOrEmpty(rawJson) && rawJson != "{}")
+            {
+                return rawJson;
+            }
+        }
+        return await _jsonBuilderService.RebuildJsonForKanjiAsync(kanjiChars);
     }
 
     public async Task<KanjiDto?> GetKanjiInfoAsync(

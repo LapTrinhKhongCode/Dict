@@ -4,6 +4,7 @@ using Dict.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dict.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251023132035_AddShortMeanToEntries")]
+    partial class AddShortMeanToEntries
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -204,10 +207,6 @@ namespace Dict.Migrations
                     b.Property<long?>("EntSeq")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("EntryCategory")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<string>("JsonErrorMessage")
                         .HasColumnType("nvarchar(max)");
 
@@ -217,7 +216,8 @@ namespace Dict.Migrations
 
                     b.Property<string>("Label")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<int?>("MobileId")
                         .HasColumnType("int");
@@ -235,7 +235,8 @@ namespace Dict.Migrations
                         .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("ShortMean")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -244,9 +245,6 @@ namespace Dict.Migrations
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int?>("Weight")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

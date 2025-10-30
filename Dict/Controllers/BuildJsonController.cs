@@ -19,6 +19,19 @@ namespace Dict.Controllers
             _response = new ResponseDTO();
             _jsonBuilderService = jsonBuilderService;
         }
+        [HttpGet]
+        [Route("BuildKanjiJson/{label}")]
+        public async Task<IActionResult> BuildKanjiJson(string label)
+        {
+            var json = await _jsonBuilderService.RebuildJsonForKanjiAsync(label);
+
+            //if (string.IsNullOrEmpty(json))
+            //    return NotFound();
+
+            //var doc = JsonDocument.Parse(json);
+            // return Ok(doc.RootElement);
+            return Ok(json);
+        }
 
         [HttpGet]
         [Route("BuildWordJson/{label}")]

@@ -183,7 +183,7 @@ namespace Dict.Data
                 b.Property(x => x.EntSeq);
                 b.HasIndex(x => new { x.EntSeq, x.Type }).IsUnique();
                 b.Property(x => x.Type).HasMaxLength(32);
-                b.Property(x => x.Label).HasMaxLength(32);
+                b.Property(x => x.Label);
                 b.Property(x => x.RawJson);
                 b.Property(x => x.MobileId);
                 b.Property(x => x.CommentRawJson);
@@ -195,6 +195,9 @@ namespace Dict.Data
                 b.Property(x => x.JsonErrorMessage);
                 b.Property(x => x.Phonetic).HasMaxLength(255);
                 b.Property(x => x.Romaji).HasMaxLength(255);
+                b.Property(x => x.ShortMean);
+                b.Property(x => x.Weight);
+                b.Property(x => x.EntryCategory).HasMaxLength(50).IsRequired(false);
 
                 b.HasIndex(x => new { x.Type, x.Label }, "IX_entries_Type_Label");
                 b.HasIndex(x => new { x.Type, x.Phonetic }, "IX_entries_Type_Phonetic");
