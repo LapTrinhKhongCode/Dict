@@ -28,7 +28,7 @@
           </div>
         </div>
       </div>
-
+    <div class="flex justify-center">XEM CHI TIẾT</div>
       <div class="border-t border-gray-700 my-4"></div>
 
       <div v-if="flip" class="animate-fade-in">

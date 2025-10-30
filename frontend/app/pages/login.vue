@@ -76,7 +76,16 @@ async function handleAuth() {
       return
     }
     if (data.result.token) {
-      login(data.result.token, data.result.username, data.result.avatarUrl)
+login(
+  data.result.token,
+  data.result.username,
+  data.result.avatarUrl,
+  data.result.email,
+  data.result.role,
+  data.result.userId
+)
+
+
       showToast('Login successful!', 'success')
       await router.push('/')
     } else {

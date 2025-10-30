@@ -200,11 +200,11 @@ export async function loadKanjiData(): Promise<KanjiItem[]> {
 
       // Dùng logic load file của Kanjistroke.vue vì nó chi tiết hơn
 
-      const csvFiles = import.meta.glob("/src/assets/kanji_fixed_v2.csv", { as: "raw" });
+      const csvFiles = import.meta.glob("/src/assets/kanji_fixed.csv", { as: "raw" });
 
-      const loadCsv = csvFiles["/src/assets/kanji_fixed_v2.csv"];
+      const loadCsv = csvFiles["/src/assets/kanji_fixed.csv"];
 
-      if (!loadCsv) throw new Error("Không tìm thấy file /src/assets/kanji_fixed_v2.csv");
+      if (!loadCsv) throw new Error("Không tìm thấy file /src/assets/kanji_fixed.csv");
 
       
 

@@ -946,7 +946,7 @@ function onNodeClick(node: GraphNode | null) {
 .graph-page-container {
   width: 100%;
 
-  height: 200vh;
+  height: 220vh;
 
   display: flex;
 

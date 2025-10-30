@@ -34,7 +34,7 @@
       <span>Account</span>
     </NuxtLink>
 
-    <NuxtLink class="sidebar-link-style">
+    <NuxtLink to="premium" class="sidebar-link-style">
       <UIcon name="i-lucide-credit-card" />
       <span>Premium</span>
     </NuxtLink>
