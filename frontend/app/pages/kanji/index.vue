@@ -95,7 +95,7 @@ import { ref, computed, onMounted, watch } from "vue";
 
 import { useRouter } from "vue-router"; // <-- Thêm import này
 
-import { kanjiList, loadKanjiData } from "../../src/services/kanjiStore"; // <-- IMPORT KHO
+import { kanjiList, loadKanjiData } from "../../src/services/kanjiIndex"; // <-- IMPORT KHO
 
 
 

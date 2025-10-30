@@ -10,15 +10,15 @@ namespace Dict.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateIndex(
-                name: "IX_entries_Type_Label",
-                table: "entries",
-                columns: new[] { "Type", "Label" });
+            //migrationBuilder.CreateIndex(
+            //    name: "IX_entries_Type_Label",
+            //    table: "entries",
+            //    columns: new[] { "Type", "Label" });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_entries_Type_Phonetic",
-                table: "entries",
-                columns: new[] { "Type", "Phonetic" });
+            //migrationBuilder.CreateIndex(
+            //    name: "IX_entries_Type_Phonetic",
+            //    table: "entries",
+            //    columns: new[] { "Type", "Phonetic" });
         }
 
         /// <inheritdoc />
