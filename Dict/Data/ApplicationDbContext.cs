@@ -1,10 +1,11 @@
 ﻿using Dict.Models;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dict.Data
 {
     // DbContext with DbSets for all tables
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
@@ -35,8 +36,8 @@ namespace Dict.Data
             optionsBuilder.EnableSensitiveDataLogging();
         }
 
-
-
+        public DbSet<SearchMiss> SearchMiss { get; set; }
+        public DbSet<SiteStatsHistory> SiteStatsHistorys { get; set; }
         // Languages
         public DbSet<Language> Languages { get; set; }
 
@@ -76,9 +77,6 @@ namespace Dict.Data
         public DbSet<ImportJob> ImportJobs { get; set; }
         public DbSet<ApiCall> ApiCalls { get; set; }
 
-        // Users / permissions
-        public DbSet<User> Users { get; set; }
-
         // Decks & flashcards
         public DbSet<Deck> Decks { get; set; }
         public DbSet<Card> Cards { get; set; }
@@ -97,6 +95,49 @@ namespace Dict.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<SearchMiss>(b =>
+            {
+                b.ToTable("SearchMisses");
+
+                b.HasKey(sm => sm.Id);
+
+                b.Property(sm => sm.SearchTerm)
+                    .IsRequired() 
+                    .HasMaxLength(255); 
+
+                b.Property(sm => sm.NormalizedTerm)
+                    .IsRequired()
+                    .HasMaxLength(255);
+
+                b.Property(sm => sm.SearchCount)
+                    .IsRequired()
+                    .HasColumnType("int")
+                    .HasDefaultValue(1);
+
+                b.Property(sm => sm.LastSearchedAt)
+                    .IsRequired()
+                    .HasColumnType("datetime2");
+                b.HasIndex(sm => sm.NormalizedTerm)
+                    .IsUnique();
+            });
+
+            modelBuilder.Entity<SiteStatsHistory>(b =>
+            {
+                b.ToTable("SiteStatsHistory");
+
+                b.HasKey(sh => sh.Date);
+
+                b.Property(sh => sh.Date)
+                    .IsRequired()
+                    .HasColumnType("date");
+
+                b.Property(sh => sh.TotalUsers).IsRequired();
+                b.Property(sh => sh.NewUsersToday).IsRequired();
+                b.Property(sh => sh.TotalEntries).IsRequired();
+                b.Property(sh => sh.TotalReviewsToday).IsRequired();
+                b.Property(sh => sh.TotalApiErrorsToday).IsRequired();
+            });
 
             // languages
             modelBuilder.Entity<Language>(b =>
@@ -415,23 +456,7 @@ namespace Dict.Data
                 b.Property(x => x.ResponseTimeMs);
                 b.Property(x => x.CreatedAt);
             });
-
-            modelBuilder.Entity<User>(b =>
-            {
-                b.ToTable("users");
-                b.HasKey(x => x.Id);
-                b.Property(x => x.Username).IsRequired().HasMaxLength(100);
-                b.HasIndex(x => x.Username).IsUnique();
-                b.Property(x => x.Email).IsRequired().HasMaxLength(255);
-                b.HasIndex(x => x.Email).IsUnique();
-                b.Property(x => x.PasswordHash).HasMaxLength(255);
-                b.Property(x => x.IsActive).HasDefaultValue(true);
-                b.Property(x => x.Role).HasMaxLength(64);   
-                b.Property(x => x.AvatarUrl);
-                b.Property(x => x.CreatedAt);
-                b.Property(x => x.UpdatedAt);
-            });
-
+            
             modelBuilder.Entity<Deck>(b =>
             {
                 b.ToTable("decks");

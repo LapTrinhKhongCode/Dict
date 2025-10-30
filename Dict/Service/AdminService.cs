@@ -13,43 +13,63 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
-using BCrypt.Net; // Thêm
+
+// 1. THÊM
+using Microsoft.AspNetCore.Identity;
 using System.Globalization;
-using Dict.Models.Enum; // Thêm
+
 
 namespace Dict.Service
 {
     public class AdminService : IAdminService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ApplicationDbContext _context; // Vẫn cần DbContext cho Decks, OcrJobs, v.v.
         private readonly ILogger<AdminService> _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private const string DefaultAvatarUrl = "/images/default_ava.jpg";
 
+        // 2. THÊM MANAGER CỦA IDENTITY
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly RoleManager<ApplicationRole> _roleManager;
+
+        // 3. CẬP NHẬT CONSTRUCTOR
         public AdminService(
             ApplicationDbContext context,
             ILogger<AdminService> logger,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            UserManager<ApplicationUser> userManager, // THÊM
+            RoleManager<ApplicationRole> roleManager) // THÊM
         {
             _context = context;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
+            _userManager = userManager; // GÁN
+            _roleManager = roleManager; // GÁN
         }
 
-        // ✨ ĐÃ SỬA LỖI: Chạy truy vấn tuần tự
+        // 4. SỬA LẠI HÀM GETDASHBOARD (DÙNG MANAGER)
         public async Task<AdminDashboardStatsDto> GetDashboardStatisticsAsync()
         {
             var today = DateTime.UtcNow;
             var startOfMonth = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
-            // Chạy tuần tự để tránh lỗi DbContext concurrency
-            var totalUsers = await _context.Users.CountAsync();
-            var newUsers = await _context.Users.CountAsync(u => u.CreatedAt >= startOfMonth);
+            // Dùng _userManager.Users thay vì _context.Users
+            var totalUsers = await _userManager.Users.CountAsync();
+            var newUsers = await _userManager.Users.CountAsync(u => u.CreatedAt >= startOfMonth);
+
             var totalDecks = await _context.Decks.CountAsync();
             var newDecks = await _context.Decks.CountAsync(d => d.CreatedAt >= startOfMonth);
-            var premiumUsers = await _context.Users.CountAsync(u => u.Role == Role.PREMIUM_USER);
+
+            // Sửa lại cách đếm Premium Users (dùng RoleManager)
+            var premiumRole = await _roleManager.FindByNameAsync("Premium_User"); // (Giả sử tên Role là "Premium_User")
+            var premiumUsers = 0;
+            if (premiumRole != null)
+            {
+                // Đếm số user có RoleId này trong bảng AspNetUserRoles
+                premiumUsers = await _context.UserRoles.CountAsync(ur => ur.RoleId == premiumRole.Id);
+            }
+
             var ocrJobs = await _context.OcrJobs.CountAsync(j => j.CreatedAt >= startOfMonth);
-            // Sửa lỗi SumAsync cho kiểu nullable
             var totalStorageBytes = await _context.MediaStore.SumAsync(m => (long?)m.SizeBytes) ?? 0L;
 
             return new AdminDashboardStatsDto
@@ -58,74 +78,79 @@ namespace Dict.Service
                 NewUsersThisMonth = newUsers,
                 TotalDecks = totalDecks,
                 NewDecksThisMonth = newDecks,
-                TotalPremiumUsers = premiumUsers,
+                TotalPremiumUsers = premiumUsers, // Đã sửa
                 TotalOcrJobsThisMonth = ocrJobs,
                 TotalStorageUsedMb = Math.Round(totalStorageBytes / (1024.0 * 1024.0), 2)
             };
         }
 
-        // --- CÁC HÀM MỚI ---
-
+        // 5. SỬA LẠI HÀM SEARCHUSERS (DÙNG MANAGER VÀ SỬA VÒNG LẶP MAP)
         public async Task<PaginatedUsersDto> SearchUsersAsync(string? searchTerm, int page, int pageSize)
         {
-            // Đảm bảo page và pageSize hợp lệ
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
 
-            var query = _context.Users.AsNoTracking();
+            // Dùng _userManager.Users
+            var query = _userManager.Users.AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 var term = searchTerm.ToLower().Trim();
-                query = query.Where(u => u.Username.ToLower().Contains(term) || u.Email.ToLower().Contains(term));
+                query = query.Where(u => u.UserName.ToLower().Contains(term) || u.Email.ToLower().Contains(term));
             }
 
             var totalCount = await query.CountAsync();
 
             var users = await query
-                .OrderBy(u => u.Username)
+                .OrderBy(u => u.UserName)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Include(u => u.Decks)
-                    .ThenInclude(d => d.Cards) // Include lồng để đếm Card
+                    .ThenInclude(d => d.Cards)
                 .ToListAsync();
+
+            // Sửa lại vòng lặp Map vì MapUserToDto giờ là async
+            var userDtos = new List<UserDto>();
+            foreach (var user in users)
+            {
+                userDtos.Add(await MapUserToDto(user));
+            }
 
             return new PaginatedUsersDto
             {
-                Users = users.Select(MapUserToDto).ToList(), // Dùng hàm Map
+                Users = userDtos, // Đã sửa
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
             };
         }
 
+        // 6. SỬA LẠI HÀM GETMONTHLYGROWTH (DÙNG MANAGER)
         public async Task<HistoricalStatsDto> GetMonthlyGrowthStatisticsAsync()
         {
             var today = DateTime.UtcNow;
-            // Lấy dữ liệu từ đầu của 11 tháng trước (tổng cộng 12 tháng)
             var lookbackDate = new DateTime(today.Year, today.Month, 1).AddMonths(-11);
 
-            // Nhóm người dùng mới
-            var usersByMonth = await _context.Users
+            // Dùng _userManager.Users
+            var usersByMonth = await _userManager.Users
                 .Where(u => u.CreatedAt >= lookbackDate)
                 .GroupBy(u => new { Year = u.CreatedAt.Value.Year, Month = u.CreatedAt.Value.Month })
                 .Select(g => new { Year = g.Key.Year, Month = g.Key.Month, Count = g.Count() })
                 .ToListAsync();
 
-            // Nhóm deck mới
+            // (Phần Decks giữ nguyên)
             var decksByMonth = await _context.Decks
                 .Where(d => d.CreatedAt >= lookbackDate)
                 .GroupBy(d => new { Year = d.CreatedAt.Value.Year, Month = d.CreatedAt.Value.Month })
                 .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
                 .ToListAsync();
 
-            // Tạo danh sách 12 tháng qua
+            // (Logic lặp tháng giữ nguyên)
             var monthlyData = new List<MonthlyDataPointDto>();
             for (int i = 0; i < 12; i++)
             {
                 var month = today.AddMonths(-i);
                 var monthKey = $"{month.Year}-{month.Month:D2}";
-
                 var users = usersByMonth.FirstOrDefault(x => x.Year == month.Year && x.Month == month.Month);
                 var decks = decksByMonth.FirstOrDefault(x => x.Year == month.Year && x.Month == month.Month);
 
@@ -137,34 +162,51 @@ namespace Dict.Service
                 });
             }
 
-            return new HistoricalStatsDto { MonthlyData = monthlyData.OrderBy(d => d.Month).ToList() }; // Sắp xếp theo thứ tự
+            return new HistoricalStatsDto { MonthlyData = monthlyData.OrderBy(d => d.Month).ToList() };
         }
 
+        // 7. SỬA LẠI HOÀN TOÀN HÀM RESET PASSWORD
         public async Task<bool> AdminResetUserPasswordAsync(int userId, string newPassword)
         {
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null)
             {
                 _logger.LogWarning("AdminResetUserPasswordAsync: User not found with ID {UserId}", userId);
                 return false;
             }
 
-            if (user.Role == Role.ADMIN)
+            // Dùng IsInRoleAsync
+            if (await _userManager.IsInRoleAsync(user, "Admin"))
             {
                 _logger.LogWarning("AdminResetUserPasswordAsync: Admin {AdminId} attempted to reset password of ADMIN account {TargetUserId}", GetAdminId(), userId);
-                return false; // Không cho reset pass của Admin khác
+                return false;
             }
 
-            // Băm mật khẩu mới
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            // Xóa mật khẩu cũ (nếu có)
+            if (await _userManager.HasPasswordAsync(user))
+            {
+                var removeResult = await _userManager.RemovePasswordAsync(user);
+                if (!removeResult.Succeeded) throw new Exception("Failed to remove old password.");
+            }
+
+            // Thêm mật khẩu mới ( UserManager sẽ tự hash)
+            var addResult = await _userManager.AddPasswordAsync(user, newPassword);
+            if (!addResult.Succeeded)
+            {
+                var errors = string.Join(", ", addResult.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Failed to add new password: {errors}");
+            }
+
             user.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _userManager.UpdateAsync(user); // Lưu lại UpdateAt
+
             _logger.LogInformation("Admin {AdminId} reset password for User {UserId}", GetAdminId(), userId);
             return true;
         }
 
         public async Task<bool> SetDeckVisibilityAsync(int deckId, bool isPublic)
         {
+            // (Hàm này OK, không liên quan đến User)
             var deck = await _context.Decks.FindAsync(deckId);
             if (deck == null)
             {
@@ -180,41 +222,92 @@ namespace Dict.Service
         }
 
 
-        // --- CÁC HÀM CŨ (Đã có trong code bạn cung cấp) ---
-
+        // 8. SỬA LẠI HÀM GETALLUSERS (SỬA VÒNG LẶP MAP)
         public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
         {
-            var users = await _context.Users
+            var users = await _userManager.Users
                .AsNoTracking()
                .Include(u => u.Decks)
                    .ThenInclude(d => d.Cards)
-               .OrderBy(u => u.Username)
+               .OrderBy(u => u.UserName)
                .ToListAsync();
-            return users.Select(user => MapUserToDto(user));
+
+            // Sửa vòng lặp
+            var dtos = new List<UserDto>();
+            foreach (var user in users)
+            {
+                dtos.Add(await MapUserToDto(user));
+            }
+            return dtos;
         }
 
+        // 9. SỬA LẠI HÀM LOCKSTATUS (DÙNG MANAGER)
+        // (Hàm này đang set cột IsActive tùy chỉnh của bạn, KHÔNG PHẢI LockoutEnabled của Identity)
         public async Task<bool> SetUserLockStatusAsync(int userId, bool isLocked)
         {
-            var user = await _context.Users.FindAsync(userId); if (user == null) return false;
-            if (user.Role == Role.ADMIN) { _logger.LogWarning("Admin {AdminId} attempted to lock ADMIN {TargetUserId}", GetAdminId(), userId); return false; }
-            user.IsActive = !isLocked; user.UpdatedAt = DateTime.UtcNow; await _context.SaveChangesAsync();
-            _logger.LogInformation("Admin {AdminId} set User {UserId} IsActive to {IsActive}", GetAdminId(), userId, user.IsActive);
-            return true;
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null) return false;
+
+            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            {
+                _logger.LogWarning("Admin {AdminId} attempted to lock ADMIN {TargetUserId}", GetAdminId(), userId);
+                return false;
+            }
+
+            user.IsActive = !isLocked; // Cập nhật trường tùy chỉnh
+            user.UpdatedAt = DateTime.UtcNow;
+
+            // Dùng UserManager để lưu
+            var result = await _userManager.UpdateAsync(user);
+
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("Admin {AdminId} set User {UserId} IsActive to {IsActive}", GetAdminId(), userId, user.IsActive);
+                return true;
+            }
+            return false;
         }
 
-        public async Task<bool> UpdateUserRoleAsync(int userId, string newRole)
+        // 10. SỬA LẠI HOÀN TOÀN HÀM UPDATE ROLE
+        // (Hàm cũ của bạn chỉ cho phép 1 Role, hàm mới này cho phép nhiều Role)
+        public async Task<bool> UpdateUserRolesAsync(int userId, List<string> newRoleNames)
         {
-            var user = await _context.Users.FindAsync(userId); if (user == null) return false;
-            var validRoles = typeof(Role).GetFields(BindingFlags.Public | BindingFlags.Static).Select(f => f.GetValue(null).ToString()).ToList();
-            if (!validRoles.Contains(newRole)) { _logger.LogWarning("Admin {AdminId} specified invalid role '{NewRole}'", GetAdminId(), newRole); throw new ArgumentException("Invalid role specified."); }
-            if (user.Role == Role.ADMIN) { _logger.LogWarning("Admin {AdminId} attempted to change role of ADMIN {TargetUserId}", GetAdminId(), userId); return false; }
-            user.Role = newRole; user.UpdatedAt = DateTime.UtcNow; await _context.SaveChangesAsync();
-            _logger.LogInformation("Admin {AdminId} updated User {UserId} role to {NewRole}", GetAdminId(), userId, newRole);
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null) return false;
+
+            // Kiểm tra xem Admin có đang cố sửa Role của Admin khác không
+            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            {
+                _logger.LogWarning("Admin {AdminId} attempted to change role of ADMIN {TargetUserId}", GetAdminId(), userId);
+                return false;
+            }
+
+            // Kiểm tra xem các Role mới có hợp lệ không
+            foreach (var roleName in newRoleNames)
+            {
+                if (!await _roleManager.RoleExistsAsync(roleName))
+                {
+                    _logger.LogWarning("Admin {AdminId} specified invalid role '{NewRole}'", GetAdminId(), roleName);
+                    throw new ArgumentException($"Invalid role specified: {roleName}");
+                }
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(user);
+
+            // Xóa các Role cũ và thêm các Role mới
+            var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
+            if (!removeResult.Succeeded) throw new Exception("Failed to remove old roles.");
+
+            var addResult = await _userManager.AddToRolesAsync(user, newRoleNames);
+            if (!addResult.Succeeded) throw new Exception("Failed to add new roles.");
+
+            _logger.LogInformation("Admin {AdminId} updated User {UserId} roles to {NewRoles}", GetAdminId(), userId, string.Join(", ", newRoleNames));
             return true;
         }
 
         public async Task<bool> AdminDeleteDeckAsync(int deckId)
         {
+            // (Hàm này OK, không liên quan đến User)
             var deck = await _context.Decks.Include(d => d.Cards).ThenInclude(c => c.CardStates).Include(d => d.Cards).ThenInclude(c => c.ReviewLogs).FirstOrDefaultAsync(d => d.Id == deckId);
             if (deck == null) { _logger.LogWarning("AdminDeleteDeckAsync: Deck not found: {DeckId}", deckId); return false; }
             foreach (var card in deck.Cards) { _context.ReviewLogs.RemoveRange(card.ReviewLogs); _context.CardStates.RemoveRange(card.CardStates); }
@@ -223,14 +316,23 @@ namespace Dict.Service
             return true;
         }
 
+        // 11. SỬA LẠI HÀM DELETE USER (DÙNG MANAGER)
         public async Task<bool> AdminDeleteUserAsync(int userId)
         {
             _logger.LogWarning("Admin {AdminId} attempting DESTRUCTIVE delete of user {UserId}", GetAdminId(), userId);
-            var user = await _context.Users.FindAsync(userId); if (user == null) return false;
-            if (user.Role == Role.ADMIN) { _logger.LogError("CRITICAL: Admin {AdminId} attempted to DELETE ADMIN {TargetUserId}", GetAdminId(), userId); return false; }
+
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null) return false;
+
+            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            {
+                _logger.LogError("CRITICAL: Admin {AdminId} attempted to DELETE ADMIN {TargetUserId}", GetAdminId(), userId);
+                return false;
+            }
+
             try
             {
-                // Xóa thủ công các dependencies
+                // BƯỚC 1: Xóa thủ công các dependencies (OK)
                 var decks = await _context.Decks.Where(d => d.UserId == userId).ToListAsync();
                 foreach (var deck in decks) { await AdminDeleteDeckAsync(deck.Id); } // Tái sử dụng logic xóa deck
 
@@ -239,29 +341,49 @@ namespace Dict.Service
                 var otherCardStates = await _context.CardStates.Where(cs => cs.UserId == userId).ToListAsync(); if (otherCardStates.Any()) _context.CardStates.RemoveRange(otherCardStates);
                 var otherReviewLogs = await _context.ReviewLogs.Where(rl => rl.UserId == userId).ToListAsync(); if (otherReviewLogs.Any()) _context.ReviewLogs.RemoveRange(otherReviewLogs);
 
-                _context.Users.Remove(user); await _context.SaveChangesAsync();
+                // (Lưu các thay đổi xóa phụ thuộc)
+                await _context.SaveChangesAsync();
+
+                // BƯỚC 2: Xóa User bằng UserManager (OK)
+                // (Nó sẽ tự động xóa AspNetUserRoles, Claims, Logins...)
+                var deleteResult = await _userManager.DeleteAsync(user);
+
+                if (!deleteResult.Succeeded)
+                {
+                    throw new Exception(string.Join(", ", deleteResult.Errors.Select(e => e.Description)));
+                }
+
                 _logger.LogInformation("Admin {AdminId} successfully deleted user {UserId}", GetAdminId(), userId);
                 return true;
             }
-            catch (DbUpdateException ex) { _logger.LogError(ex, "AdminDeleteUserAsync: FAILED due to FK constraint. User {UserId}", userId); return false; }
+            catch (Exception ex) // Bắt lỗi chung
+            {
+                _logger.LogError(ex, "AdminDeleteUserAsync: FAILED. User {UserId}", userId);
+                return false;
+            }
         }
 
         // --- HÀM HELPER ---
 
-        private UserDto MapUserToDto(User user)
+        // 12. SỬA LẠI HÀM MAPUSERTODTO (DÙNG ApplicationUser VÀ LẤY ROLE)
+        private async Task<UserDto> MapUserToDto(ApplicationUser user)
         {
             string avatarUrl = string.IsNullOrEmpty(user.AvatarUrl) ? DefaultAvatarUrl : user.AvatarUrl;
+
+            // Lấy vai trò (roles)
+            var roles = await _userManager.GetRolesAsync(user);
+
             return new UserDto
             {
                 Id = user.Id,
-                Username = user.Username,
+                Username = user.UserName, // Sửa thành UserName
                 Email = user.Email,
                 IsActive = user.IsActive,
-                Role = user.Role,
+                Role = roles.FirstOrDefault(), // Lấy vai trò đầu tiên
                 AvatarUrl = avatarUrl,
                 CreatedAt = user.CreatedAt,
                 UpdatedAt = user.UpdatedAt,
-                Decks = user.Decks?.Select(d => new DeckSummaryDto { Id = d.Id, Name = d.Name, Description = d.Description ?? "", IsPublic = d.IsPublic ?? false, CardCount = d.Cards?.Count() ?? 0, AuthorName = user.Username }).ToList() ?? new List<DeckSummaryDto>()
+                Decks = user.Decks?.Select(d => new DeckSummaryDto { Id = d.Id, Name = d.Name, Description = d.Description ?? "", IsPublic = d.IsPublic ?? false, CardCount = d.Cards?.Count() ?? 0, AuthorName = user.UserName }).ToList() ?? new List<DeckSummaryDto>()
             };
         }
 
@@ -269,7 +391,13 @@ namespace Dict.Service
         {
             var user = _httpContextAccessor.HttpContext?.User;
             if (user == null) return "UnknownAdmin (No HttpContext)";
+
+            // Dùng ClaimTypes.NameIdentifier (là UserId)
             return user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "UnknownAdmin (No Claim)";
         }
+
+        // 13. XÓA HÀM UpdateUserRoleAsync CŨ
+        // (Vì đã thay bằng hàm UpdateUserRolesAsync (số nhiều) ở trên)
+        // public async Task<bool> UpdateUserRoleAsync(int userId, string newRole) { ... }
     }
 }

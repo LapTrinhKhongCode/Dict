@@ -1,10 +1,11 @@
 ﻿using Dict.DTO;
 using Dict.DTO.Admin;
-using Dict.Models.Enum;
+// using Dict.Models.Enum; // <-- XÓA
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -12,7 +13,7 @@ namespace Dict.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = Role.ADMIN)] // ✨ QUAN TRỌNG: Chỉ ADMIN mới được truy cập
+    [Authorize(Roles = "Admin")] // ✨ SỬA: Dùng string "Admin"
     public class AdminController : ControllerBase
     {
         private readonly IAdminService _adminService;
@@ -29,16 +30,15 @@ namespace Dict.Controllers
         /// <summary>
         /// Lấy ID của Admin đang thực hiện hành động (để ghi log)
         /// </summary>
-        private int GetAdminId()
+        private string GetAdminId() // Sửa thành string cho an toàn
         {
-            var userIdClaim = User.FindFirst("userId");
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            // ✨ SỬA: Dùng ClaimTypes.NameIdentifier
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
             {
-                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
-                // mặc dù [Authorize] thường sẽ chặn các request này trước.
                 throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
             }
-            return userId;
+            return userIdClaim.Value;
         }
 
         /// <summary>
@@ -80,9 +80,29 @@ namespace Dict.Controllers
         }
 
         /// <summary>
+        /// Lấy danh sách người dùng CÓ PHÂN TRANG và TÌM KIẾM
+        /// </summary>
+        [HttpGet("users/search")]
+        public async Task<IActionResult> SearchUsers([FromQuery] string? searchTerm, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            try
+            {
+                _response.Result = await _adminService.SearchUsersAsync(searchTerm, page, pageSize);
+                _response.Message = "Users retrieved successfully.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error searching users (Admin: {AdminId})", GetAdminId());
+                _response.IsSuccess = false; _response.Message = ex.Message; return StatusCode(500, _response);
+            }
+        }
+
+
+        /// <summary>
         /// Khóa hoặc mở khóa một tài khoản người dùng.
         /// </summary>
-        [HttpPatch("users/{userId}/lock-status")] // Dùng PATCH vì là cập nhật 1 phần
+        [HttpPatch("users/{userId}/lock-status")]
         public async Task<IActionResult> SetUserLockStatus(int userId, [FromBody] AdminSetUserLockDto lockDto)
         {
             try
@@ -105,8 +125,8 @@ namespace Dict.Controllers
         /// <summary>
         /// Cập nhật vai trò (Role) của một người dùng.
         /// </summary>
-        [HttpPatch("users/{userId}/role")] // Dùng PATCH
-        public async Task<IActionResult> UpdateUserRole(int userId, [FromBody] AdminUpdateUserRoleDto roleDto)
+        [HttpPatch("users/{userId}/roles")] // Sửa route (số nhiều)
+        public async Task<IActionResult> UpdateUserRoles(int userId, [FromBody] AdminUpdateUserRolesDto rolesDto) // Sửa DTO
         {
             if (!ModelState.IsValid)
             {
@@ -115,12 +135,13 @@ namespace Dict.Controllers
 
             try
             {
-                var result = await _adminService.UpdateUserRoleAsync(userId, roleDto.Role);
+                // ✨ SỬA: Gọi hàm mới
+                var result = await _adminService.UpdateUserRolesAsync(userId, rolesDto.RoleNames);
                 if (!result)
                 {
-                    _response.IsSuccess = false; _response.Message = "User not found."; return NotFound(_response);
+                    _response.IsSuccess = false; _response.Message = "User not found or operation failed."; return NotFound(_response);
                 }
-                _response.Message = $"User role updated to {roleDto.Role}.";
+                _response.Message = $"User roles updated.";
                 return Ok(_response);
             }
             catch (ArgumentException ex) // Bắt lỗi nếu Role không hợp lệ
@@ -173,7 +194,7 @@ namespace Dict.Controllers
                 _response.Message = "User deleted successfully by admin.";
                 return Ok(_response);
             }
-            catch (Exception ex) // DbUpdateException sẽ được bắt ở đây nếu không xử lý trong service
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting user {TargetUserId} (Admin: {AdminId})", userId, GetAdminId());
                 _response.IsSuccess = false; _response.Message = $"Delete failed: {ex.Message}"; return StatusCode(500, _response);
@@ -244,5 +265,15 @@ namespace Dict.Controllers
                 _response.IsSuccess = false; _response.Message = ex.Message; return StatusCode(500, _response);
             }
         }
+
+        // 15. THÊM DTO MỚI (AdminUpdateUserRolesDto)
+        // (Bạn cần tạo file DTO này, hoặc tôi giả định nó ở đây)
+    }
+
+    // Bạn cần một DTO mới cho việc cập nhật nhiều Role
+    public class AdminUpdateUserRolesDto
+    {
+        [Required]
+        public List<string> RoleNames { get; set; } = new List<string>();
     }
 }

@@ -9,35 +9,52 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using static System.Net.WebRequestMethods;
+// 1. THÊM CÁC DỊCH VỤ IDENTITY
+using Microsoft.AspNetCore.Identity;
+using System.Linq;
+using System.Threading.Tasks;
+using System;
+using System.Collections.Generic; // Cần cho List
 
 namespace Dict.Service
 {
     public class AuthService : IAuthService
     {
-        private readonly ApplicationDbContext _context;
+        // 2. XÓA BỎ DbContext, THÊM CÁC MANAGER CỦA IDENTITY
+        // private readonly ApplicationDbContext _context; // <-- XÓA
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly RoleManager<ApplicationRole> _roleManager;
+
         private readonly IJwtService _jwtService;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthService> _logger;
-        private readonly IMemoryCache _cache; // ✨ 2. Thêm IMemoryCache
+        private readonly IMemoryCache _cache;
 
+        // 3. CẬP NHẬT HÀM KHỞI TẠO (CONSTRUCTOR)
         public AuthService(
-            ApplicationDbContext context,
+            // ApplicationDbContext context, // <-- XÓA
+            UserManager<ApplicationUser> userManager, // THÊM
+            SignInManager<ApplicationUser> signInManager, // THÊM
+            RoleManager<ApplicationRole> roleManager, // THÊM
             IJwtService jwtService,
             IEmailService emailService,
             IConfiguration configuration,
             ILogger<AuthService> logger,
-            IMemoryCache cache) // ✨ 3. Inject IMemoryCache
+            IMemoryCache cache)
         {
-            _context = context;
+            // _context = context; // <-- XÓA
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _roleManager = roleManager;
             _jwtService = jwtService;
             _emailService = emailService;
             _configuration = configuration;
             _logger = logger;
-            _cache = cache; // ✨ 4. Lưu lại
+            _cache = cache;
         }
 
-        // ✨ THAY ĐỔI: Hàm RegisterAsync
         public async Task<string> RegisterAsync(RegistrationRequestDto request)
         {
             var passwordError = ValidatePassword(request.Password);
@@ -49,81 +66,104 @@ namespace Dict.Service
             if (!Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
                 throw new InvalidOperationException("Username chỉ được chứa chữ cái, số hoặc dấu gạch dưới, không có khoảng trắng hoặc dấu.");
 
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username || u.Email == request.Email);
-            if (existingUser != null)
+            // << --- CÁC DÒNG CODE CŨ (DÙNG _context) ĐÃ ĐƯỢC XÓA Ở ĐÂY --- >>
+
+            // 4. KIỂM TRA BẰNG USERNMANAGER (Code đúng)
+            var existingUserByEmail = await _userManager.FindByEmailAsync(request.Email);
+            if (existingUserByEmail != null)
             {
-                throw new InvalidOperationException("Username or Email already exists.");
+                throw new InvalidOperationException("Email already exists.");
+            }
+            var existingUserByName = await _userManager.FindByNameAsync(request.Username);
+            if (existingUserByName != null)
+            {
+                throw new InvalidOperationException("Username already exists.");
             }
 
-            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
+            // 5. KHÔNG HASH MẬT KHẨU NỮA
+            // var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password); // <-- XÓA
 
-            var user = new User
+            var confirmationToken = Guid.NewGuid().ToString();
+
+            // 6. LƯU MẬT KHẨU GỐC (RAW) VÀO CACHE
+            // (Vì UserManager cần mật khẩu gốc để hash)
+            // var cacheEntry = new { RequestData = request, HashedPassword = hashedPassword }; // <-- SỬA
+            var cacheEntry = new { RequestData = request }; // Chỉ cần lưu request
+            _cache.Set(confirmationToken, cacheEntry, TimeSpan.FromMinutes(30));
+
+            // Gửi email (giữ nguyên)
+            var frontendUrl = _configuration["FrontendUrl"];
+            if (string.IsNullOrEmpty(frontendUrl))
             {
-                Username = request.Username,
-                Email = request.Email,
-                PasswordHash = hashedPassword,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                Role = Role.USER,
-                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/17cbb928-af2d-4d11-9397-102f8d3d332f.png",
-            };
+                throw new Exception("FrontendUrl is not configured");
+            }
+            var confirmationUrl = $"{frontendUrl}/confirm-account?token={confirmationToken}";
+            var subject = "Chào mừng bạn đến với Miyo Dictionary - Xác nhận tài khoản";
+            var body = $"Cảm ơn bạn đã đăng ký. Vui lòng nhấp vào link sau để hoàn tất tạo tài khoản:<br/>" +
+                       $"<a href='{confirmationUrl}'>Click để Xác nhận Tài khoản</a>" +
+                       $"<br/><br/>Link này sẽ hết hạn sau 30 phút.";
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _emailService.SendEmailAsync(request.Email, subject, body);
 
-            return "Registration successful.";
+            return "Registration successful. Please check your email to confirm your account.";
         }
 
-        // ✨ HÀM MỚI: Dùng để xác nhận
         public async Task<LoginResponseDto> ConfirmRegistrationAsync(string token)
         {
-            // BƯỚC 1: Lấy thông tin từ cache
             if (!_cache.TryGetValue(token, out var cacheEntry))
             {
                 throw new InvalidOperationException("Link xác thực không hợp lệ, đã hết hạn hoặc không tồn tại.");
             }
 
-            // BƯỚC 2: Ép kiểu dữ liệu từ cache
-            // (Chúng ta phải dùng dynamic hoặc một class/struct nội bộ)
+            // 7. LẤY DỮ LIỆU TỪ CACHE
             var requestData = (RegistrationRequestDto)cacheEntry.GetType().GetProperty("RequestData").GetValue(cacheEntry, null);
-            var hashedPassword = (string)cacheEntry.GetType().GetProperty("HashedPassword").GetValue(cacheEntry, null);
+            // var hashedPassword = (string)cacheEntry.GetType().GetProperty("HashedPassword").GetValue(cacheEntry, null); // <-- KHÔNG CẦN NỮA
 
-            // BƯỚC 3: Kiểm tra lại (đề phòng 2 người cùng đăng ký 1 lúc)
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == requestData.Username || u.Email == requestData.Email);
-            if (existingUser != null)
+            // 8. KIỂM TRA LẠI (GIỮ NGUYÊN, NHƯNG DÙNG USERNMANAGER)
+            if (await _userManager.FindByNameAsync(requestData.Username) != null ||
+                await _userManager.FindByEmailAsync(requestData.Email) != null)
             {
                 throw new InvalidOperationException("Username or Email already exists.");
             }
 
-            // BƯỚC 4: ✨ TẠO USER CHÍNH THỨC
-            var user = new User
+            // 9. TẠO USER (NHƯNG CHƯA CÓ MẬT KHẨU)
+            var user = new ApplicationUser
             {
-                Username = requestData.Username,
+                UserName = requestData.Username,
                 Email = requestData.Email,
-                PasswordHash = hashedPassword,
-                IsActive = true, // Kích hoạt ngay
+                IsActive = true,
                 CreatedAt = DateTime.UtcNow,
-                Role = Role.USER,
                 AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/17cbb928-af2d-4d11-9397-102f8d3d332f.png",
+                // KHÔNG SET PASSWORD HASH Ở ĐÂY
             };
 
-            // BƯỚC 5: Lưu vào DB
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            // 10. DÙNG USERNMANAGER ĐỂ TẠO USER (QUAN TRỌNG NHẤT)
+            // Lệnh này sẽ tự động HASH mật khẩu (requestData.Password) và lưu user
+            var result = await _userManager.CreateAsync(user, requestData.Password);
 
-            // BƯỚC 6: Xóa cache
+            if (!result.Succeeded)
+            {
+                // Nếu thất bại, ném lỗi
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Failed to create user: {errors}");
+            }
+
+            // 11. GÁN VAI TRÒ (ROLE) CHO USER
+            // (Đảm bảo bạn đã có Role "User" trong DB)
+            await _userManager.AddToRoleAsync(user, "User"); // Giả định vai trò "User"
+
             _cache.Remove(token);
 
-            // BƯỚC 7: Trả về token ĐĂNG NHẬP
-            var loginToken = _jwtService.GenerateToken(user);
+            // 12. TẠO TOKEN ĐĂNG NHẬP (LẤY CẢ ROLE)
+            var roles = await _userManager.GetRolesAsync(user);
+            var loginToken = _jwtService.GenerateToken(user, roles); // Truyền roles vào
+
             return new LoginResponseDto
             {
                 Token = loginToken,
-                Username = user.Username,
+                Username = user.UserName,
                 Email = user.Email,
-                Role = user.Role,
+                Role = roles.FirstOrDefault(), // Trả về vai trò
                 AvatarUrl = user.AvatarUrl,
                 UserId = user.Id
             };
@@ -131,36 +171,45 @@ namespace Dict.Service
         private string? ValidatePassword(string password)
         {
             if (string.IsNullOrWhiteSpace(password)) { return "Password is required."; }
-            if (password.Length < 8) { return "Password must be at least 8 characters long."; }
+            if (password.Length < 6) { return "Password must be at least 6 characters long."; }
             // (Các kiểm tra khác...)
             return null;
         }
 
-        // ✨ HÀM LOGIN (BẰNG PASSWORD) VẪN HOẠT ĐỘNG BÌNH THƯỜNG
         public async Task<LoginResponseDto> LoginAsync(LoginRequestDto request)
         {
-            // (Giữ nguyên không thay đổi)
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
+            // 13. DÙNG USERNMANAGER ĐỂ TÌM USER
+            var user = await _userManager.FindByNameAsync(request.Username);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user == null)
             {
                 throw new Exception("Tên đăng nhập hoặc mật khẩu không chính xác.");
             }
+
+            // 14. DÙNG SIGNINMANAGER ĐỂ KIỂM TRA MẬT KHẨU
+            // (Nó sẽ tự động so sánh hash)
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false); // false = không khóa tài khoản nếu sai
+
+            if (!result.Succeeded)
+            {
+                throw new Exception("Tên đăng nhập hoặc mật khẩu không chính xác.");
+            }
+
             if (!user.IsActive)
             {
                 throw new Exception("Tài khoản này đã bị khóa.");
             }
 
-            var token = _jwtService.GenerateToken(user);
-
+            // 15. LẤY ROLE VÀ TẠO TOKEN
+            var roles = await _userManager.GetRolesAsync(user);
+            var token = _jwtService.GenerateToken(user, roles);
 
             return new LoginResponseDto
             {
                 Token = token,
-                Username = user.Username,
+                Username = user.UserName,
                 Email = user.Email,
-                Role = user.Role,
+                Role = roles.FirstOrDefault(), // Trả về vai trò
                 AvatarUrl = user.AvatarUrl,
                 UserId = user.Id
             };

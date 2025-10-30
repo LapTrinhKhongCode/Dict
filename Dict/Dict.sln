@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dict", "Dict.csproj", "{A4D
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Import", "..\Import\Import.csproj", "{4BDB546F-3054-493C-B9AD-4BC61D32D5F3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dict.Tests", "..\Dict.Tests\Dict.Tests.csproj", "{95AB326E-BEED-4439-8264-DB125B3C9D15}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{4BDB546F-3054-493C-B9AD-4BC61D32D5F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4BDB546F-3054-493C-B9AD-4BC61D32D5F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4BDB546F-3054-493C-B9AD-4BC61D32D5F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95AB326E-BEED-4439-8264-DB125B3C9D15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95AB326E-BEED-4439-8264-DB125B3C9D15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95AB326E-BEED-4439-8264-DB125B3C9D15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95AB326E-BEED-4439-8264-DB125B3C9D15}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
