@@ -10,7 +10,7 @@
       <input
         v-model="internalSearchWord"
         type="text"
-        placeholder="Enter word..."
+        placeholder="日本語, にほんご, nihongo..."
         class="flex-grow bg-transparent outline-none text-base"
         @keyup.enter="onSearch"
         @focus="onInputFocus"
@@ -90,7 +90,7 @@
           v-else
           class="text-sm text-gray-500 text-center py-2"
         >
-          Draw a character to see suggestions.
+          Vẽ chữ Kanji hoặc Kana vào khung bên dưới và chọn từ gợi ý để thêm vào ô tìm kiếm.
         </p>
       </div>
 
@@ -100,7 +100,7 @@
         height="256"
         class="handwriting-canvas"
         style="width: 256px; height: 256px; margin: 0 auto;"
-        :style="{ 'pointer-events': isPredicting ? 'none' : 'auto', opacity: isPredicting ? 0.7 : 1 }"
+        :style="{ opacity: isPredicting ? 0.7 : 1 }"
       ></canvas>
 
       <div class="flex justify-center items-center gap-x-4 mt-4">
@@ -126,7 +126,7 @@
           :disabled="isPredicting"
           class="text-gray-300 hover:text-white disabled:text-gray-600"
         >
-          Clear
+          Xóa
         </button>
       </div>
     </div>
@@ -137,7 +137,7 @@
       <div class="flex" style="min-height: 250px">
         <div class="w-1/2 pr-3 border-r border-gray-600 flex flex-col">
           <h4 class="text-xs font-semibold text-gray-400 uppercase mb-2">
-            Recognized Text
+            Văn bản được nhận dạng
           </h4>
           
           <div
@@ -148,7 +148,7 @@
               v-if="ocrResults.length === 0 && !isOcrLoading && !ocrStatus"
               class="text-sm text-gray-500"
             >
-              Upload an image to see results...
+              Chưa có kết quả nào. Vui lòng tải lên hình ảnh chứa văn bản tiếng Nhật.
             </p>
             
             <div class="flex flex-col gap-1">
@@ -195,10 +195,10 @@
           >
             <UIcon name="i-lucide-upload-cloud" class="size-10 text-gray-500 mb-3" />
             <p class="text-sm text-gray-400">
-              <span class="font-semibold text-blue-400">Click to upload</span>
-              or drag and drop
+              <span class="font-semibold text-blue-400">Click vào để upload</span>
+              hoặc kéo thả ảnh vào đây
             </p>
-            <p class="text-xs text-gray-500">Image file (PNG, JPG, etc.)</p>
+            <p class="text-xs text-gray-500">Định dạng (PNG, JPG, etc.)</p>
           </div>
           
           <div
@@ -282,6 +282,8 @@ const historyIndex = ref(-1);
 const isPredicting = ref(false);
 const predictionLabels = ref<string[]>([]);
 // const isHandlingPredictionClick = ref(false);
+
+const predictionAbortController = ref<AbortController | null>(null);
 
 // --- NEW: OCR Pad State ---
 const showOcrPad = ref(false);
@@ -648,6 +650,7 @@ const redo = () => {
 const onSelectPrediction = (label: string) => {
 
 
+  isProgrammaticUpdate.value = true;
   // Concatenate the label to the existing search word
   internalSearchWord.value = internalSearchWord.value + label;
 
@@ -694,6 +697,14 @@ const getMatrixFromCanvas = () => {
 };
 
 const runPrediction = async () => {
+  // --- NEW: Abort previous request ---
+  if (predictionAbortController.value) {
+    predictionAbortController.value.abort("New prediction started");
+  }
+  predictionAbortController.value = new AbortController();
+  const signal = predictionAbortController.value.signal;
+  // --- END NEW ---
+
   isPredicting.value = true;
   predictionLabels.value = [];
 
@@ -715,6 +726,7 @@ const runPrediction = async () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ matrix: matrixData }),
+        signal: signal,
       }
     );
 
@@ -730,7 +742,13 @@ const runPrediction = async () => {
     } else {
       predictionLabels.value = [];
     }
-  } catch (error) {
+  } catch (error: any) {
+    // --- NEW: Handle AbortError ---
+    if (error.name === "AbortError") {
+      console.log("Prediction aborted:", error.message);
+      return; // Don't set error, this is intentional
+    }
+    // --- END NEW ---
     console.error("Error during handwriting prediction:", error);
     predictionLabels.value = [];
   } finally {
@@ -839,13 +857,13 @@ const handleDrop = (event: DragEvent) => {
     }
   } catch (error: any) {
     console.error("Error during OCR streaming:", error);
-    ocrStatus.value = `Error: ${error.message}`;
+    ocrStatus.value = `Lỗi: ${error.message}`;
   } finally {
     isOcrLoading.value = false;
     if (ocrResults.value.length > 0) {
-      ocrStatus.value = `Found ${ocrResults.value.length} lines.`;
+      ocrStatus.value = `${ocrResults.value.length} dòng.`;
     } else if (!ocrStatus.value.startsWith("Error")) {
-      ocrStatus.value = "No text found.";
+      ocrStatus.value = "Không tìm thấy văn bản tiếng Nhật.";
     }
   }
 };
