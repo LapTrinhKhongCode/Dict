@@ -13,9 +13,9 @@
               : 'bg-gray-900 text-gray-400 border-transparent',
           ]"
         >
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-2 cursor-pointer">
             <UIcon name="i-lucide-file-text" class="size-4" />
-            <span>Word</span>
+            <span>Từ vựng</span>
           </div>
         </button>
         <button
@@ -27,9 +27,9 @@
               : 'bg-gray-900 text-gray-400 border-transparent',
           ]"
         >
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-2 cursor-pointer">
             <UIcon name="i-lucide-book" class="size-4" />
-            <span>Kanji</span>
+            <span>Hán tự</span>
           </div>
         </button>
       </div>

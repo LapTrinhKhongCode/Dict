@@ -23,12 +23,12 @@
       <div class="md:col-span-4 lg:col-span-3 space-y-6">
         
         <div v-if="result.type === 'word' && result.words && result.words.length > 0">
-          <h3 class="text-lg font-semibold mb-2">Main Results</h3>
+          <h3 class="text-lg font-semibold mb-2">Kết quả tra cứu</h3>
           <ul class="space-y-2">
             <li
               v-for="word in result.words"
               :key="word._id"
-              @click="selectedItem = word"
+              @click="selectItem(word)"
               class="p-3 rounded-lg cursor-pointer transition-colors border"
               :class="selectedItem && selectedItem._id === word._id
                 ? 'bg-blue-50 border-blue-300'
@@ -42,12 +42,12 @@
         </div>
 
         <div v-if="result.type === 'kanji' && result.kanjiList && result.kanjiList.length > 0">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">Main Results</h3>
+          <h3 class="text-lg font-semibold mb-2">Kết quả tra cứu</h3>
           <ul class="space-y-2">
             <li
               v-for="kanji in result.kanjiList"
               :key="kanji._id"
-              @click="selectedItem = kanji"
+              @click="selectItem(kanji)"
               class="p-3 rounded-lg cursor-pointer transition-colors border flex items-center space-x-4"
               :class="selectedItem && selectedItem._id === kanji._id
                 ? 'bg-blue-50 border-blue-300'
@@ -64,7 +64,7 @@
           class="space-y-4"
         >
           <h3 class="text-lg font-semibold mb-2">
-            Suggested Words
+            Các từ liên quan
           </h3>
           <div class="space-y-2">
             <div
@@ -77,20 +77,19 @@
               <p class="text-sm text-blue-600">{{ suggest.phonetic }}</p>
             </div>
           </div>
-          
           <button
             v-if="result.suggestWords && result.suggestWords.length > suggestionLimit"
             @click="showAllSuggestions = !showAllSuggestions"
             class="w-full text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-colors"
           >
             <span v-if="!showAllSuggestions">
-              View More ({{ result.suggestWords.length - suggestionLimit }} more)
+              Xem thêm ({{ result.suggestWords.length - suggestionLimit }} more)
             </span>
             <span v-else>
-              View Less
+              Thu gọn
             </span>
           </button>
-          </div>
+        </div>
       </div>
 
       <div class="md:col-span-8 lg:col-span-9 space-y-6">
@@ -103,15 +102,12 @@
             <h1 class="text-6xl font-bold text-gray-900">
               {{ selectedItem.kanji }}
             </h1>
-            <div class="flex items-center space-x-6">
-              <div class="space-y-1">
-                <span class="text-lg text-blue-600 font-medium">On: {{ selectedItem.on }}</span>
-                <span class="text-lg text-green-600 font-medium">Kun: {{ selectedItem.kun }}</span>
-              </div>
-              <div class="space-y-1">
-                <span class="text-sm text-gray-500">Strokes: {{ selectedItem.stroke_count }}</span>
-                <span class="text-sm text-gray-500">Frequency: {{ selectedItem.freq }}</span>
-              </div>
+            <div class="flex flex-col space-y-1">
+              <p class="text-gray-800 text-lg">{{ selectedItem.mean }}</p>
+              <span class="text-lg text-blue-600 font-medium">On: {{ selectedItem.on }}</span>
+              <span class="text-lg text-green-600 font-medium">Kun: {{ selectedItem.kun }}</span>
+              <span class="text-sm text-gray-500">Số nét: {{ selectedItem.stroke_count }}</span>
+              <span class="text-sm text-gray-500">Độ phổ biến: {{ selectedItem.freq }}</span>
             </div>
             <div class="flex flex-wrap gap-2">
               <span
@@ -123,12 +119,12 @@
               </span>
             </div>
           </div>
+
           <div class="space-y-2">
             <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
               <UIcon name="i-lucide-book-open" class="size-4" />
-              <span>Meaning</span>
+              <span>Nghĩa</span>
             </h3>
-            <p class="text-gray-800 text-lg">{{ selectedItem.mean }}</p>
             <div v-if="selectedItem.detail" class="space-y-3">
               <div
                 v-for="(paragraph, index) in selectedItem.detail.split('##')"
@@ -138,6 +134,116 @@
                 <p class="text-gray-700 text-sm leading-relaxed">
                   {{ paragraph.trim() }}
                 </p>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="selectedItem.tips && selectedItem.tips.vi" class="space-y-2">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-lightbulb" class="size-4" />
+              <span>Mẹo nhớ</span>
+            </h3>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p class="text-gray-800" v-html="selectedItem.tips.vi"></p>
+            </div>
+          </div>
+
+          <div
+            v-if="selectedItem.compDetail && selectedItem.compDetail.length > 0"
+            class="space-y-3"
+          >
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-puzzle" class="size-4" />
+              <span>Bộ</span>
+            </h3>
+            <div class="flex flex-wrap gap-3">
+              <div
+                v-for="comp in selectedItem.compDetail"
+                :key="comp.w"
+                class="bg-gray-50 rounded-lg p-3 text-center"
+              >
+                <div class="text-2xl font-bold text-gray-900">{{ comp.w }}</div>
+                <div v-if="comp.h" class="text-sm text-gray-600">
+                  {{ comp.h }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="selectedItem.examples && selectedItem.examples.length > 0"
+            class="space-y-3"
+          >
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-list" class="size-4" />
+              <span>Ví dụ</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div
+                v-for="(example, idx) in selectedItem.examples"
+                :key="idx"
+                class="bg-gray-50 rounded-lg p-4"
+              >
+                <div class="flex items-start justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">{{ example.w }}</h4>
+                  <span
+                    class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+                  >
+                    {{ example.h }}
+                  </span>
+                </div>
+                <p class="text-gray-800 mb-1">{{ example.m }}</p>
+                <p class="text-gray-600 text-sm">{{ example.p }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="selectedItem.example_on" class="space-y-3">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-volume-2" class="size-4" />
+              <span>Ví dụ cách đọc (On)</span>
+            </h3>
+            <div
+              v-for="(examples, reading) in selectedItem.example_on"
+              :key="reading"
+              class="space-y-2"
+            >
+              <h4 class="font-medium text-gray-700">{{ reading }}</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+                <div
+                  v-for="(example, idx) in examples"
+                  :key="idx"
+                  class="bg-blue-50 rounded p-3"
+                >
+                  <div class="font-medium text-gray-900">{{ example.w }}</div>
+                  <div class="text-gray-700 text-sm">{{ example.m }}</div>
+                  <div class="text-gray-500 text-xs">{{ example.p }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="selectedItem.example_kun" class="space-y-3">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-volume-1" class="size-4" />
+              <span>Ví dụ cách đọc (Kun)</span>
+            </h3>
+            <div
+              v-for="(examples, reading) in selectedItem.example_kun"
+              :key="reading"
+              class="space-y-2"
+            >
+              <h4 class="font-medium text-gray-700">{{ reading }}</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+                <div
+                  v-for="(example, idx) in examples"
+                  :key="idx"
+                  class="bg-green-50 rounded p-3"
+                >
+                  <div class="font-medium text-gray-900">{{ example.w }}</div>
+                  <div class="text-gray-700 text-sm">{{ example.m }}</div>
+                  <div class="text-gray-500 text-xs">{{ example.p }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -151,13 +257,13 @@
             <h1 class="text-3xl font-bold text-gray-900">{{ selectedItem.word }}</h1>
             <div class="flex items-center space-x-4">
               <span class="text-lg text-blue-600 font-medium">{{ selectedItem.phonetic }}</span>
-              <span v-if="selectedItem.short_mean" class="text-gray-600 italic">{{ selectedItem.short_mean }}</span>
+              <!-- <span v-if="selectedItem.short_mean" class="text-gray-600 italic">{{ selectedItem.short_mean }}</span> -->
             </div>
           </div>
           <div v-if="selectedItem.means && selectedItem.means.length > 0" class="space-y-3">
             <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
               <UIcon name="i-lucide-book-open" class="size-4" />
-              <span>Meanings</span>
+              <span>Nghĩa</span>
             </h3>
             <div class="space-y-3">
               <div
@@ -175,7 +281,7 @@
                   </span>
                 </div>
                 <div v-if="meaning.examples && meaning.examples.length > 0" class="mt-3 space-y-2">
-                  <h4 class="text-sm font-medium text-gray-600">Examples:</h4>
+                  <h4 class="text-sm font-medium text-gray-600">Ví dụ:</h4>
                   <div
                     v-for="(example, exIdx) in meaning.examples"
                     :key="exIdx"
@@ -194,7 +300,7 @@
           <div v-if="selectedItem.synsets && selectedItem.synsets.length > 0" class="space-y-2">
             <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
               <UIcon name="i-lucide-link" class="size-4" />
-              <span>Synonyms</span>
+              <span>Từ đồng nghĩa</span>
             </h3>
             <div class="flex flex-wrap gap-2">
               <span
@@ -210,7 +316,7 @@
           <div v-if="selectedItem.images && selectedItem.images.length > 0" class="space-y-3">
             <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
               <UIcon name="i-lucide-image" class="size-4" />
-              <span>Images ({{ selectedItem.images.length }})</span>
+              <span>Ảnh minh họa ({{ selectedItem.images.length }})</span>
             </h3>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               <div
@@ -235,7 +341,7 @@
         </div>
 
         <div v-if="conjugationResult" class="space-y-6">
-          <h2 class="text-xl font-semibold border-b pb-2">Verb Conjugation</h2>
+          <h2 class="text-xl font-semibold border-b pb-2">Bảng chia động từ</h2>
           <ConjugationTable
             :root="conjugationResult.root"
             :conjugations="conjugationResult.conjugations"
@@ -263,12 +369,14 @@
       v-if="showSuggestedWordModal"
       :search-word="modalSearchWord"
       @close="showSuggestedWordModal = false"
+      class="z-50"
     />
+    
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue"; // <-- IMPORTED computed
+import { ref, watch, computed } from "vue"; 
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import WordResultModal from "~/components/WordResultModal.vue";
 
@@ -300,14 +408,14 @@ const props = defineProps({
   },
 });
 
-// --- NEW: Local state for selected item ---
+// --- Local state for selected item ---
 const selectedItem = ref<any | null>(null);
 
-// --- NEW: State for suggested words toggle ---
+// --- State for suggested words toggle ---
 const showAllSuggestions = ref(false);
 const suggestionLimit = 6;
 
-// --- NEW: Computed property for visible suggestions ---
+// --- Computed property for visible suggestions ---
 const visibleSuggestions = computed(() => {
   if (!props.result || !props.result.suggestWords) return [];
   if (showAllSuggestions.value) {
@@ -316,11 +424,11 @@ const visibleSuggestions = computed(() => {
   return props.result.suggestWords.slice(0, suggestionLimit);
 });
 
-// --- NEW: Watcher to select first item ---
+// --- Watcher to select first item ---
 watch(
   () => props.result,
   (newResult) => {
-    showAllSuggestions.value = false; // <-- RESET toggle on new search
+    showAllSuggestions.value = false; // RESET toggle on new search
     if (newResult && newResult.type === 'word' && newResult.words && newResult.words.length > 0) {
       selectedItem.value = newResult.words[0];
     } else if (newResult && newResult.type === 'kanji' && newResult.kanjiList && newResult.kanjiList.length > 0) {
@@ -329,7 +437,7 @@ watch(
       selectedItem.value = null;
     }
   },
-  { immediate: true, deep: true } // 'immediate' runs it on load
+  { immediate: true, deep: true } 
 );
 
 
@@ -346,5 +454,10 @@ const selectSuggestedWord = (word: string) => {
 const selectSynonym = (word: string) => {
   modalSearchWord.value = word;
   showSuggestedWordModal.value = true;
+};
+
+// --- NEW CLICK HANDLER ---
+const selectItem = (item: any) => {
+  selectedItem.value = item;
 };
 </script>
