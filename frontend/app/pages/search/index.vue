@@ -1,19 +1,53 @@
 <template>
   <div class="p-6 space-y-6">
-    <SearchBar v-model="searchWord" @search="onSearch" />
+    <div class="bg-gray-900 rounded-xl p-4 space-y-4">
+      <SearchBar v-model="searchWord" @search="onSearch" />
+
+      <div class="flex items-center space-x-2">
+        <button
+          @click="setView('word')"
+          :class="[
+            'px-4 py-2 rounded-lg font-medium transition-all border',
+            viewMode === 'word'
+              ? 'bg-gray-900 text-green-500 border-green-500 font-semibold'
+              : 'bg-gray-900 text-gray-400 border-transparent',
+          ]"
+        >
+          <div class="flex items-center space-x-2">
+            <UIcon name="i-lucide-file-text" class="size-4" />
+            <span>Word</span>
+          </div>
+        </button>
+        <button
+          @click="setView('kanji')"
+          :class="[
+            'px-4 py-2 rounded-lg font-medium transition-all border',
+            viewMode === 'kanji'
+              ? 'bg-gray-900 text-green-500 border-green-500 font-semibold'
+              : 'bg-gray-900 text-gray-400 border-transparent',
+          ]"
+        >
+          <div class="flex items-center space-x-2">
+            <UIcon name="i-lucide-book" class="size-4" />
+            <span>Kanji</span>
+          </div>
+        </button>
+      </div>
+    </div>
 
     <SearchResult
       :loading="loading"
       :error="error"
-      :result="result"
-      :conjugation-result="conjugationResult"
+      :result="currentResult"
+      :conjugation-result="currentConjugationResult"
       :original-search-word="searchedTerm"
-      :has-searched="hasSearched" />
+      :has-searched="hasSearched"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed } from "vue"; 
 import { useRoute, useRouter } from "vue-router";
 import conjugationsData from "~/data/conjugations_normalized.json";
 import { toKana } from "wanakana";
@@ -24,28 +58,42 @@ import SearchResult from "~/components/SearchResult.vue";
 const route = useRoute();
 const router = useRouter();
 
-const searchWord = ref(
-  (route.query.word as string) || (route.query.kanji as string) || ""
-);
-const result = ref<any | null>(null);
+const searchWord = ref((route.query.q as string) || "");
+
+// --- Separate result states ---
+const wordResult = ref<any | null>(null);
+const kanjiResult = ref<any | null>(null);
+const conjugationResult = ref<any | null>(null);
+// ---
+
 const loading = ref(false);
 const error = ref("");
-const conjugationResult = ref<any | null>(null);
 const searchedTerm = ref(searchWord.value);
-const hasSearched = ref(false); // <-- 1. ADD THIS STATE
+const hasSearched = ref(false);
 const config = useRuntimeConfig();
 
-// ... (helper functions isSingleKanji, extractWordLeftOfSlash, getDictionaryForm, checkConjugation are unchanged) ...
-const isSingleKanji = (text: string): boolean => {
-  const trimmed = text.trim();
-  if (trimmed.length !== 1) return false;
-  const charCode = trimmed.charCodeAt(0);
-  return (
-    (charCode >= 0x4e00 && charCode <= 0x9fff) ||
-    (charCode >= 0x3400 && charCode <= 0x4dbf) ||
-    (charCode >= 0x20000 && charCode <= 0x2a6df)
-  );
-};
+// --- Computed properties to drive the UI ---
+const viewMode = computed(() => {
+  if (route.query.view === "kanji") return "kanji";
+  return "word"; 
+});
+
+const currentResult = computed(() => {
+  if (viewMode.value === "kanji") {
+    return kanjiResult.value;
+  }
+  return wordResult.value;
+});
+
+const currentConjugationResult = computed(() => {
+  if (viewMode.value === "kanji") {
+    return null;
+  }
+  return conjugationResult.value;
+});
+// ---
+
+// ... (helper functions extractWordLeftOfSlash, getDictionaryForm, checkConjugation are unchanged) ...
 const extractWordLeftOfSlash = (word: string): string => {
   const slashIndex = word.indexOf("/");
   return slashIndex !== -1 ? word.substring(0, slashIndex) : word;
@@ -78,58 +126,37 @@ const checkConjugation = (word: string): any | null => {
   return null;
 };
 
-// --- Main API Fetch Logic ---
-const fetchWord = async (word: string) => {
+// --- Function to change the view in the URL ---
+const setView = (mode: "word" | "kanji") => {
+  router.push({ query: { ...route.query, view: mode } });
+};
+// ---
+
+// --- Main API Fetch Logic (MODIFIED) ---
+const fetchAll = async (word: string) => {
+  if (!word) return;
+
   hasSearched.value = true;
-  try {
-    loading.value = true;
-    error.value = "";
-    result.value = null;
-    conjugationResult.value = null;
+  loading.value = true;
+  error.value = "";
+  wordResult.value = null;
+  kanjiResult.value = null;
+  conjugationResult.value = null;
 
-    let apiUrl: string;
-    let response: any;
-
-    if (isSingleKanji(word)) {
-      // Use kanji API
-      apiUrl = `${config.public.apiBaseUrl}/api/Kanji/GetKanjiJson/${encodeURIComponent(
-        word
-      )}`;
-      const res = await fetch(apiUrl);
-      
-      // If the request failed (404, 500, etc.), just stop.
-      if (!res.ok) return; // <-- CHANGED
-
-      response = await res.json();
-
-      if (
-        response.status === 200 &&
-        response.results &&
-        response.results.length > 0
-      ) {
-        result.value = {
-          type: "kanji",
-          kanji: response.results[0],
-        };
-      } else {
-        result.value = null;
-      }
-    } else {
-      // Use word API
+  // Word Fetch Logic
+  const fetchWordData = async () => {
+    try {
       const conjugation = checkConjugation(word);
       if (conjugation) {
-        conjugationResult.value = conjugation;
+        conjugationResult.value = conjugation; 
       }
       const dictionaryForm = getDictionaryForm(word);
-      apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(
+      const apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(
         dictionaryForm
       )}`;
       const res = await fetch(apiUrl);
-
-      // If the request failed (404, 500, etc.), just stop.
-      if (!res.ok) return; // <-- CHANGED
-      
-      response = await res.json();
+      if (!res.ok) throw new Error("Word data not found");
+      const response = await res.json();
 
       const hasWordData =
         response.data &&
@@ -141,50 +168,85 @@ const fetchWord = async (word: string) => {
         response.data.suggestWords.length > 0;
 
       if (response.status === 200 && (hasWordData || hasSuggestData)) {
-        result.value = {
+        wordResult.value = {
           type: "word",
           ...response.data,
         };
-      } else {
-        result.value = null;
       }
+    } catch (e: any) {
+      console.error("Word fetch failed:", e.message);
     }
-  } catch (e: any) {
-    // This will now only catch *unexpected* errors (network down, JSON parse failed)
-    error.value = e.message || "Error loading data";
-  } finally {
-    loading.value = false;
+  };
+
+  // Kanji Fetch Logic
+  const fetchKanjiData = async () => {
+    try {
+      const apiUrl = `${config.public.apiBaseUrl}/api/Kanji/GetKanjiJson/${encodeURIComponent(
+        word
+      )}`;
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("Kanji data not found");
+      const response = await res.json();
+
+      if (
+        response.status === 200 &&
+        response.results &&
+        response.results.length > 0
+      ) {
+        // --- THIS IS THE CHANGE ---
+        // We now save the entire list, not just the first item.
+        kanjiResult.value = {
+          type: "kanji",
+          kanjiList: response.results, // Was: kanji: response.results[0]
+        };
+        // --- END OF CHANGE ---
+      }
+    } catch (e: any) {
+      console.error("Kanji fetch failed:", e.message);
+    }
+  };
+
+  // --- Run both fetches in parallel ---
+  await Promise.allSettled([fetchWordData(), fetchKanjiData()]);
+
+  loading.value = false;
+
+  if (!wordResult.value && !kanjiResult.value) {
+    error.value = "No results found for word or kanji.";
   }
 };
 
-// ... (onSearch, onMounted, and watch functions are unchanged) ...
+// --- MODIFIED: onSearch ---
 const onSearch = (term: string) => {
   const trimmedWord = term.trim();
   if (!trimmedWord) return;
+
   const convertedWord = toKana(trimmedWord);
-  searchedTerm.value = convertedWord;
-  searchWord.value = convertedWord; 
-  const queryParam = isSingleKanji(convertedWord) ? "kanji" : "word";
-  router.push({ path: "/search", query: { [queryParam]: convertedWord } });
-  fetchWord(convertedWord);
+
+  router.push({
+    path: "/search",
+    query: { q: convertedWord, view: viewMode.value },
+  });
 };
 
-onMounted(() => {
-  if (searchWord.value) {
-    searchedTerm.value = searchWord.value;
-    fetchWord(searchWord.value);
-  }
-});
-
+// --- MODIFIED: Watcher ---
 watch(
-  () => [route.query.word, route.query.kanji],
-  ([newWord, newKanji]) => {
-    const queryValue = (typeof newWord === "string" ? newWord : newKanji) as string;
-    if (queryValue && queryValue !== searchWord.value) {
+  () => route.query.q,
+  (newQueryValue) => {
+    const queryValue = newQueryValue as string;
+    if (queryValue) {
       searchWord.value = queryValue;
       searchedTerm.value = queryValue;
-      fetchWord(queryValue);
+      fetchAll(queryValue); 
+    } else {
+      hasSearched.value = false;
+      searchWord.value = "";
+      searchedTerm.value = "";
+      wordResult.value = null;
+      kanjiResult.value = null;
+      conjugationResult.value = null;
     }
-  }
+  },
+  { immediate: true }
 );
 </script>
