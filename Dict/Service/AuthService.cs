@@ -107,8 +107,8 @@ namespace Dict.Service
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
-                Role = "USER",
-                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/106449882_p0.png"
+                Role = Role.USER,
+                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/106449882_p0.png",
             };
 
             // BƯỚC 5: Lưu vào DB
@@ -195,7 +195,8 @@ namespace Dict.Service
                 Username = user.Username,
                 Email = user.Email,
                 Role = user.Role, // Đã là string
-                AvatarUrl = avatarUrl
+                AvatarUrl = avatarUrl,
+                UserId = user.Id
             };
         }
         public async Task LogoutAsync(int userId)

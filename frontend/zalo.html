@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ZaloPay Lifetime Test</title>
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #qrcode { width: 256px; height: 256px; margin-top: 15px; border: 1px solid #ccc; padding: 10px; }
+        #success-tick { font-size: 100px; color: green; display: none; text-align: center; margin-top: 50px; }
+        button { padding: 10px 15px; margin-right: 10px; font-size: 16px; cursor: pointer; }
+        #result, #status { margin-top: 15px; font-weight: bold; }
+        #error { margin-top: 15px; color: red; }
+    </style>
+</head>
+<body>
+    <h1>ZaloPay Premium Lifetime Checkout</h1>
+
+    <button id="buyButton" onclick="createLifetimeOrder()">Mua Gói Trọn Đời (500k)</button>
+
+    <div id="qrcode"></div>
+    <div id="result"></div>
+    <div id="error"></div>
+    <div id="status"></div>
+    <div id="success-tick">✓</div>
+
+<script>
+const apiUrl = 'https://localhost:7084'; // <-- Đổi sang ngrok nếu test từ ngoài
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJNaXlvIiwiZW1haWwiOiJtaXlvQGV4YW1wbGUuY29tIiwidXNlcklkIjoiMiIsImp0aSI6ImNmOTM4YTc3LThlM2MtNDg2Ni1hYTE3LWQ4M2NlMTNlOWQyNSIsImV4cCI6MTc3MDM5NjYwMiwiaXNzIjoiaHR0cHM6Ly95b3VyZG9tYWluLmNvbSIsImF1ZCI6Imh0dHBzOi8veW91cmRvbWFpbi5jb20ifQ.p-eazuBvwr5g1Jk2YNIc16Oi3shiaXFYoaq5G7R4RDw'; // <-- TOKEN hợp lệ (JWT)
+const userId = 2;    // <-- ID user thật của người đang đăng nhập
+
+const qrCodeElement = document.getElementById('qrcode');
+const resultDiv = document.getElementById('result');
+const errorDiv = document.getElementById('error');
+const statusDiv = document.getElementById('status');
+const buyButton = document.getElementById('buyButton');
+const successTick = document.getElementById('success-tick');
+let qrcode = null;
+let checkStatusInterval = null;
+let currentAppTransId = null;
+
+// --- Tạo đơn hàng ---
+async function createLifetimeOrder() {
+    resultDiv.textContent = 'Đang tạo đơn hàng...';
+    errorDiv.textContent = '';
+    statusDiv.textContent = '';
+    successTick.style.display = 'none';
+    buyButton.disabled = true;
+    if (qrcode) { qrcode.clear(); qrCodeElement.innerHTML = ''; }
+
+    try {
+        const response = await fetch(`${apiUrl}/api/subscription/checkout-lifetime`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok || !data.isSuccess) throw new Error(data.message || 'Lỗi tạo đơn hàng');
+
+        const orderUrl = data.result?.orderUrl;
+        currentAppTransId = data.result?.appTransId;
+        if (!orderUrl || !currentAppTransId) throw new Error('Thiếu orderUrl hoặc appTransId.');
+
+        resultDiv.textContent = 'Quét mã QR bằng ZaloPay Sandbox App để thanh toán.';
+        if (!qrcode) qrcode = new QRCode(qrCodeElement, { width: 256, height: 256 });
+        qrcode.makeCode(orderUrl);
+
+        // Bắt đầu kiểm tra trạng thái sau khi tạo đơn
+        startCheckingPaymentStatus();
+    } catch (err) {
+        errorDiv.textContent = 'Lỗi: ' + err.message;
+        buyButton.disabled = false;
+    }
+}
+
+// --- Kiểm tra giao dịch ---
+async function checkPaymentStatus() {
+    if (!currentAppTransId) return;
+    statusDiv.textContent = 'Đang kiểm tra trạng thái thanh toán...';
+
+    try {
+        const res = await fetch(`${apiUrl}/api/subscription/zalopay-status?appTransId=${currentAppTransId}&userId=${userId}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (data.success === true) {
+            statusDiv.textContent = 'Thanh toán thành công! Tài khoản đã được nâng cấp.';
+            resultDiv.textContent = '';
+            qrCodeElement.style.display = 'none';
+            buyButton.style.display = 'none';
+            successTick.style.display = 'block';
+            stopCheckingPaymentStatus();
+        } else {
+            statusDiv.textContent = 'Chưa thanh toán hoặc đang xử lý...';
+        }
+    } catch (err) {
+        errorDiv.textContent = 'Lỗi kiểm tra trạng thái: ' + err.message;
+    }
+}
+
+// --- Bắt đầu / Dừng polling ---
+function startCheckingPaymentStatus() {
+    stopCheckingPaymentStatus();
+    checkPaymentStatus();
+    checkStatusInterval = setInterval(checkPaymentStatus, 5000);
+}
+
+function stopCheckingPaymentStatus() {
+    if (checkStatusInterval) {
+        clearInterval(checkStatusInterval);
+        checkStatusInterval = null;
+    }
+}
+</script>
+</body>
+</html>

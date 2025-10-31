@@ -60,7 +60,7 @@
 
   
 
-  <div class="bg-[#1e293b] text-white p-6 rounded-lg shadow-lg w-[440px]">
+  <div class="bg-[#1e293b] text-white p-6 rounded-lg shadow-lg w-[400px]">
 
     <h2 class="text-lg font-bold mb-4">
 
