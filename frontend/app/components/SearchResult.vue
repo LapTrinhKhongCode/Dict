@@ -83,7 +83,7 @@
             class="w-full text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-colors"
           >
             <span v-if="!showAllSuggestions">
-              Xem thêm ({{ result.suggestWords.length - suggestionLimit }} more)
+              Xem thêm
             </span>
             <span v-else>
               Thu gọn
@@ -98,25 +98,31 @@
           v-if="result.type === 'kanji' && selectedItem"
           class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6"
         >
-          <div class="space-y-3">
-            <h1 class="text-6xl font-bold text-gray-900">
-              {{ selectedItem.kanji }}
-            </h1>
-            <div class="flex flex-col space-y-1">
-              <p class="text-gray-800 text-lg">{{ selectedItem.mean }}</p>
-              <span class="text-lg text-blue-600 font-medium">On: {{ selectedItem.on }}</span>
-              <span class="text-lg text-green-600 font-medium">Kun: {{ selectedItem.kun }}</span>
-              <span class="text-sm text-gray-500">Số nét: {{ selectedItem.stroke_count }}</span>
-              <span class="text-sm text-gray-500">Độ phổ biến: {{ selectedItem.freq }}</span>
+          <div class="flex justify-between items-start">
+            <div class="space-y-3">
+              <h1 class="text-6xl font-bold text-gray-900">
+                {{ selectedItem.kanji }}
+              </h1>
+              <div class="flex flex-col space-y-1">
+                <p class="text-gray-800 text-lg">{{ selectedItem.mean }}</p>
+                <span class="text-lg text-blue-600 font-medium">On: {{ selectedItem.on }}</span>
+                <span class="text-lg text-green-600 font-medium">Kun: {{ selectedItem.kun }}</span>
+                <span class="text-sm text-gray-500">Số nét: {{ selectedItem.stroke_count }}</span>
+                <span class="text-sm text-gray-500">Độ phổ biến: {{ selectedItem.freq }}</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="level in selectedItem.level"
+                  :key="level"
+                  class="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full"
+                >
+                  {{ level }}
+                </span>
+              </div>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="level in selectedItem.level"
-                :key="level"
-                class="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full"
-              >
-                {{ level }}
-              </span>
+            
+            <div class="flex-shrink-0 ml-4">
+              <KanjiStrokeInResult :kanji="selectedItem.kanji" />
             </div>
           </div>
 
@@ -257,7 +263,6 @@
             <h1 class="text-3xl font-bold text-gray-900">{{ selectedItem.word }}</h1>
             <div class="flex items-center space-x-4">
               <span class="text-lg text-blue-600 font-medium">{{ selectedItem.phonetic }}</span>
-              <!-- <span v-if="selectedItem.short_mean" class="text-gray-600 italic">{{ selectedItem.short_mean }}</span> -->
             </div>
           </div>
           <div v-if="selectedItem.means && selectedItem.means.length > 0" class="space-y-3">
@@ -316,11 +321,11 @@
           <div v-if="selectedItem.images && selectedItem.images.length > 0" class="space-y-3">
             <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
               <UIcon name="i-lucide-image" class="size-4" />
-              <span>Ảnh minh họa ({{ selectedItem.images.length }})</span>
+              <span>Ảnh minh họa</span>
             </h3>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               <div
-                v-for="(image, index) in selectedItem.images"
+                v-for="(image, index) in visibleImages"
                 :key="index"
                 class="relative group"
               >
@@ -330,13 +335,21 @@
                   class="w-full h-24 object-cover rounded-lg border hover:scale-105 transition-transform cursor-pointer"
                   @error="$event.target.style.display = 'none'"
                 />
-                <div
-                  class="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-1 py-0.5 rounded text-center min-w-[20px]"
-                >
-                  {{ index + 1 }}
-                </div>
+                
               </div>
             </div>
+            <button
+              v-if="selectedItem.images.length > imageLimit"
+              @click="showAllImages = !showAllImages"
+              class="text-sm font-medium text-blue-600 hover:text-blue-800"
+            >
+              <span v-if="!showAllImages">
+                Xem thêm
+              </span>
+              <span v-else>
+                Thu gọn
+              </span>
+            </button>
           </div>
         </div>
 
@@ -379,6 +392,7 @@
 import { ref, watch, computed } from "vue"; 
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import WordResultModal from "~/components/WordResultModal.vue";
+import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
 
 // --- Props ---
 const props = defineProps({
@@ -408,14 +422,14 @@ const props = defineProps({
   },
 });
 
-// --- Local state for selected item ---
 const selectedItem = ref<any | null>(null);
-
-// --- State for suggested words toggle ---
 const showAllSuggestions = ref(false);
 const suggestionLimit = 6;
 
-// --- Computed property for visible suggestions ---
+// --- NEW: State for images toggle ---
+const showAllImages = ref(false);
+const imageLimit = 6;
+
 const visibleSuggestions = computed(() => {
   if (!props.result || !props.result.suggestWords) return [];
   if (showAllSuggestions.value) {
@@ -424,11 +438,20 @@ const visibleSuggestions = computed(() => {
   return props.result.suggestWords.slice(0, suggestionLimit);
 });
 
-// --- Watcher to select first item ---
+// --- NEW: Computed property for visible images ---
+const visibleImages = computed(() => {
+  if (!selectedItem.value || !selectedItem.value.images) return [];
+  if (showAllImages.value) {
+    return selectedItem.value.images;
+  }
+  return selectedItem.value.images.slice(0, imageLimit);
+});
+
 watch(
   () => props.result,
   (newResult) => {
-    showAllSuggestions.value = false; // RESET toggle on new search
+    showAllSuggestions.value = false; 
+    showAllImages.value = false;
     if (newResult && newResult.type === 'word' && newResult.words && newResult.words.length > 0) {
       selectedItem.value = newResult.words[0];
     } else if (newResult && newResult.type === 'kanji' && newResult.kanjiList && newResult.kanjiList.length > 0) {
@@ -440,12 +463,9 @@ watch(
   { immediate: true, deep: true } 
 );
 
-
-// --- Modal State (unchanged) ---
 const showSuggestedWordModal = ref(false);
 const modalSearchWord = ref("");
 
-// --- Methods (unchanged) ---
 const selectSuggestedWord = (word: string) => {
   modalSearchWord.value = word;
   showSuggestedWordModal.value = true;
@@ -456,8 +476,8 @@ const selectSynonym = (word: string) => {
   showSuggestedWordModal.value = true;
 };
 
-// --- NEW CLICK HANDLER ---
 const selectItem = (item: any) => {
   selectedItem.value = item;
+  showAllImages.value = false;
 };
 </script>

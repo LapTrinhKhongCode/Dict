@@ -161,7 +161,7 @@
                   class="font-semibold text-gray-800 flex items-center space-x-2"
                 >
                   <UIcon name="i-lucide-image" class="size-4" />
-                  <span>Ảnh minh họa ({{ word.images.length }})</span>
+                  <span>Ảnh minh họa</span>
                 </h3>
                 <div
                   class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"
@@ -177,11 +177,7 @@
                       class="w-full h-24 object-cover rounded-lg border hover:scale-105 transition-transform cursor-pointer"
                       @error="$event.target.style.display = 'none'"
                     />
-                    <div
-                      class="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-1 py-0.5 rounded text-center min-w-[20px]"
-                    >
-                      {{ index + 1 }}
-                    </div>
+                    
                   </div>
                 </div>
               </div>
@@ -218,32 +214,39 @@
             </div>
 
             <div v-if="selectedKanji" class="space-y-6">
-              <div class="space-y-3">
-                <h1 class="text-6xl font-bold text-gray-900">
-                  {{ selectedKanji.kanji }}
-                </h1>
-                <div class="flex flex-col space-y-1">
-                  <span class="text-lg text-blue-600 font-medium"
-                    >On: {{ selectedKanji.on }}</span
-                  >
-                  <span class="text-lg text-green-600 font-medium"
-                    >Kun: {{ selectedKanji.kun }}</span
-                  >
-                  <span class="text-sm text-gray-500"
-                    >Số nét: {{ selectedKanji.stroke_count }}</span
-                  >
-                  <span class="text-sm text-gray-500"
-                    >Độ phổ biến: {{ selectedKanji.freq }}</span
-                  >
+              <div class="flex justify-between items-start">
+                <div class="space-y-3">
+                  <h1 class="text-6xl font-bold text-gray-900">
+                    {{ selectedKanji.kanji }}
+                  </h1>
+                  <div class="flex flex-col space-y-1">
+                    <p class="text-gray-800 text-lg">{{ selectedKanji.mean }}</p>
+                    <span class="text-lg text-blue-600 font-medium"
+                      >On: {{ selectedKanji.on }}</span
+                    >
+                    <span class="text-lg text-green-600 font-medium"
+                      >Kun: {{ selectedKanji.kun }}</span
+                    >
+                    <span class="text-sm text-gray-500"
+                      >Số nét: {{ selectedKanji.stroke_count }}</span
+                    >
+                    <span class="text-sm text-gray-500"
+                      >Độ phổ biến: {{ selectedKanji.freq }}</span
+                    >
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <span
+                      v-for="level in selectedKanji.level"
+                      :key="level"
+                      class="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full"
+                    >
+                      {{ level }}
+                    </span>
+                  </div>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                  <span
-                    v-for="level in selectedKanji.level"
-                    :key="level"
-                    class="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full"
-                  >
-                    {{ level }}
-                  </span>
+                
+                <div class="flex-shrink-0 ml-4">
+                  <KanjiStrokeInResult :kanji="selectedKanji.kanji" />
                 </div>
               </div>
 
@@ -254,7 +257,6 @@
                   <UIcon name="i-lucide-book-open" class="size-4" />
                   <span>Nghĩa</span>
                 </h3>
-                <p class="text-gray-800 text-lg">{{ selectedKanji.mean }}</p>
                 <div v-if="selectedKanji.detail" class="space-y-3">
                   <div
                     v-for="(paragraph, index) in selectedKanji.detail.split('##')"
@@ -422,6 +424,7 @@
 import { ref, onMounted, computed } from "vue";
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import conjugationsData from "~/data/conjugations_normalized.json";
+import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
 
 // --- Props and Emits ---
 const props = defineProps<{
