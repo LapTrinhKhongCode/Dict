@@ -54,7 +54,7 @@ function handleLogout() {
           class="flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors hover:bg-gray-700 hover:text-white [&.router-link-exact-active]:bg-neutral-600 [&.router-link-exact-active]:text-primary-400"
         >
           <UIcon name="i-lucide-house" class="w-6 h-6" />
-          <span>Home</span>
+          <span>Trang chủ</span>
         </NuxtLink>
 
         <NuxtLink
@@ -62,7 +62,7 @@ function handleLogout() {
           class="flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors hover:bg-gray-700 hover:text-white [&.router-link-exact-active]:bg-neutral-600 [&.router-link-exact-active]:text-primary-400"
         >
           <UIcon name="i-custom-translation" class="w-6 h-6" />
-          <span>Translate</span>
+          <span>Dịch</span>
         </NuxtLink>
       </nav>
     </div>
@@ -82,14 +82,14 @@ function handleLogout() {
             @click="handleLogin"
             class="block w-full px-4 py-2 text-left text-gray-200 hover:bg-neutral-700"
           >
-            Login
+            Đăng nhập
           </button>
           <button
             v-else
             @click="handleLogout"
             class="block w-full px-4 py-2 text-left text-gray-200 hover:bg-neutral-700"
           >
-            Logout
+            Đăng xuất
           </button>
         </div>
       </div>
