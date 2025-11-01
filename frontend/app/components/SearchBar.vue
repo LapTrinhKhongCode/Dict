@@ -18,15 +18,15 @@
       />
 
       <button
-        ref="penButtonRef" @click="onPenClick"
+        ref="penButtonRef"
+        @click="onPenClick"
         class="text-gray-500 hover:text-gray-700 transition ml-3"
         :class="{ 'text-blue-500': showDrawingPad }"
       >
         <UIcon name="i-lucide-pen" class="size-5" />
       </button>
 
-
-     <button
+      <button
         @click="onImageClick"
         class="text-gray-500 hover:text-gray-700 transition ml-2"
         :class="{ 'text-blue-500': showOcrPad }"
@@ -81,16 +81,14 @@
             :key="label"
             class="px-3 py-1 bg-gray-700 text-white rounded-md text-center font-medium hover:bg-gray-600 transition"
             @click="onSelectPrediction(label)"
-            >
+          >
             {{ label }}
           </button>
         </div>
 
-        <p
-          v-else
-          class="text-sm text-gray-500 text-center py-2"
-        >
-          Vẽ chữ Kanji hoặc Kana vào khung bên dưới và chọn từ gợi ý để thêm vào ô tìm kiếm.
+        <p v-else class="text-sm text-gray-500 text-center py-2">
+          Vẽ chữ Kanji hoặc Kana vào khung bên dưới và chọn từ gợi ý để thêm vào
+          ô tìm kiếm.
         </p>
       </div>
 
@@ -99,7 +97,7 @@
         width="256"
         height="256"
         class="handwriting-canvas"
-        style="width: 256px; height: 256px; margin: 0 auto;"
+        style="width: 256px; height: 256px; margin: 0 auto"
         :style="{ opacity: isPredicting ? 0.7 : 1 }"
       ></canvas>
 
@@ -139,7 +137,7 @@
           <h4 class="text-xs font-semibold text-gray-400 uppercase mb-2">
             Văn bản được nhận dạng
           </h4>
-          
+
           <div
             ref="ocrResultsRef"
             class="flex-grow max-h-[210px] overflow-y-auto suggestions-list pr-2"
@@ -148,9 +146,10 @@
               v-if="ocrResults.length === 0 && !isOcrLoading && !ocrStatus"
               class="text-sm text-gray-500"
             >
-              Chưa có kết quả nào. Vui lòng tải lên hình ảnh chứa văn bản tiếng Nhật.
+              Chưa có kết quả nào. Vui lòng tải lên hình ảnh chứa văn bản tiếng
+              Nhật.
             </p>
-            
+
             <div class="flex flex-col gap-1">
               <p
                 v-for="(result, index) in ocrResults"
@@ -161,7 +160,7 @@
               </p>
             </div>
           </div>
-          
+
           <div class="pt-2 mt-auto border-t border-gray-700 min-h-[2.5rem]">
             <div v-if="isOcrLoading" class="flex items-center gap-2">
               <div
@@ -193,14 +192,19 @@
             class="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 transition"
             :class="{ 'border-blue-500 bg-gray-700': isDragging }"
           >
-            <UIcon name="i-lucide-upload-cloud" class="size-10 text-gray-500 mb-3" />
+            <UIcon
+              name="i-lucide-upload-cloud"
+              class="size-10 text-gray-500 mb-3"
+            />
             <p class="text-sm text-gray-400">
-              <span class="font-semibold text-blue-400">Click vào để upload</span>
+              <span class="font-semibold text-blue-400"
+                >Click vào để upload</span
+              >
               hoặc kéo thả ảnh vào đây
             </p>
             <p class="text-xs text-gray-500">Định dạng (PNG, JPG, etc.)</p>
           </div>
-          
+
           <div
             v-else
             class="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-lg"
@@ -253,6 +257,10 @@ const props = defineProps({
   modelValue: {
     type: String,
     default: "",
+  },
+  searchResultRef: {
+    type: Object, // Đây là một cái 'ref'
+    default: null,
   },
 });
 const emit = defineEmits(["update:modelValue", "search"]);
@@ -320,12 +328,13 @@ watch(internalSearchWord, (newValue) => {
   //   showDrawingPad.value = false;
   // }
 
-  if (showDrawingPad.value) {
-    showDrawingPad.value = false;
-  }
-  if (showOcrPad.value) { // <-- ADD THIS
-    showOcrPad.value = false;
-  }
+  // if (showDrawingPad.value) {
+  //   showDrawingPad.value = false;
+  // }
+  // if (showOcrPad.value) {
+  //   // <-- ADD THIS
+  //   showOcrPad.value = false;
+  // }
 
   if (debounceTimer) {
     clearTimeout(debounceTimer);
@@ -391,9 +400,10 @@ watch(showDrawingPad, (isShowing) => {
 // --- Methods ---
 
 const onInputFocus = () => {
+  // Khi focus, chỉ cần hiện gợi ý (nếu có) và tắt OCR pad
   showSuggestions.value = suggestions.value.length > 0;
-  showDrawingPad.value = false;
   showOcrPad.value = false;
+  // KHÔNG tắt drawing pad ở đây nữa
 };
 
 const onPenClick = () => {
@@ -434,15 +444,23 @@ const onSelectSuggestion = (suggestion: any) => {
 };
 
 const handleClickOutside = (event: MouseEvent) => {
-  if (
-    searchContainer.value &&
-    !searchContainer.value.contains(event.target as Node)
-  ) {
-    showSuggestions.value = false;
-    showDrawingPad.value = false;
-    showOcrPad.value = false;
-    selectedIndex.value = -1;
+  const target = event.target as Node;
+
+  // Kiểm tra 1: Click có bên trong SearchBar không?
+  if (searchContainer.value && searchContainer.value.contains(target)) {
+    return; // Nếu có, không làm gì cả
   }
+
+  // Kiểm tra 2: Click có bên trong SearchResult (dùng prop) không?
+  if (props.searchResultRef && props.searchResultRef.contains(target)) {
+    return; // Nếu có, không làm gì cả
+  }
+
+  // Nếu click ra ngoài cả 2, thì TẮT
+  showSuggestions.value = false;
+  showDrawingPad.value = false;
+  showOcrPad.value = false;
+  selectedIndex.value = -1;
 };
 
 const scrollToSelected = async () => {
@@ -591,12 +609,7 @@ const stopDrawing = () => {
 const clearCanvas = () => {
   if (!ctx.value || !canvasRef.value) return;
   ctx.value.fillStyle = "#1f2937"; // bg-gray-800
-  ctx.value.fillRect(
-    0,
-    0,
-    canvasRef.value.width,
-    canvasRef.value.height
-  );
+  ctx.value.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height);
 
   history.value = [];
   historyIndex.value = -1;
@@ -648,8 +661,6 @@ const redo = () => {
 };
 
 const onSelectPrediction = (label: string) => {
-
-
   isProgrammaticUpdate.value = true;
   // Concatenate the label to the existing search word
   internalSearchWord.value = internalSearchWord.value + label;
@@ -788,7 +799,7 @@ const handleDrop = (event: DragEvent) => {
 /**
  * Placeholder for processing the uploaded file.
  */
- const processFile = async (file: File) => {
+const processFile = async (file: File) => {
   ocrResults.value = [];
   isOcrLoading.value = true;
   ocrStatus.value = "Uploading file...";
@@ -821,7 +832,7 @@ const handleDrop = (event: DragEvent) => {
     if (!reader) {
       throw new Error("Could not read response body.");
     }
-    
+
     const decoder = new TextDecoder();
     let buffer = "";
     ocrStatus.value = "Processing image...";
