@@ -5,7 +5,6 @@
         <div
           class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"
         ></div>
-
         <span>Loading...</span>
       </div>
     </div>
@@ -13,412 +12,358 @@
     <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
       <div class="flex items-center space-x-2">
         <UIcon name="i-lucide-alert-circle" class="text-red-500 size-5" />
-
         <span class="text-red-700">{{ error }}</span>
       </div>
     </div>
 
     <div
-      v-if="result && result.type === 'kanji' && result.kanji"
-      class="space-y-6"
+      v-if="result && (result.words || result.kanjiList)"
+      class="grid grid-cols-1 md:grid-cols-12 gap-6"
     >
-      <h2 class="text-xl font-semibold border-b pb-2">Kanji Result</h2>
+      <div class="md:col-span-4 lg:col-span-3 space-y-6">
+        
+        <div v-if="result.type === 'word' && result.words && result.words.length > 0">
+          <h3 class="text-lg font-semibold mb-2">Kết quả tra cứu</h3>
+          <ul class="space-y-2">
+            <li
+              v-for="word in result.words"
+              :key="word._id"
+              @click="selectItem(word)"
+              class="p-3 rounded-lg cursor-pointer transition-colors border"
+              :class="selectedItem && selectedItem._id === word._id
+                ? 'bg-blue-50 border-blue-300'
+                : 'bg-white border-transparent hover:bg-gray-100'"
+            >
+              <h4 class="font-bold text-gray-900">{{ word.word }}</h4>
+              <p class="text-sm text-blue-600">{{ word.phonetic }}</p>
+              <p class="text-sm text-gray-600 truncate">{{ word.short_mean }}</p>
+            </li>
+          </ul>
+        </div>
 
-      <div
-        class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6"
-      >
-        <div class="space-y-3">
-          <h1 class="text-6xl font-bold text-gray-900">
-            {{ result.kanji.kanji }}
-          </h1>
-
-          <div class="flex items-center space-x-6">
-            <div class="space-y-1">
-              <span class="text-lg text-blue-600 font-medium"
-                >On: {{ result.kanji.on }}</span
-              >
-
-              <span class="text-lg text-green-600 font-medium"
-                >Kun: {{ result.kanji.kun }}</span
-              >
-            </div>
-
-            <div class="space-y-1">
-              <span class="text-sm text-gray-500"
-                >Strokes: {{ result.kanji.stroke_count }}</span
-              >
-
-              <span class="text-sm text-gray-500"
-                >Frequency: {{ result.kanji.freq }}</span
-              >
+        <div v-if="result.type === 'kanji' && result.kanjiList && result.kanjiList.length > 0">
+          <h3 class="text-lg font-semibold mb-2">Kết quả tra cứu</h3>
+          <ul class="space-y-2">
+            <li
+              v-for="kanji in result.kanjiList"
+              :key="kanji._id"
+              @click="selectItem(kanji)"
+              class="p-3 rounded-lg cursor-pointer transition-colors border flex items-center space-x-4"
+              :class="selectedItem && selectedItem._id === kanji._id
+                ? 'bg-blue-50 border-blue-300'
+                : 'bg-white border-transparent hover:bg-gray-100'"
+            >
+              <h4 class="font-bold text-3xl text-gray-900">{{ kanji.kanji }}</h4>
+              <p class="text-sm text-gray-600">{{ kanji.mean }}</p>
+            </li>
+          </ul>
+        </div>
+        
+        <div
+          v-if="result.type === 'word' && result.suggestWords && result.suggestWords.length > 0"
+          class="space-y-4"
+        >
+          <h3 class="text-lg font-semibold mb-2">
+            Các từ liên quan
+          </h3>
+          <div class="space-y-2">
+            <div
+              v-for="suggest in visibleSuggestions"
+              :key="suggest._id"
+              class="bg-white rounded-lg p-3 hover:bg-gray-100 transition-colors cursor-pointer"
+              @click="selectSuggestedWord(suggest.word)"
+            >
+              <h4 class="font-semibold text-gray-900">{{ suggest.word }}</h4>
+              <p class="text-sm text-blue-600">{{ suggest.phonetic }}</p>
             </div>
           </div>
-
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="level in result.kanji.level"
-              :key="level"
-              class="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full"
-            >
-              {{ level }}
+          <button
+            v-if="result.suggestWords && result.suggestWords.length > suggestionLimit"
+            @click="showAllSuggestions = !showAllSuggestions"
+            class="w-full text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <span v-if="!showAllSuggestions">
+              Xem thêm
             </span>
-          </div>
-        </div>
-
-        <div class="space-y-2">
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-book-open" class="size-4" />
-
-            <span>Meaning</span>
-          </h3>
-
-          <p class="text-gray-800 text-lg">{{ result.kanji.mean }}</p>
-
-          <div v-if="result.kanji.detail" class="space-y-3">
-            <div
-              v-for="(paragraph, index) in result.kanji.detail.split('##')"
-              :key="index"
-              class="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-200"
-            >
-              <p class="text-gray-700 text-sm leading-relaxed">
-                {{ paragraph.trim() }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="result.kanji.tips && result.kanji.tips.vi" class="space-y-2">
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-lightbulb" class="size-4" />
-
-            <span>Memory Tip</span>
-          </h3>
-
-          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p class="text-gray-800" v-html="result.kanji.tips.vi"></p>
-          </div>
-        </div>
-
-        <div
-          v-if="result.kanji.compDetail && result.kanji.compDetail.length > 0"
-          class="space-y-3"
-        >
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-puzzle" class="size-4" />
-
-            <span>Components</span>
-          </h3>
-
-          <div class="flex flex-wrap gap-3">
-            <div
-              v-for="comp in result.kanji.compDetail"
-              :key="comp.w"
-              class="bg-gray-50 rounded-lg p-3 text-center"
-            >
-              <div class="text-2xl font-bold text-gray-900">{{ comp.w }}</div>
-
-              <div v-if="comp.h" class="text-sm text-gray-600">
-                {{ comp.h }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          v-if="result.kanji.examples && result.kanji.examples.length > 0"
-          class="space-y-3"
-        >
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-list" class="size-4" />
-
-            <span>Examples</span>
-          </h3>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div
-              v-for="(example, idx) in result.kanji.examples"
-              :key="idx"
-              class="bg-gray-50 rounded-lg p-4"
-            >
-              <div class="flex items-start justify-between mb-2">
-                <h4 class="font-semibold text-gray-900">{{ example.w }}</h4>
-
-                <span
-                  class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
-                >
-                  {{ example.h }}
-                </span>
-              </div>
-
-              <p class="text-gray-800 mb-1">{{ example.m }}</p>
-
-              <p class="text-gray-600 text-sm">{{ example.p }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="result.kanji.example_on" class="space-y-3">
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-volume-2" class="size-4" />
-
-            <span>On Reading Examples</span>
-          </h3>
-
-          <div
-            v-for="(examples, reading) in result.kanji.example_on"
-            :key="reading"
-            class="space-y-2"
-          >
-            <h4 class="font-medium text-gray-700">{{ reading }} reading:</h4>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
-              <div
-                v-for="(example, idx) in examples"
-                :key="idx"
-                class="bg-blue-50 rounded p-3"
-              >
-                <div class="font-medium text-gray-900">{{ example.w }}</div>
-
-                <div class="text-gray-700 text-sm">{{ example.m }}</div>
-
-                <div class="text-gray-500 text-xs">{{ example.p }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="result.kanji.example_kun" class="space-y-3">
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-volume-1" class="size-4" />
-
-            <span>Kun Reading Examples</span>
-          </h3>
-
-          <div
-            v-for="(examples, reading) in result.kanji.example_kun"
-            :key="reading"
-            class="space-y-2"
-          >
-            <h4 class="font-medium text-gray-700">{{ reading }} reading:</h4>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
-              <div
-                v-for="(example, idx) in examples"
-                :key="idx"
-                class="bg-green-50 rounded p-3"
-              >
-                <div class="font-medium text-gray-900">{{ example.w }}</div>
-
-                <div class="text-gray-700 text-sm">{{ example.m }}</div>
-
-                <div class="text-gray-500 text-xs">{{ example.p }}</div>
-              </div>
-            </div>
-          </div>
+            <span v-else>
+              Thu gọn
+            </span>
+          </button>
         </div>
       </div>
-    </div>
 
-    <div
-      v-if="
-        result &&
-        result.type === 'word' &&
-        result.words &&
-        result.words.length > 0
-      "
-      class="space-y-6"
-    >
-      <h2 class="text-xl font-semibold border-b pb-2">Main Results</h2>
-
-      <div
-        v-for="word in result.words"
-        :key="word._id"
-        class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4"
-      >
-        <div class="space-y-2">
-          <h1 class="text-3xl font-bold text-gray-900">{{ word.word }}</h1>
-
-          <div class="flex items-center space-x-4">
-            <span class="text-lg text-blue-600 font-medium">{{
-              word.phonetic
-            }}</span>
-
-            <span v-if="word.short_mean" class="text-gray-600 italic">{{
-              word.short_mean
-            }}</span>
-          </div>
-        </div>
-
-        <div v-if="word.means && word.means.length > 0" class="space-y-3">
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-book-open" class="size-4" />
-
-            <span>Meanings</span>
-          </h3>
-
-          <div class="space-y-3">
-            <div
-              v-for="(meaning, idx) in word.means"
-              :key="idx"
-              class="bg-gray-50 rounded-lg p-4"
-            >
-              <div class="flex items-start justify-between mb-2">
-                <p class="text-gray-800 font-medium">{{ meaning.mean }}</p>
-
+      <div class="md:col-span-8 lg:col-span-9 space-y-6">
+        
+        <div
+          v-if="result.type === 'kanji' && selectedItem"
+          class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6"
+        >
+          <div class="flex justify-between items-start">
+            <div class="space-y-3">
+              <h1 class="text-6xl font-bold text-gray-900">
+                {{ selectedItem.kanji }}
+              </h1>
+              <div class="flex flex-col space-y-1">
+                <p class="text-gray-800 text-lg">{{ selectedItem.mean }}</p>
+                <span class="text-lg text-blue-600 font-medium">On: {{ selectedItem.on }}</span>
+                <span class="text-lg text-green-600 font-medium">Kun: {{ selectedItem.kun }}</span>
+                <span class="text-sm text-gray-500">Số nét: {{ selectedItem.stroke_count }}</span>
+                <span class="text-sm text-gray-500">Độ phổ biến: {{ selectedItem.freq }}</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
                 <span
-                  v-if="meaning.kind"
-                  class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+                  v-for="level in selectedItem.level"
+                  :key="level"
+                  class="bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full"
                 >
-                  {{ meaning.kind }}
+                  {{ level }}
                 </span>
               </div>
+            </div>
+            
+            <div class="flex-shrink-0 ml-4">
+              <KanjiStrokeInResult :kanji="selectedItem.kanji" />
+            </div>
+          </div>
 
+          <div class="space-y-2">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-book-open" class="size-4" />
+              <span>Nghĩa</span>
+            </h3>
+            <div v-if="selectedItem.detail" class="space-y-3">
               <div
-                v-if="meaning.examples && meaning.examples.length > 0"
-                class="mt-3 space-y-2"
+                v-for="(paragraph, index) in selectedItem.detail.split('##')"
+                :key="index"
+                class="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-200"
               >
-                <h4 class="text-sm font-medium text-gray-600">Examples:</h4>
+                <p class="text-gray-700 text-sm leading-relaxed">
+                  {{ paragraph.trim() }}
+                </p>
+              </div>
+            </div>
+          </div>
 
-                <div
-                  v-for="(example, exIdx) in meaning.examples"
-                  :key="exIdx"
-                  class="bg-white rounded p-3 border-l-4 border-blue-200"
-                >
-                  <p class="text-gray-800 mb-1">{{ example.content }}</p>
+          <div v-if="selectedItem.tips && selectedItem.tips.vi" class="space-y-2">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-lightbulb" class="size-4" />
+              <span>Mẹo nhớ</span>
+            </h3>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p class="text-gray-800" v-html="selectedItem.tips.vi"></p>
+            </div>
+          </div>
 
-                  <p class="text-gray-600 text-sm italic">
-                    {{ example.mean }}
-                  </p>
-
-                  <p
-                    v-if="example.transcription"
-                    class="text-gray-500 text-xs mt-1"
-                  >
-                    {{ example.transcription }}
-                  </p>
+          <div
+            v-if="selectedItem.compDetail && selectedItem.compDetail.length > 0"
+            class="space-y-3"
+          >
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-puzzle" class="size-4" />
+              <span>Bộ</span>
+            </h3>
+            <div class="flex flex-wrap gap-3">
+              <div
+                v-for="comp in selectedItem.compDetail"
+                :key="comp.w"
+                class="bg-gray-50 rounded-lg p-3 text-center"
+              >
+                <div class="text-2xl font-bold text-gray-900">{{ comp.w }}</div>
+                <div v-if="comp.h" class="text-sm text-gray-600">
+                  {{ comp.h }}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div v-if="word.synsets && word.synsets.length > 0" class="space-y-2">
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-link" class="size-4" />
-
-            <span>Synonyms</span>
-          </h3>
-
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="synonym in word.synsets[0]?.entry[0]?.synonym || []"
-              :key="synonym"
-              class="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full cursor-pointer"
-              @click="selectSynonym(synonym)"
-            >
-              {{ synonym }}
-            </span>
-          </div>
-        </div>
-
-        <div v-if="word.images && word.images.length > 0" class="space-y-3">
-          <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
-            <UIcon name="i-lucide-image" class="size-4" />
-
-            <span>Images ({{ word.images.length }})</span>
-          </h3>
 
           <div
-            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"
+            v-if="selectedItem.examples && selectedItem.examples.length > 0"
+            class="space-y-3"
           >
-            <div
-              v-for="(image, index) in word.images"
-              :key="index"
-              class="relative group"
-            >
-              <img
-                :src="image"
-                :alt="`${word.word} - Image ${index + 1}`"
-                class="w-full h-24 object-cover rounded-lg border hover:scale-105 transition-transform cursor-pointer"
-                @error="$event.target.style.display = 'none'"
-              />
-
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-list" class="size-4" />
+              <span>Ví dụ</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div
-                class="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-1 py-0.5 rounded text-center min-w-[20px]"
+                v-for="(example, idx) in selectedItem.examples"
+                :key="idx"
+                class="bg-gray-50 rounded-lg p-4"
               >
-                {{ index + 1 }}
+                <div class="flex items-start justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">{{ example.w }}</h4>
+                  <span
+                    class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+                  >
+                    {{ example.h }}
+                  </span>
+                </div>
+                <p class="text-gray-800 mb-1">{{ example.m }}</p>
+                <p class="text-gray-600 text-sm">{{ example.p }}</p>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <div
-      v-if="
-        result &&
-        result.type === 'word' &&
-        result.suggestWords &&
-        result.suggestWords.length > 0
-      "
-      class="space-y-4"
-    >
-      <h2 class="text-xl font-semibold text-gray-800 border-b pb-2">
-        Suggested Words
-      </h2>
+          <div v-if="selectedItem.example_on" class="space-y-3">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-volume-2" class="size-4" />
+              <span>Ví dụ cách đọc (On)</span>
+            </h3>
+            <div
+              v-for="(examples, reading) in selectedItem.example_on"
+              :key="reading"
+              class="space-y-2"
+            >
+              <h4 class="font-medium text-gray-700">{{ reading }}</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+                <div
+                  v-for="(example, idx) in examples"
+                  :key="idx"
+                  class="bg-blue-50 rounded p-3"
+                >
+                  <div class="font-medium text-gray-900">{{ example.w }}</div>
+                  <div class="text-gray-700 text-sm">{{ example.m }}</div>
+                  <div class="text-gray-500 text-xs">{{ example.p }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div v-if="selectedItem.example_kun" class="space-y-3">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-volume-1" class="size-4" />
+              <span>Ví dụ cách đọc (Kun)</span>
+            </h3>
+            <div
+              v-for="(examples, reading) in selectedItem.example_kun"
+              :key="reading"
+              class="space-y-2"
+            >
+              <h4 class="font-medium text-gray-700">{{ reading }}</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+                <div
+                  v-for="(example, idx) in examples"
+                  :key="idx"
+                  class="bg-green-50 rounded p-3"
+                >
+                  <div class="font-medium text-gray-900">{{ example.w }}</div>
+                  <div class="text-gray-700 text-sm">{{ example.m }}</div>
+                  <div class="text-gray-500 text-xs">{{ example.p }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+
         <div
-          v-for="suggest in result.suggestWords"
-          :key="suggest._id"
-          class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-          @click="selectSuggestedWord(suggest.word)"
+          v-if="result.type === 'word' && selectedItem"
+          class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4"
         >
           <div class="space-y-2">
-            <h3 class="font-semibold text-lg text-gray-900">
-              {{ suggest.word }}
+            <h1 class="text-3xl font-bold text-gray-900">{{ selectedItem.word }}</h1>
+            <div class="flex items-center space-x-4">
+              <span class="text-lg text-blue-600 font-medium">{{ selectedItem.phonetic }}</span>
+            </div>
+          </div>
+          <div v-if="selectedItem.means && selectedItem.means.length > 0" class="space-y-3">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-book-open" class="size-4" />
+              <span>Nghĩa</span>
             </h3>
-
-            <p class="text-blue-600 font-medium">{{ suggest.phonetic }}</p>
-
-            <p class="text-gray-600 text-sm italic">
-              {{ suggest.short_mean }}
-            </p>
-
-            <div
-              v-if="suggest.means && suggest.means.length > 0"
-              class="space-y-1"
-            >
+            <div class="space-y-3">
               <div
-                v-for="(meaning, idx) in suggest.means"
+                v-for="(meaning, idx) in selectedItem.means"
                 :key="idx"
-                class="text-sm"
+                class="bg-gray-50 rounded-lg p-4"
               >
-                <span class="text-gray-800">{{ meaning.mean }}</span>
-
-                <span
-                  v-if="meaning.kind"
-                  class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded ml-2"
-                >
-                  {{ meaning.kind }}
-                </span>
+                <div class="flex items-start justify-between mb-2">
+                  <p class="text-gray-800 font-medium">{{ meaning.mean }}</p>
+                  <span
+                    v-if="meaning.kind"
+                    class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
+                  >
+                    {{ meaning.kind }}
+                  </span>
+                </div>
+                <div v-if="meaning.examples && meaning.examples.length > 0" class="mt-3 space-y-2">
+                  <h4 class="text-sm font-medium text-gray-600">Ví dụ:</h4>
+                  <div
+                    v-for="(example, exIdx) in meaning.examples"
+                    :key="exIdx"
+                    class="bg-white rounded p-3 border-l-4 border-blue-200"
+                  >
+                    <p class="text-gray-800 mb-1">{{ example.content }}</p>
+                    <p class="text-gray-600 text-sm italic">{{ example.mean }}</p>
+                    <p v-if="example.transcription" class="text-gray-500 text-xs mt-1">
+                      {{ example.transcription }}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+          <div v-if="selectedItem.synsets && selectedItem.synsets.length > 0" class="space-y-2">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-link" class="size-4" />
+              <span>Từ đồng nghĩa</span>
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="synonym in selectedItem.synsets[0]?.entry[0]?.synonym || []"
+                :key="synonym"
+                class="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full cursor-pointer"
+                @click="selectSynonym(synonym)"
+              >
+                {{ synonym }}
+              </span>
+            </div>
+          </div>
+          <div v-if="selectedItem.images && selectedItem.images.length > 0" class="space-y-3">
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-image" class="size-4" />
+              <span>Ảnh minh họa</span>
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <div
+                v-for="(image, index) in visibleImages"
+                :key="index"
+                class="relative group"
+              >
+                <img
+                  :src="image"
+                  :alt="`${selectedItem.word} - Image ${index + 1}`"
+                  class="w-full h-24 object-cover rounded-lg border hover:scale-105 transition-transform cursor-pointer"
+                  @error="$event.target.style.display = 'none'"
+                />
+                
+              </div>
+            </div>
+            <button
+              v-if="selectedItem.images.length > imageLimit"
+              @click="showAllImages = !showAllImages"
+              class="text-sm font-medium text-blue-600 hover:text-blue-800"
+            >
+              <span v-if="!showAllImages">
+                Xem thêm
+              </span>
+              <span v-else>
+                Thu gọn
+              </span>
+            </button>
+          </div>
         </div>
+
+        <div v-if="conjugationResult" class="space-y-6">
+          <h2 class="text-xl font-semibold border-b pb-2">Bảng chia động từ</h2>
+          <ConjugationTable
+            :root="conjugationResult.root"
+            :conjugations="conjugationResult.conjugations"
+            :originalForm="conjugationResult.originalForm"
+          />
+        </div>
+
       </div>
     </div>
-
-    <div v-if="conjugationResult" class="space-y-6">
-      <h2 class="text-xl font-semibold border-b pb-2">Verb Conjugation</h2>
-
-      <ConjugationTable
-        :root="conjugationResult.root"
-        :conjugations="conjugationResult.conjugations"
-        :originalForm="conjugationResult.originalForm"
-      />
-    </div>
-
     <div
       v-if="hasSearched && !result && !conjugationResult && !loading && !error"
       class="text-center py-12"
@@ -427,11 +372,9 @@
         name="i-lucide-search-x"
         class="size-12 text-gray-400 mx-auto mb-4"
       />
-
       <p class="text-gray-500 text-lg">
         No results found for "{{ originalSearchWord }}"
       </p>
-
       <p class="text-gray-400 text-sm mt-2">Try a different search term</p>
     </div>
 
@@ -439,96 +382,102 @@
       v-if="showSuggestedWordModal"
       :search-word="modalSearchWord"
       @close="showSuggestedWordModal = false"
+      class="z-50"
     />
+    
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-
+import { ref, watch, computed } from "vue"; 
 import ConjugationTable from "~/components/ConjugationTable.vue";
-
 import WordResultModal from "~/components/WordResultModal.vue";
+import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
 
 // --- Props ---
-
-// This component receives all its data from the parent
-
-defineProps({
+const props = defineProps({
   result: {
     type: Object as () => any | null,
-
     default: null,
   },
-
   conjugationResult: {
     type: Object as () => any | null,
-
     default: null,
   },
-
   loading: {
     type: Boolean,
-
     default: false,
   },
-
   error: {
     type: String,
-
     default: "",
   },
-
-  // We need this to display "No results for '...'"
-
   originalSearchWord: {
     type: String,
-
     default: "",
   },
-
   hasSearched: {
-    // <-- 1. DEFINE THE PROP
-
     type: Boolean,
-
     default: false,
   },
 });
 
-// --- Modal State ---
+const selectedItem = ref<any | null>(null);
+const showAllSuggestions = ref(false);
+const suggestionLimit = 6;
 
-// This state lives here, as this component is responsible for
+// --- NEW: State for images toggle ---
+const showAllImages = ref(false);
+const imageLimit = 6;
 
-// displaying the results that *trigger* the modal.
+const visibleSuggestions = computed(() => {
+  if (!props.result || !props.result.suggestWords) return [];
+  if (showAllSuggestions.value) {
+    return props.result.suggestWords;
+  }
+  return props.result.suggestWords.slice(0, suggestionLimit);
+});
+
+// --- NEW: Computed property for visible images ---
+const visibleImages = computed(() => {
+  if (!selectedItem.value || !selectedItem.value.images) return [];
+  if (showAllImages.value) {
+    return selectedItem.value.images;
+  }
+  return selectedItem.value.images.slice(0, imageLimit);
+});
+
+watch(
+  () => props.result,
+  (newResult) => {
+    showAllSuggestions.value = false; 
+    showAllImages.value = false;
+    if (newResult && newResult.type === 'word' && newResult.words && newResult.words.length > 0) {
+      selectedItem.value = newResult.words[0];
+    } else if (newResult && newResult.type === 'kanji' && newResult.kanjiList && newResult.kanjiList.length > 0) {
+      selectedItem.value = newResult.kanjiList[0];
+    } else {
+      selectedItem.value = null;
+    }
+  },
+  { immediate: true, deep: true } 
+);
 
 const showSuggestedWordModal = ref(false);
-
 const modalSearchWord = ref("");
-
-// --- Methods ---
-
-// Select suggested word
 
 const selectSuggestedWord = (word: string) => {
   modalSearchWord.value = word;
-
   showSuggestedWordModal.value = true;
 };
-
-// Select synonym
 
 const selectSynonym = (word: string) => {
   modalSearchWord.value = word;
-
   showSuggestedWordModal.value = true;
 };
 
-// NOTE: The image modal state and functions were removed
-
-// as they were not connected to any click handlers in the template.
-
-// If you add image modals, their state and open/close methods
-
-// would also live here.
+const selectItem = (item: any) => {
+  selectedItem.value = item;
+  showAllImages.value = false;
+};
 </script>

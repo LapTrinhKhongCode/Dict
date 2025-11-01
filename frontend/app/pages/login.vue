@@ -59,8 +59,8 @@ async function handleAuth() {
     }
     // Handle registration success (result is null, isSuccess true)
     if (mode.value === 'register' && data.isSuccess && !data.result) {
-      success.value = 'Registration successful! Please log in.'
-      showToast('Registration successful! Please log in.', 'success')
+      success.value = 'Đăng kí thành công!'
+      showToast('Đăng kí thành công!', 'success')
       // Autofill username and password
       mode.value = 'login'
       // wait a tick for template to update
@@ -103,10 +103,10 @@ login(
     <div class="bg-neutral-800 rounded-lg shadow-lg p-8 w-full max-w-md">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-bold text-white">
-          {{ mode === 'login' ? 'Login' : 'Register' }}
+          {{ mode === 'login' ? 'ĐĂNG NHẬP' : 'ĐĂNG KÍ' }}
         </h2>
         <button @click="() => {mode = (mode === 'login' ? 'register' : 'login'); touched = false; fieldErrors = {}; success = ''}" class="text-primary-400 hover:underline text-sm">
-          {{ mode === 'login' ? 'Need an account? Register' : 'Have an account? Login' }}
+          {{ mode === 'login' ? 'Bạn chưa có tài khoản? ĐĂNG KÍ' : 'Bạn đã có tài khoản? ĐĂNG NHẬP' }}
         </button>
       </div>
       <div v-if="success" class="mb-4 text-green-400">
@@ -115,20 +115,20 @@ login(
       <div class="mb-4">
         <label class="block text-gray-200 mb-1">Username</label>
         <input v-model="username" class="w-full px-3 py-2 rounded bg-neutral-700 text-white focus:outline-none" />
-        <div v-if="touched && !username" class="text-xs text-red-400 mt-1">Username is required</div>
+        <div v-if="touched && !username" class="text-xs text-red-400 mt-1">Không được để trống username</div>
         <div v-if="fieldErrors.username" class="text-xs text-red-400 mt-1">{{ fieldErrors.username }}</div>
       </div>
       <div v-if="mode === 'register'" class="mb-4">
         <label class="block text-gray-200 mb-1">Email</label>
         <input v-model="email" type="email" class="w-full px-3 py-2 rounded bg-neutral-700 text-white focus:outline-none" />
         <div v-if="touched && !email" class="text-xs text-red-400 mt-1">Email is required</div>
-        <div v-if="touched && email && !isEmailValid()" class="text-xs text-red-400 mt-1">Email is invalid</div>
+        <div v-if="touched && email && !isEmailValid()" class="text-xs text-red-400 mt-1">Email không hợp lệ</div>
         <div v-if="fieldErrors.email" class="text-xs text-red-400 mt-1">{{ fieldErrors.email }}</div>
       </div>
       <div class="mb-4">
         <label class="block text-gray-200 mb-1">Password</label>
         <input v-model="password" type="password" class="w-full px-3 py-2 rounded bg-neutral-700 text-white focus:outline-none" />
-        <div v-if="touched && !password" class="text-xs text-red-400 mt-1">Password is required</div>
+        <div v-if="touched && !password" class="text-xs text-red-400 mt-1">Không được để trống password</div>
         <div v-if="fieldErrors.password" class="text-xs text-red-400 mt-1">{{ fieldErrors.password }}</div>
       </div>
       <div v-if="error" class="text-red-400 mb-4">{{ error }}</div>
