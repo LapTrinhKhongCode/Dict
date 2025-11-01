@@ -1,69 +1,96 @@
 <template>
-  <div class="min-h-screen text-white p-4 sm:p-8">
+  <div class="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
     <div class="max-w-5xl mx-auto">
-        <img src="https://adsinhouse.eupgroup.net/uploads/images/3291_top4web_2_vi.webp"/>
-      <!-- Header -->
-      <div class="mb-6">
-        <!-- Nút quay lại trang chủ -->
-        <!-- <button @click="goHome" class="flex items-center text-sm text-sky-400 hover:text-sky-300 transition-colors mb-2">
-          &larr; Quay lại trang chủ
-        </button> -->
-        <!-- <h1 class="text-3xl font-bold text-center text-sky-400">Nâng cấp tài khoản</h1> -->
+
+      <div class="relative w-full rounded-lg overflow-hidden mb-12">
+        <img
+          src="https://adsinhouse.eupgroup.net/uploads/images/3291_top4web_2_vi.webp"
+          alt="3 bước nâng cấp"
+          class="w-full object-cover max-h-24 md:max-h-32"
+        />
+        </div>
+
+      <div v-if="role !== 'USER'" class="flex flex-col items-center justify-center mt-12 space-y-4 text-center">
+        <h1 class="text-6xl font-extrabold bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent animate-pulse drop-shadow-lg">
+          Bạn đã là thành viên VIP
+        </h1>
+        <div class="flex items-center space-x-3 text-yellow-400 text-lg">
+          <i class="fa-solid fa-crown text-3xl"></i>
+          <span class="text-2xl font-semibold">Chúc mừng bạn đã mở khóa tất cả quyền lợi cao cấp!</span>
+        </div>
+        <button @click="goHome" class="mt-8 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg transition-colors shadow-lg">
+          Trải nghiệm quyền lợi VIP
+        </button>
       </div>
 
-      <!-- Banner (giả lập từ ảnh) -->
-      <div class="w-full mt-10 h-300  rounded-lg flex items-center justify-center text-2xl font-bold text-blue-200 mb-30">
-           <div class=" flex-col mb-50 w-full h-300 rounded-lg flex items-center justify-center text-2xl font-bold text-blue-200 mb-8 overflow-hidden">
-  <img 
-    src="https://lh3.googleusercontent.com/rd-gg-dl/ABS2GSm4XkTtp4WAM0tIaoXPsn1L_G_80KMq8r63J8pmmgDDX99rQ3z8a2x7LyiwMxJH6INKkubxC7GqG-5UtOyOD2KswZ4rDanHWwSu0wWDNJCyQvvSA2rjen_nLLr1cn6gvozcWcOrvFKbflSzMRYaOhYpySjTHGtPuMR0wjMBMfsG56gdQUXeAHk3qKryrrlkXFRxlMHkPg4g4cx2PoxsO5oHAEZumBpidziHXg729S_ihcwRK2PFHjMAADQ2OLYMVQYR8hMByEGUTTRICNvtqzVh4nFMbyL-NK6sXU4oUoKuG0X9p9IcpvHhccUreYHOwEmY7nMJ-Ah8T4Qqr0hxG0yJIhAFUpve2JLZcRX7GU4RZOmB8rstnOfriGmMD63v5YNliC9F0WSmVxP_Dp17vEvhGUDZhu2IdlN_NoMU5_IX8T44V0d0Wk40sfUt-vxOQUqfQgGU7traCQM_uL2Y2wDmUMc-D7FuscVFE0BdNEeMnLtNu9wNZMAnEJD-573h1sE54OmyX6sWWQW41RhuvPSaQmnIAYT5kOATStic0UNIF2m0nNs4aFxgHRskNG8dfwX0NxLcCYX6yRkMVMfSuiSH9QnPWje9EYNERZhtj8ffSVdlzv5Cf4qzxl69rpa602l3V__GY9eDBVekymSHocI2HSu_KQ8YGcTGG8wA9X2wdvm9mBua33MmTjRwvQr8BPi4_IFnhYV-rN8JHFb38334TdOmgHptFz5Ru2YYpI8h2I00Is2EyITaoKk2iDuJqyptnnF2FZsL379-QZRHnHr7764HFAVZDhGiXxgbFmUDPafwDvqciJZYNOIBWrGsiIElaGzuP1RF2dJYnp2lEoHVP2uwOzqVuJ0w5Ydvvf_QmVFvIU77pA7YDYNZ2_UsKtJKso_5JSNyEZ0wU4oI3JiSFK15zFIPimshIoEx34fDxYldS2Nfhs9VHM5DmxInnzPDL9M35toz4QIRT57L1xdBMnWhgJ08hPhmWwPA7juejXB8TAvsG6Yxl_WI25tsb-BJsmf-DA4tHjDvAQNFeivO769mW75dXtmHdlHSNalLnEEGahxYfj5SIjI9GTkkUcrG_okEtaK8JQsXNbuVt5DDOupHXJZpCeX9XwGK2dOuuWB6C2uIXfBS8kxSB7yMU1ukcRtBe0ezYsaJkwqwDCS2gAgNysSrET89mRd-CZGftMCQ-bjY2iaBZcj_cC0zuzb7PRBQSOL6tyB4r3m3NZwWh1yj5mrwK6b2fB_J9WcIP9nmy0Kltcyx_2RT8LLhzfzjgryH51pH1lOsJnUUlY9Jvze78Bepra8bunBnj6-6Rv-h=s1024-rj"
-    alt="Preview"
-    class="object-contain h-full max-h-200"
-  />
-      <div
-          class=" shadow-2xl w-full max-w-sm cursor-pointer transition-transform transform hover:scale-105 mb-30"
+      <div v-if="role === 'USER'" class="flex flex-col items-center justify-center mt-12 mb-16">
+        
+        <h2 class="text-4xl sm:text-5xl font-extrabold text-white mb-10 text-center leading-tight">
+          Nâng cấp tài khoản của bạn để trải nghiệm
+          <span class="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">không giới hạn</span>
+        </h2>
+
+        <div
+          class="relative bg-gradient-to-br from-gray-800 to-gray-950 p-6 rounded-2xl shadow-3xl border border-blue-700/50
+                 w-full max-w-sm cursor-pointer transition-transform transform hover:scale-105 hover:border-blue-500
+                 flex flex-col items-center text-center overflow-hidden"
           @click="selectLifetime"
         >
-          <!-- Thẻ "Most Popular" -->
-          <div class="relative text-center">
-            <!-- <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-400 text-gray-900 text-sm font-bold px-4 py-1 rounded-full uppercase">
-              Most Popular
-            </span> -->
+          <div class="absolute top-4 right-4 bg-red-600 text-white text-sm font-bold px-4 py-1 rounded-full shadow-lg rotate-3">
+            -50% TRỌN ĐỜI
           </div>
-          
-          <!-- Nội dung gói -->
-          <div class="p-8 pt-10 text-center">
-            <!-- <h3 class="text-2xl font-bold text-white mb-2">Trọn đời</h3>
-            <p class="text-lg text-gray-400 mb-6">Basic version</p>
-            
-            <div class="mb-4">
-              <span class="text-5xl font-bold text-yellow-400">500.000 đ</span>
-            </div> -->
 
-            <button class="w-full  bg-yellow-500 hover:bg-yellow-600 text-gray-900 text-lg font-bold py-3 rounded-lg transition-colors">
-              Nâng cấp ngay
-            </button>
+          <div class="relative w-32 h-32 rounded-full border-4 border-blue-500 bg-gray-700 flex items-center justify-center -mt-4 mb-6 shadow-xl">
+            <img 
+              src="/assets/icons/miyo.jpg"
+              alt="Avatar nhân vật"
+              class="w-full h-full object-cover rounded-full"
+            />
+            <span class="absolute -bottom-1 -right-1 bg-yellow-400 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full shadow-md">
+              M
+            </span>
           </div>
+
+          <h3 class="text-4xl font-extrabold text-blue-400 mb-2 drop-shadow-md">Gói Trọn Đời</h3>
+          <p class="text-lg text-gray-400 mb-6 max-w-xs">Mở khóa tất cả tính năng cao cấp vĩnh viễn.</p>
+
+          <div class="flex flex-col items-center mb-8">
+            <span class="text-6xl font-extrabold text-yellow-400 leading-none">500.000 đ</span>
+            <span class="text-xl text-gray-500 line-through mt-1">999.000 đ</span>
+          </div>
+
+          <button class="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900
+                         text-white text-xl font-bold py-4 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-100">
+            Nâng cấp ngay!
+          </button>
         </div>
       </div>
-</div>
 
-      </div>
-
-      <!-- Lựa chọn gói -->
-      <div class="flex justify-center">
-        <!-- Gói Trọn Đời -->
-    
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-// Nuxt sẽ tự động import navigateTo
+import { useJwt } from '~/composables/useJwt'; // Đảm bảo đường dẫn đúng
+
+const { username, role, jwt } = useJwt();
+
 function selectLifetime() {
-  navigateTo('/premium/confirm');
+  if (jwt.value) { // Sử dụng .value với ref/computed
+    navigateTo('/premium/confirm');
+  } else {
+    navigateTo('/login');
+  }
 }
 
 function goHome() {
   navigateTo('/'); // Điều hướng về trang chủ
 }
 </script>
+
+<style scoped>
+/* Thêm các shadow tùy chỉnh nếu cần, ví dụ: */
+.shadow-3xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.05);
+}
+</style>

@@ -1,16 +1,19 @@
 ﻿using Dict.Service.IService;
 using SendGrid.Helpers.Mail;
 using SendGrid;
+using Microsoft.Extensions.Logging; // ✨ 1. Thêm thư viện này
 
 namespace Dict.Service
 {
     public class EmailService : IEmailService
     {
         private readonly IConfiguration _configuration;
+        private readonly ILogger<EmailService> _logger; // ✨ 2. Thêm ILogger
 
-        public EmailService(IConfiguration configuration)
+        public EmailService(IConfiguration configuration, ILogger<EmailService> logger) // ✨ 3. Inject ILogger
         {
             _configuration = configuration;
+            _logger = logger; // ✨ 4. Lưu lại
         }
 
         public async Task SendEmailAsync(string toEmail, string subject, string body)
@@ -21,7 +24,7 @@ namespace Dict.Service
 
             if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(fromEmail))
             {
-                // Xử lý lỗi nếu thiếu cấu hình
+                _logger.LogError("SendGrid:ApiKey hoặc SendGrid:FromEmail chưa được cấu hình.");
                 throw new Exception("SendGrid is not configured.");
             }
 
@@ -32,7 +35,24 @@ namespace Dict.Service
 
             var response = await client.SendEmailAsync(msg);
 
-            // Bạn có thể thêm log ở đây để kiểm tra response.IsSuccessStatusCode
+            // ✨ 5. BẮT BUỘC KIỂM TRA RESPONSE
+            if (!response.IsSuccessStatusCode)
+            {
+                // Đọc nội dung lỗi mà SendGrid trả về
+                var errorBody = await response.Body.ReadAsStringAsync();
+
+                // Log lỗi chi tiết để bạn debug
+                _logger.LogError(
+                    "Gửi email SendGrid thất bại. StatusCode: {StatusCode}, Lý do: {ErrorBody}",
+                    response.StatusCode,
+                    errorBody
+                );
+
+                // Ném lỗi để AuthController bắt được và trả về IsSuccess = false
+                throw new Exception("Không thể gửi email xác thực. Vui lòng thử lại sau.");
+            }
+
+            _logger.LogInformation("Đã gửi email thành công tới {ToEmail} với subject {Subject}", toEmail, subject);
         }
     }
 }

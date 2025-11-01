@@ -43,7 +43,7 @@
             <p class="text-gray-300 truncate">{{ card.meaning }}</p>
           </div>
           <div class="flex justify-between items-center mt-auto">
-            <div class="text-xs text-sky-500">
+            <div v-if="set.authorName==username" class="text-xs text-sky-500">
               Lần ôn tới: {{ getCountdownString(card, idx) }}
             </div>
 
