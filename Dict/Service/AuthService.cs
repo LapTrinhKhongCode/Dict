@@ -165,6 +165,7 @@ namespace Dict.Service
 
             var token = _jwtService.GenerateToken(user);
             // ... (trả về LoginResponseDto)
+<<<<<<< HEAD
             return new LoginResponseDto
             {
                 Token = token,
@@ -174,6 +175,9 @@ namespace Dict.Service
                 AvatarUrl = user.AvatarUrl,
                 UserId = user.Id
             };
+=======
+            return new LoginResponseDto { Token = token, Username = user.Username, /*...*/ };
+>>>>>>> eaccd71b3b9673652b8feba76931a14a754a8dc2
         }
         public async Task LogoutAsync(int userId)
         {

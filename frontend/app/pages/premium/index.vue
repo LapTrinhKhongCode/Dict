@@ -82,6 +82,10 @@ function selectLifetime() {
     navigateTo('/login');
   }
 }
+else{
+  navigateTo('/login');
+}
+}
 
 function goHome() {
   navigateTo('/'); // Điều hướng về trang chủ
