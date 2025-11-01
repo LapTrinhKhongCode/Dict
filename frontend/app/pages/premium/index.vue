@@ -10,7 +10,7 @@
         />
         </div>
 
-      <div v-if="role !== 'USER'" class="flex flex-col items-center justify-center mt-12 space-y-4 text-center">
+      <div v-if="role !== 'USER'&&role!" class="flex flex-col items-center justify-center mt-12 space-y-4 text-center">
         <h1 class="text-6xl font-extrabold bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent animate-pulse drop-shadow-lg">
           Bạn đã là thành viên VIP
         </h1>
@@ -23,7 +23,7 @@
         </button>
       </div>
 
-      <div v-if="role === 'USER'" class="flex flex-col items-center justify-center mt-12 mb-16">
+      <div v-if="role === 'USER'||role == null" class="flex flex-col items-center justify-center mt-12 mb-16">
         
         <h2 class="text-4xl sm:text-5xl font-extrabold text-white mb-10 text-center leading-tight">
           Nâng cấp tài khoản của bạn để trải nghiệm
