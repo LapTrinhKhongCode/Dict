@@ -35,32 +35,6 @@ namespace Dict.Controllers
             return userId;
         }
 
-        [HttpPost("verify-email")]
-        public async Task<IActionResult> VerifyEmail(VerifyEmailDto verifyDto)
-        {
-            if (!ModelState.IsValid)
-            {
-                _response.IsSuccess = false;
-                _response.Message = "Invalid input.";
-                return BadRequest(_response);
-            }
-
-            try
-            {
-                // Trả về token đăng nhập
-                var loginResponse = await _authService.VerifyEmailAsync(verifyDto);
-                _response.Result = loginResponse;
-                _response.Message = "Email verified successfully. You are now logged in.";
-                return Ok(_response);
-            }
-            catch (Exception ex)
-            {
-                _response.IsSuccess = false;
-                _response.Message = ex.Message;
-                return BadRequest(_response);
-            }
-        }
-
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegistrationRequestDto request)
         {
@@ -143,6 +117,40 @@ namespace Dict.Controllers
                 _response.IsSuccess = false;
                 _response.Message = "An error occurred during logout.";
                 return StatusCode(StatusCodes.Status500InternalServerError, _response);
+            }
+        }
+        [HttpPost("confirm-registration")]
+        public async Task<IActionResult> ConfirmRegistration(ConfirmRegistrationDto dto)
+        {
+            if (string.IsNullOrEmpty(dto.Token))
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Token is required.";
+                return BadRequest(_response);
+            }
+
+            try
+            {
+                // Gọi hàm service mới
+                var loginResponse = await _authService.ConfirmRegistrationAsync(dto.Token);
+
+                _response.Result = loginResponse; // Trả về token đăng nhập
+                _response.Message = "Tạo tài khoản thành công và đã đăng nhập.";
+                _response.IsSuccess = true;
+                return Ok(_response);
+            }
+            catch (InvalidOperationException opEx) // Lỗi do token hết hạn/sai
+            {
+                _response.IsSuccess = false;
+                _response.Message = opEx.Message;
+                return BadRequest(_response);
+            }
+            catch (Exception ex) // Lỗi hệ thống
+            {
+                _logger.LogError(ex, "Lỗi khi xác nhận đăng ký với token {Token}", dto.Token);
+                _response.IsSuccess = false;
+                _response.Message = "Đã xảy ra lỗi hệ thống.";
+                return StatusCode(500, _response);
             }
         }
     }
