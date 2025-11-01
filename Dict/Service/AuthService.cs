@@ -165,6 +165,7 @@ namespace Dict.Service
 
             var token = _jwtService.GenerateToken(user);
 
+
             return new LoginResponseDto
             {
                 Token = token,
