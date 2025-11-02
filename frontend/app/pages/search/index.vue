@@ -1,8 +1,22 @@
 <template>
   <div class="p-6 space-y-6">
     <div class="bg-gray-900 rounded-xl p-4 space-y-4">
-      <SearchBar v-model="searchWord" @search="onSearch" />
-
+      <SearchBar
+        v-model="searchWord"
+        @search="onSearch"
+        :search-result-ref="searchResultRef"
+      />
+      <div id="search-results-area" ref="searchResultRef">
+        <SearchResult
+          :loading="loading"
+          :error="error"
+          :result="currentResult"
+          :conjugation-result="currentConjugationResult"
+          :original-search-word="searchedTerm"
+          :has-searched="hasSearched"
+          @item-selected="handleSelectionChange"
+        />
+      </div>
       <div class="flex items-center space-x-2">
         <button
           @click="setView('word')"
@@ -34,20 +48,11 @@
         </button>
       </div>
     </div>
-
-    <SearchResult
-      :loading="loading"
-      :error="error"
-      :result="currentResult"
-      :conjugation-result="currentConjugationResult"
-      :original-search-word="searchedTerm"
-      :has-searched="hasSearched"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from "vue"; 
+import { ref, watch, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import conjugationsData from "~/data/conjugations_normalized.json";
 import { toKana } from "wanakana";
@@ -64,6 +69,8 @@ const searchWord = ref((route.query.q as string) || "");
 const wordResult = ref<any | null>(null);
 const kanjiResult = ref<any | null>(null);
 const conjugationResult = ref<any | null>(null);
+const selectedWordItem = ref<any | null>(null); // State để nhận từ được chọn từ SearchResult
+const searchResultRef = ref(null);
 // ---
 
 const loading = ref(false);
@@ -75,7 +82,7 @@ const config = useRuntimeConfig();
 // --- Computed properties to drive the UI ---
 const viewMode = computed(() => {
   if (route.query.view === "kanji") return "kanji";
-  return "word"; 
+  return "word";
 });
 
 const currentResult = computed(() => {
@@ -93,7 +100,7 @@ const currentConjugationResult = computed(() => {
 });
 // ---
 
-// ... (helper functions extractWordLeftOfSlash, getDictionaryForm, checkConjugation are unchanged) ...
+// ... (helper functions - Giữ nguyên) ...
 const extractWordLeftOfSlash = (word: string): string => {
   const slashIndex = word.indexOf("/");
   return slashIndex !== -1 ? word.substring(0, slashIndex) : word;
@@ -126,13 +133,54 @@ const checkConjugation = (word: string): any | null => {
   return null;
 };
 
-// --- Function to change the view in the URL ---
+// --- Function to change the view in the URL (Giữ nguyên) ---
 const setView = (mode: "word" | "kanji") => {
   router.push({ query: { ...route.query, view: mode } });
 };
+
+// --- NEW: Kanji Fetch Logic (Hàm độc lập) ---
+const fetchKanjiDataOnly = async (kanjiSearchTerm: string) => {
+  // Không cần clear lỗi chính ở đây, chỉ cần clear kết quả cũ
+  kanjiResult.value = null;
+
+  try {
+    const apiUrl = `${
+      config.public.apiBaseUrl
+    }/api/Kanji/GetKanjiJson/${encodeURIComponent(
+      kanjiSearchTerm // <-- Sử dụng từ khóa/từ có hán tự được chọn
+    )}`;
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error("Kanji data not found");
+    const response = await res.json();
+
+    if (
+      response.status === 200 &&
+      response.results &&
+      response.results.length > 0
+    ) {
+      kanjiResult.value = {
+        type: "kanji",
+        kanjiList: response.results,
+      };
+    }
+  } catch (e: any) {
+    console.error("Kanji fetch failed:", e.message);
+  }
+};
 // ---
 
-// --- Main API Fetch Logic (MODIFIED) ---
+// --- NEW: Function to handle selection change from child ---
+const handleSelectionChange = (item: any) => {
+  // 1. Lưu selected item vào state
+  selectedWordItem.value = item;
+
+  // 2. Tự động chạy lại tìm kiếm Kanji nếu item mới có word
+  if (item && item.word) {
+    fetchKanjiDataOnly(item.word);
+  }
+};
+
+// --- Main API Fetch Logic (ĐÃ SỬA) ---
 const fetchAll = async (word: string) => {
   if (!word) return;
 
@@ -142,26 +190,24 @@ const fetchAll = async (word: string) => {
   wordResult.value = null;
   kanjiResult.value = null;
   conjugationResult.value = null;
+  selectedWordItem.value = null; // Reset selection on new search
 
-  // Word Fetch Logic
+  // 1. Chạy Word Fetch (Word Fetch phải chạy trước)
   const fetchWordData = async () => {
     try {
       const conjugation = checkConjugation(word);
-      if (conjugation) {
-        conjugationResult.value = conjugation; 
-      }
+      conjugationResult.value = conjugation;
+
       const dictionaryForm = getDictionaryForm(word);
-      const apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(
-        dictionaryForm
-      )}`;
+      const apiUrl = `${
+        config.public.apiBaseUrl
+      }/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error("Word data not found");
       const response = await res.json();
 
       const hasWordData =
-        response.data &&
-        response.data.words &&
-        response.data.words.length > 0;
+        response.data && response.data.words && response.data.words.length > 0;
       const hasSuggestData =
         response.data &&
         response.data.suggestWords &&
@@ -178,36 +224,14 @@ const fetchAll = async (word: string) => {
     }
   };
 
-  // Kanji Fetch Logic
-  const fetchKanjiData = async () => {
-    try {
-      const apiUrl = `${config.public.apiBaseUrl}/api/Kanji/GetKanjiJson/${encodeURIComponent(
-        word
-      )}`;
-      const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error("Kanji data not found");
-      const response = await res.json();
+  await fetchWordData();
 
-      if (
-        response.status === 200 &&
-        response.results &&
-        response.results.length > 0
-      ) {
-        // --- THIS IS THE CHANGE ---
-        // We now save the entire list, not just the first item.
-        kanjiResult.value = {
-          type: "kanji",
-          kanjiList: response.results, // Was: kanji: response.results[0]
-        };
-        // --- END OF CHANGE ---
-      }
-    } catch (e: any) {
-      console.error("Kanji fetch failed:", e.message);
-    }
-  };
+  // 2. Xác định từ khóa tra Kanji
+  // Ưu tiên 1: Từ khóa từ kết quả Word đầu tiên (nếu có)
+  const kanjiSearchTerm = wordResult.value?.words?.[0]?.word || word;
 
-  // --- Run both fetches in parallel ---
-  await Promise.allSettled([fetchWordData(), fetchKanjiData()]);
+  // 3. Gọi Kanji Fetch với từ khóa đã ưu tiên (Hàm đã tách)
+  await fetchKanjiDataOnly(kanjiSearchTerm);
 
   loading.value = false;
 
@@ -216,7 +240,7 @@ const fetchAll = async (word: string) => {
   }
 };
 
-// --- MODIFIED: onSearch ---
+// --- MODIFIED: onSearch và Watcher (Giữ nguyên) ---
 const onSearch = (term: string) => {
   const trimmedWord = term.trim();
   if (!trimmedWord) return;
@@ -229,7 +253,6 @@ const onSearch = (term: string) => {
   });
 };
 
-// --- MODIFIED: Watcher ---
 watch(
   () => route.query.q,
   (newQueryValue) => {
@@ -237,7 +260,7 @@ watch(
     if (queryValue) {
       searchWord.value = queryValue;
       searchedTerm.value = queryValue;
-      fetchAll(queryValue); 
+      fetchAll(queryValue);
     } else {
       hasSearched.value = false;
       searchWord.value = "";

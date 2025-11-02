@@ -257,14 +257,89 @@
 
         <div
           v-if="result.type === 'word' && selectedItem"
-          class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4"
+          class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4 relative"
         >
+        <button
+  ref="decksButtonRef"
+  type="button"
+  class="absolute top-4 right-4 z-10 size-9 flex items-center justify-center rounded-full bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+  @click="toggleDecksPanel" 
+  aria-label="Lưu vào Deck"
+>
+  <div v-if="decksLoading" class="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+  <UIcon v-else name="i-lucide-plus" class="size-6" />
+</button>
+
+        <div
+          v-if="showDecksPanel"
+          ref="decksPanelRef"
+          class="absolute top-16 right-4 z-20 w-64 rounded-lg shadow-lg bg-white dark:bg-gray-900 border dark:border-gray-800 p-4"
+        >
+          <h4 class="font-medium text-gray-900 dark:text-white mb-2">Lưu vào Deck...</h4>
+          
+          <div v-if="decksLoading" class="flex items-center justify-center py-2">
+            <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">Đang tải decks...</span>
+          </div>
+          
+          <div v-else-if="saveLoading" class="flex items-center justify-center py-2">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+            <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">Đang lưu thẻ...</span>
+          </div>
+
+          <ul v-else-if="decks.length > 0" class="space-y-1 max-h-48 overflow-y-auto">
+            <li
+              v-for="deck in decks"
+              :key="deck.id" 
+              class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-gray-800 dark:text-gray-200"
+              @click="saveToDeck(deck.id)" 
+            >
+              {{ deck.name }} 
+            </li>
+          </ul>
+
+          <div v-else class="text-gray-500 dark:text-gray-400 text-sm">
+            Không tìm thấy deck nào.
+          </div>
+        </div>
           <div class="space-y-2">
             <h1 class="text-3xl font-bold text-gray-900">{{ selectedItem.word }}</h1>
             <div class="flex items-center space-x-4">
               <span class="text-lg text-blue-600 font-medium">{{ selectedItem.phonetic }}</span>
             </div>
           </div>
+          <div 
+            v-if="selectedItem.pronunciation && selectedItem.pronunciation.length > 0" 
+            class="flex flex-wrap gap-3 pt-3 border-t border-gray-100"
+          >
+            <div
+              v-for="(pron, index) in selectedItem.pronunciation"
+              :key="index"
+              class="bg-gray-50 rounded-lg p-3 border"
+            >
+              <div 
+                v-if="pron.word !== selectedItem.word"
+                class="font-bold text-xl text-gray-900 text-center mb-1"
+              >
+                {{ pron.word }}
+              </div>
+              
+              <div 
+              v-if="pron.transcriptions?.[0]" 
+              class="flex items-center justify-center text-center"
+              :class="pron.word !== selectedItem.word ? '' : 'mt-0'" 
+            >
+              <UIcon 
+                name="i-lucide-volume-2" 
+                class="size-4 text-blue-500 mr-1 cursor-pointer" 
+                @click="speak(pron.word)"  />
+              
+              <span class="text-lg text-blue-600 font-medium">{{ pron.transcriptions[0].kana }}</span>
+              <span class="text-gray-600 text-base ml-1">[{{ pron.transcriptions[0].romaji }}]</span>
+            </div>
+            </div>
+          </div>
+
+          
           <div v-if="selectedItem.means && selectedItem.means.length > 0" class="space-y-3">
             <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
               <UIcon name="i-lucide-book-open" class="size-4" />
@@ -302,19 +377,47 @@
               </div>
             </div>
           </div>
-          <div v-if="selectedItem.synsets && selectedItem.synsets.length > 0" class="space-y-2">
+          <div 
+            v-if="selectedItem.synsets && selectedItem.synsets.length > 0" 
+            class="space-y-2"
+          >
             <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
               <UIcon name="i-lucide-link" class="size-4" />
               <span>Từ đồng nghĩa</span>
             </h3>
+            
+            <div class="flex flex-wrap gap-2">
+              <template v-for="(synset, i) in selectedItem.synsets" :key="`synset-${i}`">
+                <template v-for="(entry, j) in synset.entry" :key="`entry-${i}-${j}`">
+                  <span
+                    v-for="(synonym, k) in entry.synonym"
+                    :key="`syn-${i}-${j}-${k}`"
+                    class="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full cursor-pointer"
+                    @click="selectSynonym(synonym)"
+                  >
+                    {{ synonym }}
+                  </span>
+                </template>
+              </template>
+            </div>
+          </div>
+          <div 
+            v-if="selectedItem.opposite_word && selectedItem.opposite_word.length > 0" 
+            class="space-y-2"
+          >
+            <h3 class="font-semibold text-gray-800 flex items-center space-x-2">
+              <UIcon name="i-lucide-arrow-left-right" class="size-4" />
+              <span>Từ trái nghĩa</span>
+            </h3>
+            
             <div class="flex flex-wrap gap-2">
               <span
-                v-for="synonym in selectedItem.synsets[0]?.entry[0]?.synonym || []"
-                :key="synonym"
-                class="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full cursor-pointer"
-                @click="selectSynonym(synonym)"
+                v-for="(word, index) in selectedItem.opposite_word"
+                :key="`opp-${index}`"
+                class="bg-red-100 text-red-800 text-sm px-3 py-1 rounded-full cursor-pointer"
+                @click="selectSynonym(word)"
               >
-                {{ synonym }}
+                {{ word }}
               </span>
             </div>
           </div>
@@ -334,8 +437,7 @@
                   :alt="`${selectedItem.word} - Image ${index + 1}`"
                   class="w-full h-24 object-cover rounded-lg border hover:scale-105 transition-transform cursor-pointer"
                   @error="$event.target.style.display = 'none'"
-                />
-                
+                  @click="openImageModal(image)" />
               </div>
             </div>
             <button
@@ -384,15 +486,23 @@
       @close="showSuggestedWordModal = false"
       class="z-50"
     />
-    
+      <ImageModal 
+      :is-open="showImageModal" 
+      :image-url="currentImage" 
+      @close="showImageModal = false" 
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue"; 
+import { ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
+import { useJwt } from '~/composables/useJwt';
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import WordResultModal from "~/components/WordResultModal.vue";
 import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
+import ImageModal from "~/components/ImageModal.vue";
+import { useToast } from '@/composables/useToast' // Giả sử đường dẫn này đúng
+const { addToast } = useToast()
 
 // --- Props ---
 const props = defineProps({
@@ -425,7 +535,10 @@ const props = defineProps({
 const selectedItem = ref<any | null>(null);
 const showAllSuggestions = ref(false);
 const suggestionLimit = 6;
-
+const emit = defineEmits(['itemSelected']);
+watch(selectedItem, (newItem) => {
+    emit('itemSelected', newItem); // <-- THÊM KHỐI NÀY
+}, { deep: true });
 // --- NEW: State for images toggle ---
 const showAllImages = ref(false);
 const imageLimit = 6;
@@ -466,6 +579,175 @@ watch(
 const showSuggestedWordModal = ref(false);
 const modalSearchWord = ref("");
 
+const showImageModal = ref(false);
+const currentImage = ref("");
+const config = useRuntimeConfig();
+
+// 2. LẤY TOKEN VÀ TRẠNG THÁI ĐĂNG NHẬP
+const { isAuthenticated, jwt } = useJwt();
+
+const decks = ref<any[]>([]);
+const decksLoading = ref(false);
+const saveLoading = ref(false);
+const showDecksPanel = ref(false);
+const decksButtonRef = ref<HTMLElement | null>(null); // Ref cho nút
+const decksPanelRef = ref<HTMLElement | null>(null);  // Ref cho panel
+
+// 3. Hàm mới để ĐÓNG/MỞ panel
+const toggleDecksPanel = () => {
+  showDecksPanel.value = !showDecksPanel.value;
+  
+  if (showDecksPanel.value) {
+    // Chỉ fetch khi mở ra
+    fetchDecks(); 
+    // Thêm listener để đóng khi click ra ngoài
+    setTimeout(() => {
+    document.addEventListener('click', handleClickOutside);
+   }, 0); // 0 mili-giây là đủ
+
+  } else {
+    // Gỡ listener khi đóng
+    document.removeEventListener('click', handleClickOutside);
+  }
+};
+
+// 4. Hàm mới để xử lý click ra ngoài
+const handleClickOutside = (event: MouseEvent) => {
+  const isClickInsideButton = decksButtonRef.value?.contains(event.target as Node);
+  const isClickInsidePanel = decksPanelRef.value?.contains(event.target as Node);
+
+  // Nếu click ra ngoài cả nút VÀ panel
+  if (!isClickInsideButton && !isClickInsidePanel) {
+    showDecksPanel.value = false;
+    document.removeEventListener('click', handleClickOutside);
+  }
+};
+
+// 5. Gỡ listener khi component bị hủy (quan trọng)
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+});
+/**
+ * Hàm gọi API để lấy danh sách decks.
+ * Chỉ gọi 1 lần, nếu decks đã có thì không gọi lại.
+ */
+const fetchDecks = async () => {
+  if (decks.value.length > 0) return;
+
+  // SỬA LỖI Ở ĐÂY (dùng addToast)
+  if (!isAuthenticated.value) { 
+    addToast('Bạn cần đăng nhập để tải decks', 'error');
+    return;
+  }
+
+  const headers = {
+    'Authorization': `Bearer ${jwt.value}`,
+    'accept': '*/*'
+  };
+
+  decksLoading.value = true;
+  try {
+    const response = await $fetch<any>(
+      `${config.public.apiBaseUrl}/api/Decks/my-decks`, 
+      {
+        method: 'GET',
+        headers: headers 
+      }
+    );
+    decks.value = response.result;
+    
+    if (!decks.value) {
+      decks.value = [];
+    }
+
+  } catch (e) {
+    // VÀ SỬA LỖI Ở ĐÂY (dùng addToast)
+    addToast('Không thể tải danh sách decks', 'error');
+    decks.value = []; // Gán mảng rỗng nếu lỗi
+  } finally {
+    decksLoading.value = false; 
+  }
+};
+/**
+ * Hàm gọi API để lưu 1 thẻ vào deck được chọn (ĐÃ THÊM AUTH)
+ */
+const saveToDeck = async (deckId: string) => {
+  if (!selectedItem.value || saveLoading.value) return;
+
+  if (!isAuthenticated.value) {
+    addToast('Bạn cần đăng nhập để lưu thẻ', 'error');
+    return;
+  }
+
+  saveLoading.value = true; // <-- BẬT LÊN
+
+  const payload = [
+    {
+      frontText: selectedItem.value.word,
+      backText: selectedItem.value.means?.[0]?.mean || selectedItem.value.short_mean || '',
+      tags: selectedItem.value.phonetic || ''
+    }
+  ];
+  
+  const headers = {
+    'Authorization': `Bearer ${jwt.value}`,
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    await $fetch(`${config.public.apiBaseUrl}/api/Decks/${deckId}/cards`, {
+      method: 'POST',
+      body: payload,
+      headers: headers
+    });
+
+    // Gọi toast thành công (từ composable của bạn)
+    addToast(
+      `Đã lưu từ "${selectedItem.value.word}" vào deck.`, 
+      'success'
+    );
+    
+  } catch (e) {
+    // Gọi toast lỗi (từ composable của bạn)
+    addToast('Không thể lưu thẻ, vui lòng thử lại', 'error');
+  } finally {
+    // ---------------------------------
+    // KHỐI NÀY SẼ LUÔN LUÔN CHẠY
+    // ---------------------------------
+    
+    saveLoading.value = false; // <-- TẮT ĐI
+    
+    // Đóng panel
+    showDecksPanel.value = false;
+    document.removeEventListener('click', handleClickOutside);
+  }
+};
+function speak(textToSpeak) {
+  // Quan trọng: Phải check 'process.client' vì window.speechSynthesis chỉ tồn tại ở trình duyệt
+  if (process.client) {
+    if (!window.speechSynthesis) {
+      console.error('Rất tiếc, trình duyệt của bạn không hỗ trợ chức năng phát âm.');
+      return;
+    }
+
+    // Tạo một yêu cầu phát âm mới
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    
+    // *** Đặt ngôn ngữ là tiếng Nhật ***
+    utterance.lang = 'ja-JP'; 
+
+    // (Nên có) Hủy bỏ bất kỳ lần phát âm nào trước đó nếu người dùng click nhanh
+    window.speechSynthesis.cancel(); 
+    
+    // Phát âm
+    window.speechSynthesis.speak(utterance);
+  }
+}
+const openImageModal = (imageUrl: string) => {
+  currentImage.value = imageUrl;
+  showImageModal.value = true;
+};
+
 const selectSuggestedWord = (word: string) => {
   modalSearchWord.value = word;
   showSuggestedWordModal.value = true;
@@ -481,3 +763,4 @@ const selectItem = (item: any) => {
   showAllImages.value = false;
 };
 </script>
+

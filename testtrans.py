@@ -207,7 +207,7 @@ app.add_middleware(
 
 # --- TẢI MÔ HÌNH (CHỈ 1 LẦN) ---
 # SỬA ĐƯỜNG DẪN NÀY
-model_path = r"D:\DUT\DichNhat\trainfile\mbart\best_model"
+model_path = r"G:\GPT\OCR\OCR\best_model"
 print("=" * 50)
 print(f"⏳ [API Server] Đang tải mô hình từ: {model_path}")
 print("Đây là quá trình MỘT LẦN. Vui lòng chờ...")

@@ -2,6 +2,7 @@
 using Dict.DTO;
 using Dict.Models;
 using Dict.Service.IService;
+using ImageMagick;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http;
@@ -21,7 +22,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-
+using ImageMagick;
+using System.Text.Json;
 [ApiController]
 [Route("api/[controller]")]
 public class InferController : ControllerBase
@@ -43,6 +45,60 @@ public class InferController : ControllerBase
         [JsonPropertyName("matrix")]
         public List<List<int>> Matrix { get; set; }
     }
+    // DTO để hứng JSON trả về từ Python
+    public class OcrStreamResult
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; }
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; }
+
+        [JsonPropertyName("line_number")]
+        public int LineNumber { get; set; }
+
+        [JsonPropertyName("text")]
+        public string Text { get; set; }
+        [JsonPropertyName("bbox")]
+        public List<int> Bbox { get; set; }
+
+        [JsonPropertyName("crop_dataurl")]
+        public string CropDataUrl { get; set; }
+
+        [JsonPropertyName("vis_dataurl")]
+        public string VisDataUrl { get; set; }
+
+        // Chúng ta sẽ thêm trường này
+        [JsonPropertyName("page_number")]
+        public int PageNumber { get; set; }
+    }
+    // === DTO MỚI CHO DỊCH THUẬT ===
+    public class TranslationRequestDto
+    {
+        [JsonPropertyName("text")]
+        public string Text { get; set; }
+
+        // Mặc dù Python là 'tgt_lang', C# convention là PascalCase
+        // JsonPropertyName sẽ lo việc chuyển đổi
+        [JsonPropertyName("tgt_lang")]
+        public string TgtLang { get; set; }
+    }
+
+    public class TranslationResponseDto
+    {
+        [JsonPropertyName("original_text")]
+        public string OriginalText { get; set; }
+
+        [JsonPropertyName("translated_text")]
+        public string TranslatedText { get; set; }
+
+        [JsonPropertyName("detected_lang")]
+        public string DetectedLang { get; set; }
+
+        [JsonPropertyName("processing_time_ms")]
+        public float ProcessingTimeMs { get; set; }
+    }
+    // === KẾT THÚC DTO MỚI ===
     // Constructor được rút gọn
     public InferController(
         ILogger<InferController> logger,
@@ -134,7 +190,120 @@ public class InferController : ControllerBase
     }
 
 
+    [HttpPost("pdf-stream")]
+    public async Task StreamPdfOcr(IFormFile file)
+    {
+        if (file == null || file.Length == 0 || file.ContentType != "application/pdf")
+        {
+            HttpContext.Response.StatusCode = 400; // BadRequest
+            await HttpContext.Response.WriteAsync("Vui lòng tải lên một file PDF hợp lệ.");
+            return;
+        }
 
+        // 1. Cài đặt stream về cho Vue (Giống hệt hàm cũ)
+        HttpContext.Response.ContentType = "text/event-stream";
+        HttpContext.Response.StatusCode = 200;
+
+        int pageIndex = 1;
+
+        try
+        {
+            // 2. Mở file PDF bằng Magick.NET
+            // Thư viện này sẽ đọc PDF và tách thành một bộ sưu tập ảnh
+            using var images = new MagickImageCollection();
+            await images.ReadAsync(file.OpenReadStream());
+
+            _logger.LogInformation($"Tách PDF thành công. Số trang: {images.Count}");
+
+            // 3. Lặp qua từng trang (từng ảnh)
+            foreach (var image in images)
+            {
+                // Chuyển ảnh của trang hiện tại thành byte[] (định dạng Png)
+                image.Format = MagickFormat.Png;
+                byte[] imageBytes = image.ToByteArray();
+
+                _logger.LogInformation($"Đang xử lý trang {pageIndex}...");
+
+                // 4. Gọi API Python /ocr-stream (Tái sử dụng logic cũ của bạn)
+                using var httpClient = _httpClientFactory.CreateClient();
+                using var formData = new MultipartFormDataContent();
+                var imageContent = new ByteArrayContent(imageBytes);
+                imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+                formData.Add(imageContent, "file", $"page_{pageIndex}.png");
+
+                var pythonRequest = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    "http://127.0.0.1:8000/ocr-stream" // Gọi lại API OCR ảnh cũ
+                );
+                pythonRequest.Content = formData;
+
+                using var pythonResponse = await httpClient.SendAsync(
+                    pythonRequest,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    HttpContext.RequestAborted
+                );
+
+                if (!pythonResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning($"Python API error (Page {pageIndex}): {pythonResponse.StatusCode}");
+                    continue; // Bỏ qua trang này, tiếp tục trang sau
+                }
+
+                // 5. Đọc stream từ Python và bơm về cho Vue (ĐÃ NÂNG CẤP)
+                using var pythonStream = await pythonResponse.Content.ReadAsStreamAsync();
+                using var reader = new StreamReader(pythonStream);
+
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+
+                    if (string.IsNullOrEmpty(line))
+                    {
+                        await HttpContext.Response.WriteAsync("\n\n");
+                        continue;
+                    }
+
+                    if (line.StartsWith("data:"))
+                    {
+                        try
+                        {
+                            // Đọc JSON từ Python
+                            string jsonString = line.Substring(5).Trim();
+                            var data = JsonSerializer.Deserialize<OcrStreamResult>(jsonString);
+
+                            if (data != null)
+                            {
+                                // Thêm số trang vào JSON
+                                data.PageNumber = pageIndex;
+
+                                // Gửi JSON đã sửa đổi về Vue
+                                string modifiedJsonString = JsonSerializer.Serialize(data);
+                                await HttpContext.Response.WriteAsync($"data: {modifiedJsonString}\n\n");
+                                await HttpContext.Response.Body.FlushAsync(); // Đẩy dữ liệu đi ngay
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Lỗi parse JSON từ Python: {line}");
+                        }
+                    }
+                }
+
+                pageIndex++;
+            } // Kết thúc vòng lặp ForEach
+
+            _logger.LogInformation("Đã xử lý xong tất cả các trang PDF.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi khi xử lý stream PDF");
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.StatusCode = 500;
+                await HttpContext.Response.WriteAsync($"Lỗi server C#: {ex.Message}");
+            }
+        }
+    }
     [HttpPost("predict")]
     public async Task<IActionResult> PredictHandwriting([FromBody] PredictionRequestDto request)
     {
@@ -184,6 +353,52 @@ public class InferController : ControllerBase
         }
     }
 
+    // === ENDPOINT MỚI CHO DỊCH THUẬT ===
+    [HttpPost("translate")]
+    public async Task<IActionResult> TranslateText([FromBody] TranslationRequestDto request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Text))
+        {
+            return BadRequest(new { error = "Input 'text' cannot be empty." });
+        }
+
+        _logger.LogInformation("Nhận được request /translate cho: {Text}", request.Text.Length > 50 ? request.Text.Substring(0, 50) + "..." : request.Text);
+
+        try
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            var pythonUrl = "http://127.0.0.1:8000/translate";
+
+            // Gửi request JSON (giống hệt /predict)
+            using var response = await httpClient.PostAsJsonAsync(
+                pythonUrl,
+                request, // Gửi DTO request
+                HttpContext.RequestAborted
+            );
+
+            // Kiểm tra lỗi từ Python
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Python /translate API error: {StatusCode} - {Body}", response.StatusCode, errorBody);
+                return StatusCode((int)response.StatusCode, errorBody);
+            }
+
+            // Đọc kết quả JSON
+            var translationResult = await response.Content.ReadFromJsonAsync<TranslationResponseDto>();
+
+            _logger.LogInformation("/translate thành công");
+
+            // Trả kết quả về cho client
+            return Ok(translationResult);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi nghiêm trọng khi gọi /translate");
+            return StatusCode(500, $"Lỗi server C#: {ex.Message}");
+        }
+    }
+    // === KẾT THÚC ENDPOINT MỚI ===
 
     [HttpGet("health")]
     [AllowAnonymous] // Cho phép kiểm tra health mà không cần đăng nhập

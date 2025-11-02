@@ -23,10 +23,17 @@
       <span>Từ vựng</span>
     </NuxtLink>
        <NuxtLink to="/explore" class="sidebar-link-style">
-      <UIcon name="i-lucide-book-a" class="text-3xl" />
+      <UIcon name="i-lucide-copy" class="text-3xl" />
       <span>Flashcard</span>
     </NuxtLink>
-
+    <NuxtLink to="/ocr" class="sidebar-link-style">
+      <UIcon name="i-lucide-scan-text" class="text-3xl" />
+      <span>OCR</span>
+    </NuxtLink>
+    <NuxtLink to="/reading" class="sidebar-link-style">
+      <UIcon name="i-lucide-newspaper" class="text-3xl" />
+      <span>Luyện đọc</span>
+    </NuxtLink>
     <!-- Settings -->
     <div class="px-3 py-2 text-sm font-medium text-gray-400 mt-4">Settings</div>
     <NuxtLink class="sidebar-link-style">
