@@ -93,7 +93,11 @@ function handleLogout() {
           </button>
         </div>
       </div>
-      <UButton icon="i-lucide-settings" size="xl" variant="ghost" />
+          <NuxtLink to="/account">
+      <UButton icon="i-lucide-settings" size="xl" variant="ghost" >
+    
+      </UButton>
+      </NuxtLink>
     </div>
   </header>
 </template>

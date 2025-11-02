@@ -3,7 +3,9 @@ using Dict.DTO.Deck;
 using Dict.DTO.User;
 using Dict.Models;
 using Dict.Service.IService;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using SendGrid.Helpers.Mail;
 using System; // Thêm
 using System.Collections.Generic;
 using System.Linq;
@@ -246,7 +248,33 @@ namespace Dict.Service
             }
         }
 
-        // ❌ REMOVE: The dedicated UpdateAvatarUrlAsync method is no longer needed
-        // public async Task<bool> UpdateAvatarUrlAsync(int userId, string newAvatarUrl) { ... }
+        public async Task<bool> ChangePasswordAsync(string username, string oldPassword, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(oldPassword) || string.IsNullOrWhiteSpace(newPassword))
+            throw new ArgumentException("Username, old password, and new password are required.");
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+        if (user == null)
+            throw new InvalidOperationException("User not found.");
+
+        // 🔒 Kiểm tra mật khẩu cũ
+        if (!BCrypt.Net.BCrypt.Verify(oldPassword, user.PasswordHash))
+            throw new InvalidOperationException("Old password is incorrect.");
+
+        // 🔐 Hash mật khẩu mới
+        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(newPassword);
+
+        user.PasswordHash = hashedPassword;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        _context.Users.Update(user);
+        await _context.SaveChangesAsync();
+
+        return true;
     }
+
+
+    // ❌ REMOVE: The dedicated UpdateAvatarUrlAsync method is no longer needed
+    // public async Task<bool> UpdateAvatarUrlAsync(int userId, string newAvatarUrl) { ... }
+}
 }

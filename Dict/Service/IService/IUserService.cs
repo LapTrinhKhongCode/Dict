@@ -10,5 +10,6 @@ namespace Dict.Service.IService
         Task<bool> DeleteUserAsync(int id);
         Task<IEnumerable<UserDto>> SearchUsersByUsernameAsync(string username);
         Task<UserResponseDto> UpdateUserByUsernameAsync(string username, UpdateUserDto updateUserDto);
+        Task<bool> ChangePasswordAsync(string username, string oldPassword, string newPassword);
     }
 }

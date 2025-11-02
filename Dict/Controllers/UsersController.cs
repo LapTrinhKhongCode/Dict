@@ -94,6 +94,29 @@ namespace Dict.Controllers
                 return StatusCode(500, _response);
             }
         }
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO request)
+        {
+      
+            try
+            {
+                var result = await _userService.ChangePasswordAsync(request.Username, request.OldPassword, request.NewPassword);
+                if (!result)
+                {
+                    _response.IsSuccess = false;
+                    _response.Message = "User not found.";
+                    return NotFound(_response);
+                }
+                _response.Message = "User deleted successfully.";
+                return Ok(_response); 
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return StatusCode(500, _response);
+            }
+        }
         [HttpGet("search/{username}")]
         [AllowAnonymous]
         public async Task<IActionResult> SearchUsers(string username)
