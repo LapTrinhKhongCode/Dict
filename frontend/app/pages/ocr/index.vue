@@ -173,7 +173,7 @@ function calculateBoxStyle(bbox) {
   const [x_min, y_min, x_max, y_max] = bbox;
 
   // <-- thêm hàng này: số px muốn dịch xuống (chỉnh ở đây)
-  const extraOffsetY = 10; // dịch xuống 6px
+  const extraOffsetY = 0; // dịch xuống 6px
 
   const top = y_min * ratio + offsetY + extraOffsetY + "px";
   const left = x_min * ratio + offsetX + "px";

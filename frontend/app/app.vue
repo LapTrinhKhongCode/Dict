@@ -2,36 +2,40 @@
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
-  
+
   <ToastDisplay />
-  
+
   <WordResultModal
-    v-if="isModalVisible"
+    v-if="isLookupModalVisible"
     :search-word="selectedWord"
-    @close="isModalVisible = false"
+    @close="isLookupModalVisible = false"
   />
-  
+
+  <TranslationModal
+    v-if="isTranslateModalVisible"
+    :search-word="selectedWord"
+    @close="isTranslateModalVisible = false"
+  />
 </template>
 
 <script setup>
-import ToastDisplay from '@/components/ToastDisplay.vue'
-import WordResultModal from '~/components/WordResultModal.vue'
+import ToastDisplay from "@/components/ToastDisplay.vue";
+import WordResultModal from "~/components/WordResultModal.vue";
+import TranslationModal from "~/components/translate/TranslationModal.vue"; // <-- THÊM MỚI
 
-// Import các state toàn cục (Giờ chỉ cần 2 state)
-import { 
+// Import các state toàn cục (thêm state mới)
+import {
   useLookupModalVisible,
+  useTranslateModalVisible, // <-- THÊM MỚI
   useLookupSelectedWord,
-} from '~/composables/useLookupState' 
+} from "~/composables/useLookupState";
 
 // Gán state
-const isModalVisible = useLookupModalVisible()
-const selectedWord = useLookupSelectedWord()
-
-// KHÔNG CẦN import SearchResult, apiResult, loading, error ở đây nữa
+const isLookupModalVisible = useLookupModalVisible();
+const isTranslateModalVisible = useTranslateModalVisible(); // <-- THÊM MỚI
+const selectedWord = useLookupSelectedWord();
 </script>
 
 <style>
-/* XÓA TOÀN BỘ CSS CỦA MODAL CŨ (modal-overlay, modal-content) 
-  Vì component <WordResultModal> của bạn sẽ tự quản lý style của nó.
-*/
+/* CSS toàn cục (nếu có) */
 </style>

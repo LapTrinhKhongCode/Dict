@@ -1,85 +1,124 @@
 // plugins/lookup.client.ts
+import { 
+  useLookupModalVisible, 
+  useTranslateModalVisible, 
+  useLookupHighlightedWord, 
+  useLookupSelectedWord 
+} from '~/composables/useLookupState'
 
 export default defineNuxtPlugin((nuxtApp) => {
   // Lấy global state
   const isModalVisible = useLookupModalVisible()
-  const highlightedWord = useLookupHighlightedWord() // State tạm
-  const selectedWord = useLookupSelectedWord()     // State tra cứu
+  const isTranslateModalVisible = useTranslateModalVisible()
+  const highlightedWord = useLookupHighlightedWord()
+  const selectedWord = useLookupSelectedWord()
 
-  // 1. Tạo Pop-up Icon (Giữ nguyên)
-  const popup = document.createElement('div')
-  popup.id = 'global-lookup-popup'
-  popup.innerHTML = '🔍'
-  // (Giữ nguyên toàn bộ code style cho popup...)
-  popup.style.position = 'absolute';
-  popup.style.display = 'none';
-  popup.style.zIndex = '9998';
-  popup.style.padding = '5px';
-  popup.style.backgroundColor = '#333';
-  popup.style.color = 'white';
-  popup.style.borderRadius = '5px';
-  popup.style.cursor = 'pointer';
-  popup.style.fontSize = '1.2rem';
-  popup.style.lineHeight = '1';
-  popup.style.userSelect = 'none';
-  popup.onmouseover = () => { popup.style.backgroundColor = '#007bff'; };
-  popup.onmouseout = () => { popup.style.backgroundColor = '#333'; };
+  // --- 1. Tạo Pop-up CONTAINER (Sửa innerHTML) ---
+  const popupContainer = document.createElement('div')
+  popupContainer.id = 'global-lookup-container'
   
-  document.body.appendChild(popup)
+  // [ĐÃ SỬA] Thay "T" bằng SVG thô của icon 'lucide:languages'
+  const svgIcon = `
+    <svg xmlns="http://www.w3.org/2000/svg" 
+         width="18" height="18" viewBox="0 0 24 24" 
+         fill="none" stroke="currentColor" stroke-width="2.5" 
+         stroke-linecap="round" stroke-linejoin="round" 
+         style="display: block; margin: 0 auto;">
+      <path d="m5 8 6 6"/>
+      <path d="m4 14 6-6 2-3"/>
+      <path d="M2 5h12"/>
+      <path d="M7 2h1"/>
+      <path d="m22 22-5-10-5 10"/>
+      <path d="M14 18h6"/>
+    </svg>
+  `
+  
+  popupContainer.innerHTML = `
+    <span id="global-lookup-icon" title="Tra cứu">🔍</span>
+    <span id="global-translate-icon" title="Dịch">${svgIcon}</span>
+  `
+  
+  // (Style cho container)
+  popupContainer.style.position = 'absolute';
+  popupContainer.style.display = 'none';
+  popupContainer.style.zIndex = '9998';
+  popupContainer.style.backgroundColor = '#333';
+  popupContainer.style.borderRadius = '5px';
+  popupContainer.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+  popupContainer.style.userSelect = 'none';
+  popupContainer.style.overflow = 'hidden';
+  
+  document.body.appendChild(popupContainer)
 
-  // 2. Gắn Listener Toàn cục
+  // --- 2. Lấy 2 icon đó và thêm Style (Sửa style) ---
+  const lookupIcon = document.getElementById('global-lookup-icon')
+  const translateIcon = document.getElementById('global-translate-icon')
+
+  // [ĐÃ SỬA] Căn chỉnh 2 icon (emoji và SVG)
+  const iconBaseStyle = `
+    display: inline-flex; /* Dùng flex để căn giữa */
+    align-items: center;
+    justify-content: center;
+    padding: 6px 9px; /* Tăng padding 1 chút */
+    cursor: pointer;
+    line-height: 1;
+    color: white;
+  `
+  // Style cho icon Tra cứu (emoji)
+  lookupIcon.style.cssText = iconBaseStyle + 'font-size: 1.1rem; border-right: 1px solid #555;';
+  // Style cho icon Dịch (SVG)
+  translateIcon.style.cssText = iconBaseStyle; 
+  // --- KẾT THÚC SỬA ---
+
+  lookupIcon.onmouseover = () => { lookupIcon.style.backgroundColor = '#007bff'; };
+  lookupIcon.onmouseout = () => { lookupIcon.style.backgroundColor = 'transparent'; };
+  translateIcon.onmouseover = () => { translateIcon.style.backgroundColor = '#28a745'; };
+  translateIcon.onmouseout = () => { translateIcon.style.backgroundColor = 'transparent'; };
   
-  // Click vào icon
-  popup.addEventListener('click', () => {
-    selectedWord.value = highlightedWord.value // Sao chép Tạm -> Tra cứu
-    popup.style.display = 'none'
-    isModalVisible.value = true // Mở modal
+  // --- 3. Gắn Listener Toàn cục (Đã sửa logic Reset) ---
+  
+  lookupIcon.addEventListener('click', () => {
+    selectedWord.value = highlightedWord.value
+    popupContainer.style.display = 'none'
+    isTranslateModalVisible.value = false // Tắt Dịch
+    isModalVisible.value = true      // Bật Tra cứu
   })
 
-  // Thả chuột (mouseup) ở BẤT CỨ ĐÂU
+  translateIcon.addEventListener('click', () => {
+    selectedWord.value = highlightedWord.value
+    popupContainer.style.display = 'none'
+    isModalVisible.value = false      // Tắt Tra cứu
+    isTranslateModalVisible.value = true // Bật Dịch
+  })
+
   document.addEventListener('mouseup', (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    
-    // Bỏ qua nếu click vào chính pop-up
-    if (target.closest('#global-lookup-popup')) {
+    if (target.closest('#global-lookup-container')) {
       return
     }
-    
-    // (Bỏ qua nếu bôi đen trong ô input, v.v.)
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        // (Trừ khi target là #reading-content, 
-        // nhưng chúng ta có thể bỏ qua logic phức tạp đó vì nó vẫn hoạt động)
-    }
-
     const selection = window.getSelection()
     const text = selection?.toString().trim()
-
     if (!text || text.length === 0) {
-      popup.style.display = 'none'
+      popupContainer.style.display = 'none'
       return
     }
-
-    // Luôn cập nhật state "Tạm"
     highlightedWord.value = text 
-
     if (e.altKey) {
-      // Chế độ 2: Tra ngay
-      selectedWord.value = text // Sao chép Tạm -> Tra cứu
-      popup.style.display = 'none'
-      isModalVisible.value = true 
+      selectedWord.value = text
+      popupContainer.style.display = 'none'
+      isTranslateModalVisible.value = false
+      isModalVisible.value = true
     } else {
-      // Chế độ 1: Chỉ hiện icon
-      popup.style.top = `${e.clientY + window.scrollY + 5}px`
-      popup.style.left = `${e.clientX + window.scrollX}px`
-      popup.style.display = 'block'
+      popupContainer.style.top = `${e.clientY + window.scrollY + 5}px`
+      popupContainer.style.left = `${e.clientX + window.scrollX}px`
+      popupContainer.style.display = 'block'
     }
   })
   
-  // Nhấn chuột (mousedown) để ẩn icon
   document.addEventListener('mousedown', (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    if (!target.closest('#global-lookup-popup')) {
-      popup.style.display = 'none'
+    if (!target.closest('#global-lookup-container')) {
+      popupContainer.style.display = 'none'
     }
   })
 })

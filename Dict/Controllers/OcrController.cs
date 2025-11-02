@@ -72,6 +72,33 @@ public class InferController : ControllerBase
         [JsonPropertyName("page_number")]
         public int PageNumber { get; set; }
     }
+    // === DTO MỚI CHO DỊCH THUẬT ===
+    public class TranslationRequestDto
+    {
+        [JsonPropertyName("text")]
+        public string Text { get; set; }
+
+        // Mặc dù Python là 'tgt_lang', C# convention là PascalCase
+        // JsonPropertyName sẽ lo việc chuyển đổi
+        [JsonPropertyName("tgt_lang")]
+        public string TgtLang { get; set; }
+    }
+
+    public class TranslationResponseDto
+    {
+        [JsonPropertyName("original_text")]
+        public string OriginalText { get; set; }
+
+        [JsonPropertyName("translated_text")]
+        public string TranslatedText { get; set; }
+
+        [JsonPropertyName("detected_lang")]
+        public string DetectedLang { get; set; }
+
+        [JsonPropertyName("processing_time_ms")]
+        public float ProcessingTimeMs { get; set; }
+    }
+    // === KẾT THÚC DTO MỚI ===
     // Constructor được rút gọn
     public InferController(
         ILogger<InferController> logger,
@@ -326,6 +353,52 @@ public class InferController : ControllerBase
         }
     }
 
+    // === ENDPOINT MỚI CHO DỊCH THUẬT ===
+    [HttpPost("translate")]
+    public async Task<IActionResult> TranslateText([FromBody] TranslationRequestDto request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Text))
+        {
+            return BadRequest(new { error = "Input 'text' cannot be empty." });
+        }
+
+        _logger.LogInformation("Nhận được request /translate cho: {Text}", request.Text.Length > 50 ? request.Text.Substring(0, 50) + "..." : request.Text);
+
+        try
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            var pythonUrl = "http://127.0.0.1:8000/translate";
+
+            // Gửi request JSON (giống hệt /predict)
+            using var response = await httpClient.PostAsJsonAsync(
+                pythonUrl,
+                request, // Gửi DTO request
+                HttpContext.RequestAborted
+            );
+
+            // Kiểm tra lỗi từ Python
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Python /translate API error: {StatusCode} - {Body}", response.StatusCode, errorBody);
+                return StatusCode((int)response.StatusCode, errorBody);
+            }
+
+            // Đọc kết quả JSON
+            var translationResult = await response.Content.ReadFromJsonAsync<TranslationResponseDto>();
+
+            _logger.LogInformation("/translate thành công");
+
+            // Trả kết quả về cho client
+            return Ok(translationResult);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi nghiêm trọng khi gọi /translate");
+            return StatusCode(500, $"Lỗi server C#: {ex.Message}");
+        }
+    }
+    // === KẾT THÚC ENDPOINT MỚI ===
 
     [HttpGet("health")]
     [AllowAnonymous] // Cho phép kiểm tra health mà không cần đăng nhập
