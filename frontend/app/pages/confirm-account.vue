@@ -1,81 +1,125 @@
 <template>
-  <div>
-    <h2>Đang xác nhận tài khoản...</h2>
-    <p v-if="error" style="color: red;">{{ error }}</p>
-    <p v-if="success" style="color: green;">{{ success }}</p>
+  <div class="flex items-center justify-center min-h-screen bg-gray-50">
+    <div
+      class="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md text-center space-y-4 border border-gray-100"
+    >
+      <!-- Loading -->
+      <div v-if="loading" class="animate-pulse">
+        <div class="flex flex-col items-center space-y-3">
+          <svg
+            class="w-10 h-10 text-blue-500 animate-spin"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8H4z"
+            />
+          </svg>
+          <h2 class="text-lg font-semibold text-gray-700">
+            Đang xác nhận tài khoản...
+          </h2>
+        </div>
+      </div>
+
+      <!-- Kết quả -->
+      <div v-else>
+        <h2
+          class="text-xl font-semibold transition-all duration-300"
+          :class="success ? 'text-green-600' : 'text-red-600'"
+        >
+          {{ success || error }}
+        </h2>
+
+        <p v-if="success" class="text-gray-600 mt-2">
+          Bạn sẽ được chuyển hướng về trang chủ trong giây lát...
+        </p>
+
+        <p v-if="error" class="text-gray-500 mt-2">
+          Nếu lỗi vẫn tiếp tục, vui lòng đăng ký lại hoặc liên hệ hỗ trợ.
+        </p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted } from 'vue'
+import { useJwt } from '~/composables/useJwt'
+import { useRuntimeConfig, useRoute, useRouter } from '#imports'
 
-// 1. Lấy các hàm composables của Nuxt 3
-const config = useRuntimeConfig(); // Để lấy config.public.apiBaseUrl
-const route = useRoute();         // Để lấy query params từ URL
-const router = useRouter();       // Để chuyển trang
+const config = useRuntimeConfig()
+const route = useRoute()
+const router = useRouter()
+const { logout, login } = useJwt()
 
-// 2. Tạo các biến trạng thái (state)
-const error = ref(null);
-const success = ref(null);
+const loading = ref(true)
+const error = ref(null)
+const success = ref(null)
 
-// 3. Dùng onMounted để chạy code khi component được tải
-// (Tương đương với 'mounted' trong Options API)
 onMounted(async () => {
-  
-  // Lấy token tạm thời từ URL
-  const confirmationToken = route.query.token;
+  // 🧹 1. Logout mọi user hiện tại
+  logout()
 
+  const confirmationToken = route.query.token
   if (!confirmationToken) {
-    error.value = 'Link xác nhận không hợp lệ.';
-    return;
+    loading.value = false
+    error.value = 'Link xác nhận không hợp lệ.'
+    return
   }
 
   try {
-    // 1. TẠO URL (Theo phong cách của bạn)
-    const url = `${config.public.apiBaseUrl}/api/Auth/confirm-registration`;
-
-    // 2. TẠO TÙY CHỌN FETCH
-    const fetchOptions = {
+    // 📨 2. Gọi API xác nhận đăng ký
+    const url = `${config.public.apiBaseUrl}/api/Auth/confirm-registration`
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: confirmationToken }),
-    };
+    })
+    const data = await res.json()
 
-    // 3. GỌI API (Theo phong cách của bạn)
-    const response = await fetch(url, fetchOptions);
-    const data = await response.json(); // Đây là ResponseDTO
-
-    // 4. KIỂM TRA KẾT QUẢ
-    if (!response.ok || !data.isSuccess) {
-      // Ném lỗi nếu API trả về thất bại (ví dụ: token hết hạn)
-      throw new Error(data.message || 'Xác nhận thất bại.');
+    if (!res.ok || !data.isSuccess) {
+      throw new Error(data.message || 'Xác nhận thất bại.')
     }
 
-    // 5. THÀNH CÔNG: Lấy token JWT (token "vĩnh viễn")
-    const loginToken = data.result.token;
-    if (!loginToken) {
-      throw new Error('Không nhận được token đăng nhập từ máy chủ.');
-    }
+    // ✅ 3. Nhận token và thông tin user
+    const result = data.result
+    const loginToken = result?.token
+    if (!loginToken) throw new Error('Không nhận được token đăng nhập từ máy chủ.')
 
-    // 6. ✨ LƯU TOKEN VĨNH VIỄN
-    localStorage.setItem('auth_token', loginToken);
+    // 🌟 4. Tự động login lại bằng useJwt()
+    login(
+      loginToken,
+      result?.username,
+      result?.avatarUrl,
+      result?.email,
+      result?.role,
+      result?.userId
+    )
 
-    // (Tùy chọn: Cập nhật Pinia store tại đây)
-    // const authStore = useAuthStore();
-    // authStore.setUser(data.result);
+    success.value = '✅ Xác nhận thành công! Bạn đã được đăng nhập.'
+    loading.value = false
 
-    success.value = 'Xác nhận thành công! Đang chuyển hướng...';
-
-    // 7. CHUYỂN HƯỚNG về trang chủ
-    setTimeout(() => {
-      router.push('/');
-    }, 2000);
-
+    // ⏳ 5. Chuyển hướng về trang chủ
+    setTimeout(() => router.push('/'), 2000)
   } catch (err) {
-    // 8. BẮT LỖI
-    error.value = err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.';
+    loading.value = false
+    error.value = err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.'
   }
-});
+})
 </script>
+
+<style scoped>
+h2 {
+  transition: all 0.3s ease-in-out;
+}
+</style>

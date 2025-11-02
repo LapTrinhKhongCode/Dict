@@ -26,9 +26,11 @@
 
 
 using Dict.Data;
+using Dict.Models;
 using Dict.Service;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
