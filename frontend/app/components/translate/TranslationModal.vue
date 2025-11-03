@@ -1,43 +1,47 @@
 <template>
   <div
-    class="fixed inset-0 z-60 bg-black bg-opacity-20 flex items-center justify-center"
+    v-if="isOpen"
+    class="fixed inset-0 z-60 flex items-center justify-center p-4"
     style="background-color: rgba(0, 0, 0, 0.5)"
     @click.self="$emit('close')"
   >
     <div
-      class="relative bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col"
+      class="relative rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col"
       @click.stop
     >
       <button
         @click="$emit('close')"
-        class="absolute -top-3 -right-3 z-50 bg-gray-800 text-white rounded-full p-1.5 hover:bg-gray-600 transition"
+        class="absolute -top-3 -right-3 z-50 bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-600 rounded-full p-1.5 transition"
       >
         <UIcon name="i-lucide-x" class="size-5" />
       </button>
 
       <div
-        class="translation-block flex flex-col h-full bg-gray-800 rounded-xl overflow-hidden"
+        class="translation-block flex flex-col h-full bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700"
       >
         <div class="panel source-panel flex-1 flex flex-col min-w-0">
           <textarea
             v-model="sourceText"
             placeholder="Nhập văn bản (Tiếng Nhật hoặc Tiếng Việt)..."
             maxlength="5000"
-            class="flex-1 border-gray-100 p-4 text-lg resize-none leading-relaxed focus:outline-none w-full bg-gray-800 text-gray-100 placeholder-gray-500"
+            class="flex-1 p-4 text-lg resize-none leading-relaxed focus:outline-none w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
           ></textarea>
           <div
-            class="panel-footer flex items-center justify-between py-2.5 px-5 border-t h-11 border-gray-700 bg-gray-800"
+            class="panel-footer flex items-center justify-between py-2.5 px-5 border-t h-11 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
           >
-            <span class="char-count text-xs text-gray-500"
+            <span
+              class="char-count text-xs text-gray-400 dark:text-gray-500"
               >{{ sourceText.length }}/5000</span
             >
             <button
-              class="translate-button flex items-center gap-1.5 bg-gray-700 text-gray-200 border border-gray-600 rounded-md px-4 text-sm font-bold cursor-pointer hover:bg-gray-600"
+              class="translate-button flex items-center gap-1.5 bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 rounded-md px-4 text-sm font-bold cursor-pointer"
               :disabled="isLoading"
               :class="{ 'opacity-50 cursor-not-allowed': isLoading }"
               @click="doTranslate"
             >
-              <span class="icon-translate text-blue-400">
+              <span
+                class="icon-translate text-primary-600 dark:text-blue-400"
+              >
                 <span v-if="isLoading">⏳</span>
                 <span v-else>✨</span>
               </span>
@@ -47,13 +51,13 @@
         </div>
 
         <div
-          class="panel target-panel flex-1 flex flex-col min-w-0 border-t border-gray-700"
+          class="panel target-panel flex-1 flex flex-col min-w-0 border-t border-gray-200 dark:border-gray-700"
         >
           <textarea
             v-model="targetText"
             placeholder="Bản dịch"
             readonly
-            class="flex-1 p-4 text-lg border-gray-100 resize-none leading-relaxed focus:outline-none w-full bg-gray-800 text-gray-100 placeholder-gray-500"
+            class="flex-1 p-4 text-lg resize-none leading-relaxed focus:outline-none w-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
           ></textarea>
         </div>
       </div>
@@ -67,6 +71,7 @@ import { ref, watch } from "vue";
 // --- 1. Nhận Prop (chữ bôi đen) & Emits ---
 const props = defineProps<{
   searchWord: string;
+  isOpen: boolean; // ✅ THÊM: Prop để điều khiển modal
 }>();
 const emit = defineEmits(["close"]);
 
@@ -150,51 +155,37 @@ watch(sourceText, (newText, oldText) => {
     doTranslate();
   }
 });
-</script>
-<style scoped>
-/* Style cho modal (bạn có thể dán CSS modal toàn cục vào đây
-   hoặc để ở app.vue đều được) */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal-content {
-  position: relative;
-  background: white;
-  border-radius: 0.75rem; /* rounded-xl */
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  width: 100%;
-  max-width: 64rem; /* max-w-6xl */
-  height: 85vh;
-  display: flex;
-  flex-direction: column;
-}
-.modal-close-button {
-  position: absolute;
-  top: -0.75rem; /* -top-3 */
-  right: -0.75rem; /* -right-3 */
-  z-index: 50;
-  background-color: #1f2937; /* bg-gray-800 */
-  color: white;
-  border-radius: 9999px; /* rounded-full */
-  padding: 0.375rem; /* p-1.5 */
-  transition: background-color 0.2s;
-}
-.modal-close-button:hover {
-  background-color: #374151; /* hover:bg-gray-700 */
-}
 
-/* Style cho nội dung bên trong */
-.translation-block {
-  flex-grow: 1; /* Đảm bảo nó lấp đầy modal-content */
+// ✅ THÊM: Watch khi modal mở/đóng
+watch(
+  () => props.isOpen,
+  (newVal) => {
+    if (newVal) {
+      // Khi modal mở, nếu searchWord có giá trị, tự động dịch
+      if (props.searchWord && props.searchWord !== sourceText.value) {
+        sourceText.value = props.searchWord;
+        doTranslate();
+      } else if (sourceText.value) {
+        // Nếu đã có sẵn text, cũng dịch
+        doTranslate();
+      }
+    } else {
+      // (Tùy chọn) Xóa text khi đóng modal
+      // sourceText.value = "";
+      // targetText.value = "";
+    }
+  }
+);
+</script>
+
+<style scoped>
+/* (Toàn bộ style cũ đã bị xóa vì Tailwind đã xử lý) */
+
+/* Thêm style cho textarea đích (readonly) */
+.panel.target-panel textarea[readonly] {
+  background-color: #f9fafb; /* bg-gray-50 */
 }
-.panel textarea {
-  height: 100%; /* Đảm bảo textarea co giãn */
-  min-height: 150px; /* Chiều cao tối thiểu */
+.dark .panel.target-panel textarea[readonly] {
+  background-color: #1f2937; /* bg-gray-800-ish */
 }
 </style>

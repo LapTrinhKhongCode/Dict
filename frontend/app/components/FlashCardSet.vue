@@ -1,16 +1,33 @@
-<!-- src/components/FlashCardSet.vue -->
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-900 relative">
-    <div v-if="isLoading" class="text-center text-gray-400">Đang tải phiên học...</div>
-    <div v-else-if="error" class="text-center text-red-400 p-4 bg-red-900/50 rounded-lg">{{ error }}</div>
-    
+  <div
+    class="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-neutral-900 relative transition-colors"
+  >
+    <div
+      v-if="isLoading"
+      class="text-center text-gray-500 dark:text-gray-400"
+    >
+      Đang tải phiên học...
+    </div>
+    <div
+      v-else-if="error"
+      class="text-center text-red-700 dark:text-red-400 p-4 bg-red-100 dark:bg-red-900/50 rounded-lg"
+    >
+      {{ error }}
+    </div>
+
     <div v-else-if="isComplete" class="text-center">
-      <div class="bg-gray-800 p-8 rounded-lg shadow-xl">
-        <h2 class="text-3xl font-bold text-green-400 mb-4">🎉 Chúc mừng! 🎉</h2>
-        <p class="text-gray-300 mb-6">Bạn đã hoàn thành phiên học này.</p>
+      <div
+        class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-transparent p-8 rounded-lg shadow-xl"
+      >
+        <h2 class="text-3xl font-bold text-green-500 dark:text-green-400 mb-4">
+          🎉 Chúc mừng! 🎉
+        </h2>
+        <p class="text-gray-700 dark:text-gray-300 mb-6">
+          Bạn đã hoàn thành phiên học này.
+        </p>
         <button
           @click="emit('go-to-list')"
-          class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+          class="bg-primary-600 hover:bg-primary-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
         >
           Quay lại danh sách
         </button>
@@ -25,8 +42,18 @@
         :key="currentCard?.id"
         @go-back="emit('go-to-list')"
       />
-      <button @click="prevCard" class="nav-btn left-0 -translate-x-16 sm:-translate-x-24">‹</button>
-      <button @click="nextCard" class="nav-btn right-0 translate-x-16 sm:translate-x-24">›</button>
+      <button
+        @click="prevCard"
+        class="nav-btn left-0 -translate-x-16 sm:-translate-x-24"
+      >
+        ‹
+      </button>
+      <button
+        @click="nextCard"
+        class="nav-btn right-0 translate-x-16 sm:translate-x-24"
+      >
+        ›
+      </button>
     </div>
   </div>
 </template>
@@ -50,7 +77,6 @@ const error = ref<string | null>(null);
 const config = useRuntimeConfig()
 const BASE_URL = config.public.apiBaseUrl
 
-
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Lỗi không xác định' }));
@@ -68,7 +94,7 @@ onMounted(async () => {
   try {
     // ✨ SỬA: Cập nhật route API
     const response = await fetch(`${BASE_URL}/api/review/GetQueue/${props.deckId}`,
-       { cache: 'no-store', headers: { 'Authorization': `Bearer ${jwt.value}` } }
+      { cache: 'no-store', headers: { 'Authorization': `Bearer ${jwt.value}` } }
     );
     reviewQueue.value = await handleResponse<CardDto[]>(response);
     if (reviewQueue.value.length > 1) {
@@ -115,11 +141,12 @@ async function onAnswer(difficulty: 'again' | 'hard' | 'good' | 'easy') {
   try {
     // ✨ SỬA: Cập nhật route API
     const response = await fetch(`${BASE_URL}/api/review/PostAnswer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' ,
-           'Authorization': `Bearer ${jwt.value}`
-        },
-        body: JSON.stringify(answer)
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt.value}`
+      },
+      body: JSON.stringify(answer)
     });
 
     const responseData = await handleResponse(response); // Đã bao gồm check lỗi
@@ -137,15 +164,29 @@ async function onAnswer(difficulty: 'again' | 'hard' | 'good' | 'easy') {
 </script>
 
 <style scoped>
+/* THAY ĐỔI:
+  - Tách style mặc định (light mode) ra.
+  - Bọc các style cũ (dark mode) trong class .dark
+*/
+
+/* --- LIGHT MODE (MẶC ĐỊNH) --- */
 .nav-btn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   font-size: 3rem;
-  color: #6B7280;
+  color: #d1d5db; /* text-gray-300 */
   transition: color 0.2s;
 }
 .nav-btn:hover {
-  color: #FFFFFF;
+  color: #4b5563; /* text-gray-600 */
+}
+
+/* --- DARK MODE --- */
+.dark .nav-btn {
+  color: #6b7280; /* text-gray-500 */
+}
+.dark .nav-btn:hover {
+  color: #ffffff; /* text-white */
 }
 </style>

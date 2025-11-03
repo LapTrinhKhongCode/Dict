@@ -1,6 +1,10 @@
 <template>
-  <div class="p-6 space-y-6 bg-gray-800 rounded-xl shadow-lg text-gray-300">
-    <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2 text-white">
+  <div
+    class="p-6 space-y-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg text-gray-900 dark:text-gray-300 transition-colors"
+  >
+    <h2
+      class="text-xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 text-gray-900 dark:text-white"
+    >
       OCR (Tải lên Ảnh hoặc PDF)
     </h2>
 
@@ -11,23 +15,23 @@
           @change="handleFileChange"
           accept="image/*,application/pdf"
           :disabled="isLoading"
-          class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-700 file:text-gray-300 hover:file:bg-gray-600"
+          class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600"
         />
       </label>
       <button
         @click="startOCR"
         :disabled="isLoading || !file"
-        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+        class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed"
       >
         {{ isLoading ? "Đang xử lý..." : "Bắt đầu OCR" }}
       </button>
     </div>
 
-    <hr class="border-t border-gray-700" />
+    <hr class="border-t border-gray-200 dark:border-gray-700" />
 
     <div
       v-if="statusMessage"
-      class="p-4 bg-gray-900 border border-blue-800 rounded-lg text-blue-300"
+      class="p-4 bg-blue-50 border border-blue-200 text-blue-700 dark:bg-gray-900 dark:border-blue-800 dark:text-blue-300 rounded-lg"
     >
       <strong>Trạng thái OCR:</strong> {{ statusMessage }}
     </div>
@@ -59,17 +63,21 @@
       </div>
 
       <div class="text-list-wrapper">
-        <h3 class="text-lg font-semibold text-white mb-2">Kết quả OCR:</h3>
+        <h3
+          class="text-lg font-semibold text-gray-900 dark:text-white mb-2"
+        >
+          Kết quả OCR:
+        </h3>
         <ul class="ocr-results">
           <li
             v-if="isLoading && results.length === 0"
-            class="p-4 text-gray-500"
+            class="p-4 text-gray-400 dark:text-gray-500"
           >
             Đang xử lý...
           </li>
           <li
             v-if="!isLoading && results.length === 0"
-            class="p-4 text-gray-500"
+            class="p-4 text-gray-400 dark:text-gray-500"
           >
             Chưa có kết quả...
           </li>
@@ -81,7 +89,7 @@
             @mouseover="hoveredLine = item.line_number"
             @mouseleave="hoveredLine = -1"
           >
-            <strong class="text-green-400">
+            <strong class="text-green-600 dark:text-green-400">
               <span v-if="item.page_number">P{{ item.page_number }} - </span>
               L{{ item.line_number }}:
             </strong>
@@ -128,7 +136,9 @@
         </div>
 
         <div class="text-list-wrapper">
-          <h3 class="text-lg font-semibold text-white mb-2">
+          <h3
+            class="text-lg font-semibold text-gray-900 dark:text-white mb-2"
+          >
             Kết quả Trang {{ page.id }}:
           </h3>
           <ul class="ocr-results">
@@ -140,7 +150,9 @@
               @mouseover="hoveredLine = item.line_number"
               @mouseleave="hoveredLine = -1"
             >
-              <strong class="text-green-400"> L{{ item.line_number }}: </strong>
+              <strong class="text-green-600 dark:text-green-400">
+                L{{ item.line_number }}:
+              </strong>
               {{ item.text }}
             </li>
 
@@ -149,7 +161,7 @@
                 !isLoading &&
                 results.filter((r) => r.page_number === page.id).length === 0
               "
-              class="p-4 text-gray-500"
+              class="p-4 text-gray-400 dark:text-gray-500"
             >
               (Không có kết quả cho trang này)
             </li>
@@ -395,6 +407,12 @@ async function startOCR() {
 </script>
 
 <style scoped>
+/* THAY ĐỔI:
+  - Tái cấu trúc lại toàn bộ khối style
+  - Thêm style cho light mode (mặc định)
+  - Bọc style cho dark mode (cũ) trong class .dark
+*/
+
 /* === CẤU TRÚC CHUNG === */
 .result-container {
   display: flex;
@@ -416,17 +434,25 @@ async function startOCR() {
 /* --- CỘT TRÁI (ẢNH + BOX ĐỎ) --- */
 .image-wrapper {
   flex: 3;
-  background: #111;
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #4b5563;
   position: relative;
   padding: 12px;
   box-sizing: border-box;
   height: 100%; /* cao bằng layout */
+  /* Light Mode */
+  background: #f3f4f6; /* bg-gray-100 */
+  border: 1px solid #e5e7eb; /* border-gray-200 */
+  color: #6b7280; /* text-gray-500 */
+}
+.dark .image-wrapper {
+  /* Dark Mode */
+  background: #111;
+  border: 1px solid #4b5563;
+  color: #9ca3af; /* text-gray-400 */
 }
 
 .image-overlay-container {
@@ -437,7 +463,6 @@ async function startOCR() {
   align-items: center;
   justify-content: center;
 }
-
 .image-overlay-container img {
   max-width: 100%;
   max-height: 100%;
@@ -445,7 +470,7 @@ async function startOCR() {
   display: block;
 }
 
-/* Box đỏ OCR */
+/* Box đỏ OCR (Giữ nguyên, hoạt động tốt trên cả 2 nền) */
 .ocr-bbox {
   position: absolute;
   border: 2px solid rgba(239, 68, 68, 0.7);
@@ -468,7 +493,6 @@ async function startOCR() {
   overflow: hidden;
   background: transparent;
 }
-
 .ocr-results {
   flex: 1;
   overflow-y: auto; /* 🔥 cuộn riêng trong cột phải */
@@ -476,23 +500,38 @@ async function startOCR() {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid #4b5563;
+  border: 1px solid #e5e7eb; /* border-gray-200 */
   border-radius: 5px;
+  background: #ffffff; /* bg-white */
+}
+.dark .ocr-results {
+  border: 1px solid #4b5563;
   background: #1f2937;
 }
 
 .ocr-item {
   padding: 10px 12px;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid #f3f4f6; /* border-gray-100 */
   transition: background-color 0.1s;
   cursor: default;
 }
+.dark .ocr-item {
+  border-bottom: 1px solid #374151;
+}
+
 .ocr-item.is-hovered {
-  background-color: #3b82f6;
-  color: white;
+  background-color: #dbeafe; /* blue-100 */
+  color: #1f2937; /* text-gray-800 */
 }
 .ocr-item.is-hovered strong {
-  color: #c7d2fe;
+  color: #1d4ed8; /* blue-700 */
+}
+.dark .ocr-item.is-hovered {
+  background-color: #3b82f6; /* blue-500 */
+  color: white;
+}
+.dark .ocr-item.is-hovered strong {
+  color: #c7d2fe; /* blue-200 */
 }
 
 /* === 2️⃣ PDF (DANH SÁCH NHIỀU TRANG) === */
@@ -501,14 +540,17 @@ async function startOCR() {
   flex-direction: column;
   gap: 30px;
 }
-
 .pdf-page-row {
   display: flex;
   flex-direction: row;
   gap: 20px;
-  border: 1px solid #374151;
+  border: 1px solid #e5e7eb; /* border-gray-200 */
   border-radius: 8px;
   padding: 16px;
+  background: #ffffff; /* bg-white */
+}
+.dark .pdf-page-row {
+  border: 1px solid #374151;
   background: #1f2937;
 }
 
@@ -519,9 +561,12 @@ async function startOCR() {
   border: none;
   background: none;
 }
-
 .pdf-page-row .text-list-wrapper {
   flex: 2;
+  height: auto; /* Reset chiều cao cố định */
+}
+.pdf-page-row .ocr-results {
+  height: 400px; /* Thêm chiều cao + cuộn cho list text PDF */
 }
 
 /* === ẢNH TRONG PDF === */
@@ -535,24 +580,31 @@ async function startOCR() {
   flex-direction: column;
   align-items: center;
 }
-
 .pdf-page-item {
   margin-bottom: 0;
-  border: 1px solid #4b5563;
+  border: 1px solid #e5e7eb; /* border-gray-200 */
   border-radius: 8px;
   overflow: hidden;
-  background: #1f2937;
+  background: #f9fafb; /* bg-gray-50 */
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+.dark .pdf-page-item {
+  border: 1px solid #4b5563;
+  background: #1f2937;
 }
 
 .page-number-title {
   text-align: center;
   padding: 8px;
+  background: #f3f4f6; /* bg-gray-100 */
+  color: #111827; /* text-gray-900 */
+  font-weight: bold;
+}
+.dark .page-number-title {
   background: #374151;
   color: white;
-  font-weight: bold;
 }
 
 .pdf-page-image-container {
@@ -570,14 +622,25 @@ async function startOCR() {
 .pdf-preview-container::-webkit-scrollbar {
   width: 8px;
 }
+/* Light Mode */
 .ocr-results::-webkit-scrollbar-thumb,
 .pdf-preview-container::-webkit-scrollbar-thumb {
-  background-color: #4b5563;
+  background-color: #d1d5db; /* gray-300 */
   border-radius: 10px;
-  border: 2px solid #1f2937;
+  border: 2px solid #ffffff; /* bg-white */
 }
 .ocr-results::-webkit-scrollbar-thumb:hover,
 .pdf-preview-container::-webkit-scrollbar-thumb:hover {
-  background-color: #6b7280;
+  background-color: #9ca3af; /* gray-400 */
+}
+/* Dark Mode */
+.dark .ocr-results::-webkit-scrollbar-thumb,
+.dark .pdf-preview-container::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* gray-600 */
+  border: 2px solid #1f2937; /* bg-gray-800 */
+}
+.dark .ocr-results::-webkit-scrollbar-thumb:hover,
+.dark .pdf-preview-container::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280; /* gray-500 */
 }
 </style>

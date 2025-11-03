@@ -1,6 +1,8 @@
 <template>
-  <div class="p-6 space-y-6">
-    <div class="bg-gray-900 rounded-xl p-4 space-y-4">
+  <div class="p-6 space-y-6 bg-gray-50 dark:bg-neutral-900 transition-colors">
+    <div
+      class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-4 space-y-4"
+    >
       <SearchBar
         v-model="searchWord"
         @search="onSearch"
@@ -12,8 +14,8 @@
           :class="[
             'px-4 py-2 rounded-lg font-medium transition-all border',
             viewMode === 'word'
-              ? 'bg-gray-900 text-green-500 border-green-500 font-semibold'
-              : 'bg-gray-900 text-gray-400 border-transparent',
+              ? 'text-primary-600 border-primary-500 font-semibold dark:text-green-500 dark:border-green-500'
+              : 'text-gray-500 border-transparent hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200',
           ]"
         >
           <div class="flex items-center space-x-2 cursor-pointer">
@@ -26,8 +28,8 @@
           :class="[
             'px-4 py-2 rounded-lg font-medium transition-all border',
             viewMode === 'kanji'
-              ? 'bg-gray-900 text-green-500 border-green-500 font-semibold'
-              : 'bg-gray-900 text-gray-400 border-transparent',
+              ? 'text-primary-600 border-primary-500 font-semibold dark:text-green-500 dark:border-green-500'
+              : 'text-gray-500 border-transparent hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200',
           ]"
         >
           <div class="flex items-center space-x-2 cursor-pointer">
@@ -38,16 +40,16 @@
       </div>
     </div>
     <div id="search-results-area" ref="searchResultRef">
-        <SearchResult
-          :loading="loading"
-          :error="error"
-          :result="currentResult"
-          :conjugation-result="currentConjugationResult"
-          :original-search-word="searchedTerm"
-          :has-searched="hasSearched"
-          @item-selected="handleSelectionChange"
-        />
-      </div>
+      <SearchResult
+        :loading="loading"
+        :error="error"
+        :result="currentResult"
+        :conjugation-result="currentConjugationResult"
+        :original-search-word="searchedTerm"
+        :has-searched="hasSearched"
+        @item-selected="handleSelectionChange"
+      />
+    </div>
   </div>
 </template>
 
