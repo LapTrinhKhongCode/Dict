@@ -60,7 +60,7 @@
 
     <div
       v-if="showDrawingPad"
-      class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4"
+      class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 z-1000"
     >
       <div class="min-h-[48px] mb-3 flex items-center justify-center">
         <div
@@ -130,7 +130,7 @@
     </div>
     <div
       v-if="showOcrPad"
-      class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4"
+      class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 z-1000"
     >
       <div class="flex" style="min-height: 250px">
         <div class="w-1/2 pr-3 border-r border-gray-600 flex flex-col">

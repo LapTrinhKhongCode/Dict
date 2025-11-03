@@ -75,7 +75,7 @@ function handleLogout() {
           <UButton v-else icon="i-lucide-user" size="xl" variant="ghost" />
         </div>
         <div
-          class="absolute right-0 mt-2 w-32 bg-neutral-800 border border-neutral-700 rounded shadow-lg z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+          class="absolute right-0 mt-2 w-32 bg-neutral-800 border border-neutral-700 rounded shadow-lg z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
         >
           <button
             v-if="!isAuthenticated"

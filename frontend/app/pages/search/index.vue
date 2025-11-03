@@ -6,17 +6,6 @@
         @search="onSearch"
         :search-result-ref="searchResultRef"
       />
-      <div id="search-results-area" ref="searchResultRef">
-        <SearchResult
-          :loading="loading"
-          :error="error"
-          :result="currentResult"
-          :conjugation-result="currentConjugationResult"
-          :original-search-word="searchedTerm"
-          :has-searched="hasSearched"
-          @item-selected="handleSelectionChange"
-        />
-      </div>
       <div class="flex items-center space-x-2">
         <button
           @click="setView('word')"
@@ -48,6 +37,17 @@
         </button>
       </div>
     </div>
+    <div id="search-results-area" ref="searchResultRef">
+        <SearchResult
+          :loading="loading"
+          :error="error"
+          :result="currentResult"
+          :conjugation-result="currentConjugationResult"
+          :original-search-word="searchedTerm"
+          :has-searched="hasSearched"
+          @item-selected="handleSelectionChange"
+        />
+      </div>
   </div>
 </template>
 
