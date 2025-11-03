@@ -22,13 +22,13 @@
       <UIcon name="i-custom-word" class="text-3xl" />
       <span>Từ vựng</span>
     </NuxtLink>
-       <NuxtLink to="/explore" class="sidebar-link-style">
+    <NuxtLink to="/explore" class="sidebar-link-style">
       <UIcon name="i-lucide-copy" class="text-3xl" />
       <span>Flashcard</span>
     </NuxtLink>
     <NuxtLink to="/ocr" class="sidebar-link-style">
       <UIcon name="i-lucide-scan-text" class="text-3xl" />
-      <span>OCR</span>
+      <span>Nhận dạng văn bản</span>
     </NuxtLink>
     <NuxtLink to="/reading" class="sidebar-link-style">
       <UIcon name="i-lucide-newspaper" class="text-3xl" />
@@ -45,7 +45,5 @@
       <UIcon name="i-lucide-credit-card" />
       <span>Premium</span>
     </NuxtLink>
-    
- 
   </nav>
 </template>
