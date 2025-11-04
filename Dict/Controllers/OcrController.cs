@@ -33,7 +33,7 @@ public class InferController : ControllerBase
     private readonly IOcrProcessingService _ocrProcessingService; 
     private readonly ResponseDTO _response;
     private readonly IHttpClientFactory _httpClientFactory;
-
+    private readonly string _pythonApiBaseUrl;
     // Định nghĩa form nhận file
     public class UploadForm
     {
@@ -103,13 +103,15 @@ public class InferController : ControllerBase
     public InferController(
         ILogger<InferController> logger,
         IOcrProcessingService ocrProcessingService,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory, IConfiguration configuration)
         
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _ocrProcessingService = ocrProcessingService;
         _response = new ResponseDTO();
+        _pythonApiBaseUrl = configuration["ServiceUrls:PythonApiBaseUrl"]
+                            ?? "http://127.0.0.1:8000";
     }
 
     // ✨ CẢI TIẾN: Dùng ClaimTypes.NameIdentifier
@@ -150,7 +152,7 @@ public class InferController : ControllerBase
             // 3. Tạo request POST đến Python (giữ nguyên logic)
             var pythonRequest = new HttpRequestMessage(
                 HttpMethod.Post,
-                "http://127.0.0.1:8000/ocr-stream"
+                $"{_pythonApiBaseUrl}/ocr-stream"
             );
             pythonRequest.Content = formData;
 
@@ -233,7 +235,7 @@ public class InferController : ControllerBase
 
                 var pythonRequest = new HttpRequestMessage(
                     HttpMethod.Post,
-                    "http://127.0.0.1:8000/ocr-stream" // Gọi lại API OCR ảnh cũ
+                    $"{_pythonApiBaseUrl}/ocr-stream" // Gọi lại API OCR ảnh cũ
                 );
                 pythonRequest.Content = formData;
 
@@ -305,6 +307,7 @@ public class InferController : ControllerBase
         }
     }
     [HttpPost("predict")]
+    [AllowAnonymous]
     public async Task<IActionResult> PredictHandwriting([FromBody] PredictionRequestDto request)
     {
         // Kiểm tra dữ liệu đầu vào (đơn giản)
@@ -320,7 +323,7 @@ public class InferController : ControllerBase
             using var httpClient = _httpClientFactory.CreateClient();
 
             // URL đến endpoint MỚI của Python
-            var pythonUrl = "http://127.0.0.1:8000/predict";
+            var pythonUrl = $"{_pythonApiBaseUrl}/predict";
 
             // Gửi request.
             // Đây là request-response JSON bình thường, KHÔNG stream.
@@ -355,6 +358,7 @@ public class InferController : ControllerBase
 
     // === ENDPOINT MỚI CHO DỊCH THUẬT ===
     [HttpPost("translate")]
+    [AllowAnonymous]
     public async Task<IActionResult> TranslateText([FromBody] TranslationRequestDto request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request.Text))
@@ -367,7 +371,7 @@ public class InferController : ControllerBase
         try
         {
             using var httpClient = _httpClientFactory.CreateClient();
-            var pythonUrl = "http://127.0.0.1:8000/translate";
+            var pythonUrl = $"{_pythonApiBaseUrl}/translate";
 
             // Gửi request JSON (giống hệt /predict)
             using var response = await httpClient.PostAsJsonAsync(
