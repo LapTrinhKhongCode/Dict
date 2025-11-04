@@ -720,12 +720,17 @@ const runPrediction = async () => {
   predictionLabels.value = [];
 
   const matrixData = getMatrixFromCanvas();
+
+  // ▼▼▼ BỎ PHẦN NÀY ▼▼▼
+  /*
   const token = localStorage.getItem("jwt_token");
   if (!token) {
     console.error("Prediction error: Not logged in");
     isPredicting.value = false;
     return;
   }
+  */
+  // ▲▲▲ BỎ PHẦN NÀY ▲▲▲
 
   try {
     const response = await fetch(
@@ -733,7 +738,8 @@ const runPrediction = async () => {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          // ▼▼▼ BỎ DÒNG NÀY ▼▼▼
+          // Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ matrix: matrixData }),

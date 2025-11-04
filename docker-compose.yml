@@ -11,6 +11,7 @@ services:
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
       - ASPNETCORE_Kestrel__Certificates__Default__Password=25102004
       - CorsOrigins=http://${PI_IP}:3000
+      - ServiceUrls__PythonApiBaseUrl=${PYTHON_API_URL}
     volumes:
       - ./Dict/aspnetapp.pfx:/https/aspnetapp.pfx:ro
     restart: unless-stopped
