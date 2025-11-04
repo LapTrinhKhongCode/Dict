@@ -10,7 +10,7 @@ services:
       - ASPNETCORE_URLS=http://+:8080;https://+:8081
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
       - ASPNETCORE_Kestrel__Certificates__Default__Password=25102004
-      - CorsOrigins=http://${PI_IP}:3000
+      - CorsOrigins=${FE_DOMAIN}
       - ServiceUrls__PythonApiBaseUrl=${PYTHON_API_URL}
     volumes:
       - ./Dict/aspnetapp.pfx:/https/aspnetapp.pfx:ro
@@ -23,7 +23,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NUXT_PUBLIC_API_BASE_URL=${API_URL_CHO_FE}
+      - NUXT_PUBLIC_API_BASE_URL=${API_DOMAIN}
     depends_on:
       - backend
     restart: unless-stopped
