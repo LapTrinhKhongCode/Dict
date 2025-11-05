@@ -363,6 +363,123 @@ namespace Dict.Service
             }
         }
 
+        /// <summary>
+        /// Thống kê 20 từ được tra cứu nhiều nhất (tra thành công)
+        /// </summary>
+        public async Task<List<TopSearchItemDto>> GetTopSearchedWordsAsync()
+        {
+            var topWords = await _context.StatsWordFreq
+                .AsNoTracking()
+                .OrderByDescending(s => s.Occurrences)
+                .Take(20)
+                // Join với bảng Words để lấy WordText
+                .Join(_context.Words,
+                    stat => stat.WordId,
+                    word => word.Id,
+                    (stat, word) => new TopSearchItemDto
+                    {
+                        Term = word.WordText, // Dùng WordText làm Term
+                        Count = stat.Occurrences ?? 0,
+                        WordId = word.Id,
+                        ActualWord = word.WordText
+                    })
+                .ToListAsync();
+
+            return topWords;
+        }
+
+        /// <summary>
+        /// Thống kê 20 từ khóa tìm không thấy (Lỗ hổng nội dung)
+        /// </summary>
+        public async Task<List<TopSearchItemDto>> GetTopSearchMissesAsync()
+        {
+            // Truy vấn bảng SearchMisses mới mà chúng ta đã tạo
+            var topMisses = await _context.SearchMiss
+                .AsNoTracking()
+                .OrderByDescending(sm => sm.SearchCount)
+                .Take(20)
+                .Select(sm => new TopSearchItemDto
+                {
+                    Term = sm.SearchTerm,
+                    Count = sm.SearchCount,
+                    WordId = null,
+                    ActualWord = null // Không tìm thấy
+                })
+                .ToListAsync();
+
+            return topMisses;
+        }
+
+        /// <summary>
+        /// Thống kê hiệu suất API (Lỗi và Tốc độ)
+        /// </summary>
+        public async Task<List<ApiStatItemDto>> GetApiPerformanceStatsAsync()
+        {
+            var apiStats = await _context.ApiCalls
+                .GroupBy(a => a.Endpoint)
+                .Select(g => new ApiStatItemDto
+                {
+                    Endpoint = g.Key,
+                    TotalCalls = g.Count(),
+                    ErrorCount = g.Count(a => a.ResponseStatus >= 400),
+                    AvgResponseTimeMs = (int)g.Average(a => a.ResponseTimeMs),
+                })
+                // Sắp xếp theo tỷ lệ lỗi (cao nhất trước), sau đó là tốc độ chậm nhất
+                .OrderByDescending(a => (double)a.ErrorCount / a.TotalCalls)
+                .ThenByDescending(a => a.AvgResponseTimeMs)
+                .ToListAsync();
+
+            // Tính toán ErrorRate trong code (không thể làm trong SQL/LINQ)
+            foreach (var stat in apiStats)
+            {
+                stat.ErrorRate = stat.TotalCalls > 0 ? Math.Round((double)stat.ErrorCount / stat.TotalCalls * 100, 2) : 0;
+            }
+
+            return apiStats;
+        }
+
+        /// <summary>
+        /// Lấy danh sách các Job hệ thống bị lỗi (OCR và Import)
+        /// </summary>
+        public async Task<List<FailedJobItemDto>> GetFailedSystemJobsAsync()
+        {
+            // Lấy Job OCR bị lỗi
+            var failedOcrJobs = await _context.OcrJobs
+                .AsNoTracking()
+                .Where(j => j.Status == "Failed")
+                .OrderByDescending(j => j.CreatedAt)
+                .Select(j => new FailedJobItemDto
+                {
+                    Id = j.Id,
+                    JobType = "OCR",
+                    Status = j.Status,
+                    ErrorMessage = "Check OcrJob details for specific error.", // Cần xem chi tiết
+                    StartedAt = j.CreatedAt ?? DateTime.MinValue
+                })
+                .Take(50) // Giới hạn 50 lỗi gần nhất
+                .ToListAsync();
+
+            // Lấy Job Import bị lỗi
+            var failedImportJobs = await _context.ImportJobs
+                .AsNoTracking()
+                .Where(j => j.Status == "Failed")
+                .OrderByDescending(j => j.StartedAt)
+                .Select(j => new FailedJobItemDto
+                {
+                    Id = j.Id,
+                    JobType = j.JobType,
+                    Status = j.Status,
+                    // Meta thường chứa thông tin lỗi JSON
+                    ErrorMessage = EF.Functions.Like(j.Meta, "%error%") ? j.Meta.Substring(0, Math.Min(j.Meta.Length, 200)) : j.Meta,
+                    StartedAt = j.StartedAt ?? DateTime.MinValue
+                })
+                .Take(50) // Giới hạn 50 lỗi gần nhất
+                .ToListAsync();
+
+            return failedOcrJobs.Concat(failedImportJobs)
+                .OrderByDescending(j => j.StartedAt)
+                .ToList();
+        }
         // --- HÀM HELPER ---
 
         // 12. SỬA LẠI HÀM MAPUSERTODTO (DÙNG ApplicationUser VÀ LẤY ROLE)

@@ -18,5 +18,9 @@ namespace Dict.Service.IService
 
         Task<bool> AdminDeleteDeckAsync(int deckId);
         Task<bool> AdminDeleteUserAsync(int userId);
+        Task<List<TopSearchItemDto>> GetTopSearchedWordsAsync();
+        Task<List<TopSearchItemDto>> GetTopSearchMissesAsync();
+        Task<List<ApiStatItemDto>> GetApiPerformanceStatsAsync();
+        Task<List<FailedJobItemDto>> GetFailedSystemJobsAsync();
     }
 }
