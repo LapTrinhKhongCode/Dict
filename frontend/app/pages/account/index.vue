@@ -35,13 +35,13 @@
           <div class="space-y-6">
             <div>
               <label for="email" class="form-label">Email</label>
-              <input type="email" id="email" :value="email" class="form-input" disabled />
+              <input type="email" id="email" :value="email" class="form-input" />
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Bạn không thể thay đổi email.</p>
             </div>
 
             <div>
-              <label for="name" class="form-label">Họ tên</label>
-              <input type="text" id="name" v-model="profile.name" class="form-input" placeholder="Tên của bạn" />
+              <label for="name" class="form-label">Username</label>
+              <input type="text" id="name" v-model="profile.name" class="form-input" placeholder="Tên của bạn" disabled/>
             </div>
 
             <div>

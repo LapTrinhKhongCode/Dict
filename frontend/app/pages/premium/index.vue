@@ -12,7 +12,7 @@
       </div>
 
       <div
-        v-if="role !== 'USER' && role!"
+        v-if="role != 'USER' && role!"
         class="flex flex-col items-center justify-center mt-12 space-y-4 text-center"
       >
         <h1
@@ -115,7 +115,7 @@ function selectLifetime() {
     navigateTo('/login');
   }
 }
-
+console.log(role)
 function goHome() {
   navigateTo('/'); // Điều hướng về trang chủ
 }

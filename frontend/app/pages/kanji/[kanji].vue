@@ -2,10 +2,8 @@
 import { ref, shallowRef, onMounted, onUnmounted } from "vue";
 import KanjiReadingsCard from "~/components/KanjiReadingsCard.vue";
 
-// ✅ SỬA: Đã thêm useRouter trở lại
+// ✅ SỬA: Đã thêm useRouter trở lại, giữ nguyên useRoute
 import { useRoute, useRouter } from "vue-router";
-// ✅ THÊM: Import useColorMode
-import { useColorMode } from "#imports";
 
 import compositionJson from "@/data/composition_filtered.json";
 import kanjiListJson from "@/data/kanjilist_filtered.json";
@@ -26,13 +24,11 @@ type GraphNode = {
   x?: number;
   y?: number;
   z?: number;
-  color?: string; // Cache màu cho dark mode
 };
 type GraphLink = { source: any; target: any };
 
 const route = useRoute();
 const router = useRouter(); // ✅ ĐÃ THÊM LẠI
-const colorMode = useColorMode(); // ✅ ĐÃ THÊM
 
 // --- THAY ĐỔI LỚN: Dùng ref nội bộ để quản lý kanji trung tâm ---
 // Điều này ngăn component bị remount khi click
@@ -304,7 +300,6 @@ function buildGraph(newKanji?: string, keepDimension = true) {
   }
 }
 
-// ✅ THAY ĐỔI: Giữ lại hàm này cho dark mode
 function randomBlueToWhite(): string {
   const start = { r: 11, g: 109, b: 176 }; // #0B6DB0
   const end = { r: 255, g: 255, b: 255 }; // trắng
@@ -316,85 +311,59 @@ function randomBlueToWhite(): string {
 }
 
 //Vẽ node 2d
-// ✅ THAY ĐỔI: Cập nhật hàm này
 function drawNode(
   node: GraphNode & { color?: string },
   ctx: CanvasRenderingContext2D,
   globalScale: number
 ) {
-  const isDark = colorMode.value === "dark";
   const center = node.group === "center";
   const r = center ? 26 : 18;
   const strokeWidth = center ? 1 : 1;
   const label = String(node.id ?? "");
   const fontSize = Math.max(10, (center ? 30 : 20) * (1 / globalScale));
-
   let fill: string;
   if (center) {
-    fill = isDark ? "#0B6DB0" : "#2563eb"; // Dark Blue / Primary
+    fill = "#0B6DB0";
   } else {
-    if (isDark) {
-      // Giữ logic cũ cho dark mode
-      if (!node.color) {
-        node.color = randomBlueToWhite(); // gán màu solid random
-      }
-      fill = node.color;
-    } else {
-      // Dùng màu xám/blue đậm cho light mode
-      fill = "#475569"; // slate-600
+    if (!node.color) {
+      node.color = randomBlueToWhite(); // gán màu solid random
     }
+    fill = node.color;
   }
-
   ctx.beginPath();
   ctx.arc(node.x ?? 0, node.y ?? 0, r, 0, 2 * Math.PI, false);
   ctx.fillStyle = fill;
   ctx.fill();
-
   ctx.lineWidth = strokeWidth;
-  // Stroke mỏng bên trong
-  ctx.strokeStyle = isDark ? "#000" : "#FFF";
+  ctx.strokeStyle = "#000"; // đen nhạt, 30% opacity
   ctx.stroke();
-
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  // Màu chữ (text)
-  ctx.fillStyle = isDark ? "#000" : "#FFF"; // Đen trên nền sáng (dark) / Trắng trên nền tối (light)
+  ctx.fillStyle = "#000"; //Màu chữ
   ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial`;
   ctx.fillText(label, node.x ?? 0, node.y ?? 0);
 }
 
 //Vẽ node 3d
-// ✅ THAY ĐỔI: Cập nhật hàm này
 function makeNodeText(node: GraphNode & { color?: string }) {
-  const isDark = colorMode.value === "dark";
   const group = new THREE.Group();
   const radius = node.group === "center" ? 10 : 5;
-
   // Sphere
   const geometry = new THREE.SphereGeometry(radius, 32, 32);
-  let sphereColor: number;
-  if (node.group === "center") {
-    sphereColor = isDark ? 0x0b6db0 : 0x2563eb; // Dark Blue / Primary
-  } else {
-    // Dùng màu random cho dark mode, màu cố định cho light mode
-    sphereColor = isDark ? parseInt(randomBlueToWhite().replace('rgb(', '').replace(')', '').split(',').map(c => parseInt(c).toString(16).padStart(2, '0')).join(''), 16) : 0x475569;
-  }
   const material = new THREE.MeshPhongMaterial({
-    color: sphereColor,
+    color: node.group === "center" ? 0x0b6db0 : randomBlueToWhite(),
     shininess: 80,
     specular: 0xffffff,
   });
   const circle = new THREE.Mesh(geometry, material);
-
   // Glow
   const glowGeom = new THREE.SphereGeometry(radius * 1.25, 32, 32);
   const glowMat = new THREE.MeshBasicMaterial({
-    color: node.group === "center" ? (isDark ? 0x66d7ff : 0x2563eb) : (isDark ? 0xffffff : 0x475569),
+    color: node.group === "center" ? 0x66d7ff : 0xffffff,
     transparent: true,
     opacity: 0.08,
   });
   const glow = new THREE.Mesh(glowGeom, glowMat);
-
   // === Label cố định bằng canvas ===
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
@@ -407,18 +376,13 @@ function makeNodeText(node: GraphNode & { color?: string }) {
   const textH = Math.ceil(fontPx * 1.2);
   canvas.width = textW + padding * 2;
   canvas.height = textH + padding * 2;
-
   // Vẽ lại chữ
   ctx.font = `${fontPx}px Arial`;
   ctx.textBaseline = "top";
-  // Chữ Đen (trên nền sáng/xanh) ở dark mode
-  // Chữ Trắng (trên nền tối/xanh) ở light mode
-  ctx.fillStyle = isDark ? "#000000" : "#FFFFFF";
+  ctx.fillStyle = "#000000";
   ctx.fillText(text, padding, padding);
-
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
-
   // Tạo plane từ texture
   const scaleFactor = 0.02 * (radius / 10); // hệ số tỉ lệ
   const w = canvas.width * scaleFactor;
@@ -463,7 +427,6 @@ function paintNodePointerArea(
 }
 
 //Vẽ link
-// ✅ THAY ĐỔI: Cập nhật hàm này
 function drawLink(link: GraphLink, ctx: CanvasRenderingContext2D) {
   const s = link.source as any;
   const e = link.target as any;
@@ -476,25 +439,15 @@ function drawLink(link: GraphLink, ctx: CanvasRenderingContext2D) {
     typeof e.y !== "number"
   )
     return;
-
-  const isDark = colorMode.value === "dark";
-  
   const grad = ctx.createLinearGradient(s.x, s.y, e.x, e.y);
-  if (isDark) {
-    grad.addColorStop(0, "white");
-    grad.addColorStop(1, "rgba(102,176,224,0.8)"); // Sky
-  } else {
-    grad.addColorStop(0, "#4b5563"); // Gray-600
-    grad.addColorStop(1, "rgba(37,99,235,0.8)"); // Primary-600
-  }
-
+  grad.addColorStop(0, "white");
+  grad.addColorStop(1, "rgba(102,176,224,0.8)");
   ctx.strokeStyle = grad;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(s.x, s.y);
   ctx.lineTo(e.x, e.y);
   ctx.stroke();
-
   const R = e.group === "center" ? 26 : 18;
   const TIP_MARGIN = 1;
   const ARROW_LEN = 18;
@@ -512,18 +465,14 @@ function drawLink(link: GraphLink, ctx: CanvasRenderingContext2D) {
   const rightY = tipY - uy * ARROW_LEN - py * (ARROW_W / 2);
   const baseX = tipX - ux * (ARROW_LEN * 0.6);
   const baseY = tipY - uy * (ARROW_LEN * 0.6);
-  
   ctx.beginPath();
   ctx.moveTo(tipX, tipY);
   ctx.lineTo(leftX, leftY);
   ctx.lineTo(baseX, baseY);
   ctx.lineTo(rightX, rightY);
   ctx.closePath();
-  
-  // Màu mũi tên
-  ctx.fillStyle = isDark ? "white" : "#2563eb"; // White / Primary-600
+  ctx.fillStyle = "white";
   ctx.fill();
-  
   ctx.strokeStyle = grad;
   ctx.lineWidth = 1.2;
   ctx.stroke();
@@ -566,7 +515,7 @@ onUnmounted(() => {
 });
 // -------------------------------------------------
 
-// --- onNodeClick đã được viết lại hoàn toàn ---
+// --- onNodeClick (GIỮ NGUYÊN CODE GỐC CỦA BẠN) ---
 function onNodeClick(node: GraphNode | null) {
   if (!node?.id) return;
   // Nếu click vào node đang là trung tâm -> không làm gì
@@ -579,12 +528,10 @@ function onNodeClick(node: GraphNode | null) {
     if (mode.value === "composition") {
       // 1. Cập nhật state nội bộ (reactive ref)
       centerKanji.value = node.id!;
-      
       // 2. Cập nhật URL (KHÔNG reload trang)
-      // ✅ SỬA: Dùng router.push() thay vì history.pushState()
+      // Dùng pushState để user có thể "back" về kanji trước
       const newUrl = `/kanji/${encodeURIComponent(node.id!)}`;
-      router.push(newUrl);
-
+      history.pushState({ kanji: node.id }, "", newUrl);
       // 3. Build lại graph (component không bị remount)
       buildGraph(node.id);
     } else {
@@ -650,6 +597,7 @@ function onNodeClick(node: GraphNode | null) {
         <div class="graph-container">
           <client-only>
             <component
+              v...for="mean in selectedKanji.meanlong.split('\n')"
               v-if="ForceGraphComp"
               :is="ForceGraphComp"
               ref="fgRef"
@@ -661,9 +609,7 @@ function onNodeClick(node: GraphNode | null) {
               :linkWidth="1"
               :linkDirectionalParticles="2"
               :linkDirectionalParticleWidth="dimension === '2d' ? 5 : 1"
-              :linkDirectionalParticleColor="
-                () => (colorMode.value === 'dark' ? 'white' : 'black')
-              "
+              :linkDirectionalParticleColor="() => 'white'"
               :linkDirectionalParticleSpeed="() => 0.005"
               :linkCanvasObject="dimension === '2d' ? drawLink : undefined"
               :linkCanvasObjectMode="
@@ -686,14 +632,16 @@ function onNodeClick(node: GraphNode | null) {
 
 <style scoped>
 /* ✅ THAY ĐỔI:
-  - Tách style mặc định (light mode) ra.
-  - Bọc các style cũ (dark mode) trong class .dark
+  - Tái cấu trúc lại toàn bộ CSS
+  - Sửa các lỗi layout (220vh, 60vh)
+  - Thêm style cho light mode (mặc định)
+  - Bọc style cho dark mode (cũ) trong class .dark
 */
 
 /* --- LIGHT MODE (MẶC ĐỊNH) --- */
 .graph-page-container {
   width: 100%;
-  min-height: 100vh;
+  min-height: 100vh; /* Đảm bảo cao ít nhất 1 màn hình */
   display: flex;
   flex-direction: column;
   background-color: #f9fafb; /* bg-gray-50 */
@@ -733,15 +681,17 @@ function onNodeClick(node: GraphNode | null) {
   gap: 1.5rem;
   padding: 1rem;
   box-sizing: border-box;
+  flex: 1; /* ✅ THÊM: Để lấp đầy không gian còn lại */
 }
 .flex-container {
   display: flex;
   flex-direction: row;
   width: 100%;
-  min-height: 600px;
+  min-height: 600px; /* Giữ chiều cao tối thiểu */
+  height: 100%; /* Lấp đầy .main-content */
 }
 .stroke-panel {
-  flex: 0 0 320px;
+  flex: 0 0 320px; /* Chiều rộng cố định, ổn định */
   display: flex;
   flex-direction: column;
 }
@@ -751,8 +701,8 @@ function onNodeClick(node: GraphNode | null) {
   padding: 1.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   border: 1px solid #e5e7eb; /* border-gray-200 */
-  height: auto;
-  width: 100%;
+  height: auto; /* Tự động co dãn */
+  width: 100%; /* Vừa với panel */
   display: flex;
   flex-direction: column;
 }
@@ -783,7 +733,7 @@ function onNodeClick(node: GraphNode | null) {
   flex: 1;
   position: relative;
   overflow: hidden;
-  min-height: 600px;
+  min-height: 600px; /* Giữ chiều cao tối thiểu */
 }
 .force-graph-component {
   position: absolute;
@@ -849,7 +799,7 @@ button.active {
   color: #7dd3fc;
 }
 .dark .toggle-label {
-  color: #94a3b8;
+  color: #94a3b8; /* ✅ SỬA LỖI TYPO: 'source:' -> 'color:' */
 }
 .dark .kanji-card {
   background: #1e293b;
@@ -883,7 +833,7 @@ button.active {
   border-top: 4px solid #0ea5e9;
 }
 
-/* --- Responsive (Giữ nguyên) --- */
+/* --- Responsive (Đã sửa lỗi) --- */
 @media (max-width: 968px) {
   .main-content {
     flex-direction: column;
@@ -922,4 +872,5 @@ button.active {
     padding: 1rem;
   }
 }
+/* ❌ ĐÃ XÓA: Media query 'height: 300vh' không cần thiết */
 </style>

@@ -120,15 +120,6 @@ namespace Dict.Service
             var user = await _context.Users.FindAsync(id);
             if (user == null) return null;
 
-            if (!string.IsNullOrWhiteSpace(dto.Username))
-            {
-                var newUsername = dto.Username!.Trim();
-                if (!user.Username.Equals(newUsername, StringComparison.OrdinalIgnoreCase) &&
-                    await _context.Users.AnyAsync(u => u.Username.ToLower() == newUsername.ToLower() && u.Id != id))
-                    throw new InvalidOperationException("Username already taken.");
-                user.Username = newUsername;
-            }
-
             if (!string.IsNullOrWhiteSpace(dto.Email))
             {
                 var newEmail = dto.Email!.Trim();
@@ -177,14 +168,7 @@ namespace Dict.Service
             var user = await _context.Users.SingleOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
             if (user == null) return null;
 
-            if (!string.IsNullOrWhiteSpace(dto.Username))
-            {
-                var newUsername = dto.Username!.Trim();
-                if (!user.Username.Equals(newUsername, StringComparison.OrdinalIgnoreCase) &&
-                    await _context.Users.AnyAsync(u => u.Username.ToLower() == newUsername.ToLower() && u.Id != user.Id))
-                    throw new InvalidOperationException("New username is already taken.");
-                user.Username = newUsername;
-            }
+  
 
             if (!string.IsNullOrWhiteSpace(dto.Email))
             {

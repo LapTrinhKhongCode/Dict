@@ -60,9 +60,10 @@
           >
             FlashCard ({{ dueCardCount }})
           </button>
+          <!-- ✅ SỬA: Gọi hàm handleStartQuiz thay vì emit trực tiếp -->
           <button
             v-if="isOwner"
-            @click="emit('start-review', 'quiz')"
+            @click="handleStartQuiz"
             class="learn-button bg-emerald-500 hover:bg-emerald-600 text-white"
           >
             Học trắc nghiệm
@@ -190,11 +191,6 @@
       </div>
     </div>
 
-    <!-- 
-      (Không thay đổi) 
-      Giả định rằng ConfirmationModal.vue đã được thiết kế 
-      để hoạt động với cả hai chế độ.
-    -->
     <ConfirmationModal
       :is-open="isModalOpen"
       title="Xác nhận đặt lại"
@@ -211,8 +207,10 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import type { DeckDetailDto, CardDto } from '~/types'
 import ConfirmationModal from './ConfirmationModal.vue'
 import { useJwt } from '~/composables/useJwt'
+import { useToast } from '~/composables/useToast'
 
-const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt()
+const { username, jwt } = useJwt()
+const { showToast } = useToast()
 
 const props = defineProps<{
   set: DeckDetailDto | null,
@@ -248,6 +246,7 @@ let timer: ReturnType<typeof setInterval> | null = null
 const config = useRuntimeConfig()
 const baseUrl = config.public.apiBaseUrl
 
+// --- Logic tính toán thời gian (không đổi) ---
 function getCardKey(card: any): number | null {
   if (typeof card?.id === 'number') return card.id
   return null
@@ -259,15 +258,12 @@ function parseDbDate(dateString?: string | null): Date | null {
   if (!dateString) return null
   const s = dateString.toString().trim()
   if (!s || s.startsWith('0001-01-01')) return null
-
   let d = new Date(s)
   if (!isNaN(d.getTime())) return d
-
   let s2 = s.replace(' ', 'T')
   if (!/[zZ]|[+\-]\d{2}(:?\d{2})?$/.test(s2)) s2 = s2 + 'Z'
   d = new Date(s2)
   if (!isNaN(d.getTime())) return d
-
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?Z?$/)
   if (!m) return null
   const [, Y, M, D, hh, mm, ss, frac = '0'] = m
@@ -285,7 +281,6 @@ function formatDuration(secondsTotal: number): string {
   s = s % 3600
   const minutes = Math.floor(s / 60)
   const seconds = Math.round(s % 60)
-
   if (days >= 2) return `trong ${days} ngày`
   if (days === 1) return `trong 1 ngày`
   if (hours > 0) return `trong ${hours} giờ ${minutes} phút`
@@ -360,7 +355,6 @@ async function handleConfirmReset() {
   if (!cardToReset.value || resettingCardId.value !== null) return
   const key = getCardKey(cardToReset.value)
   if (key === null) {
-    // THAY ĐỔI: Bỏ 'alert' và dùng 'console.error'
     console.error("Không thể tìm thấy ID của thẻ.")
     return
   }
@@ -373,24 +367,33 @@ async function handleConfirmReset() {
     })
     await handleResponse(response)
     emit('card-updated')
-    // THAY ĐỔI: Bỏ 'alert', bạn nên dùng (useToast) ở component cha
     console.log('Đặt lại tiến độ thành công!')
   } catch (err: any) {
     console.error("Lỗi khi reset thẻ:", err)
-    // THAY ĐỔI: Bỏ 'alert'
     console.error(`Lỗi khi đặt lại thẻ: ${err?.message ?? err}`)
   } finally {
     resettingCardId.value = null
   }
 }
+
+// --- ✅ SỬA: Logic kiểm tra Quiz ---
+
+// (Đã xóa computed 'allUniqueMeanings')
+
+// Hàm được gọi bởi nút "Học trắc nghiệm"
+function handleStartQuiz() {
+    // Yêu cầu ít nhất 4 thẻ (theo yêu cầu mới của bạn)
+    if (!props.set || props.set.cards.length < 4) {
+        showToast('Không thể tạo trắc nghiệm. Bộ thẻ cần ít nhất 4 thẻ.', 'error');
+    } else {
+        // Nếu đủ điều kiện, phát sự kiện để chuyển trang
+        emit('start-review', 'quiz');
+    }
+}
 </script>
 
 <style>
 .learn-button {
-  /* THAY ĐỔI:
-    - Xóa 'color: white;'
-    - Thêm 'text-white' vào các class của button trong template.
-  */
   font-weight: 700;
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -400,3 +403,4 @@ async function handleConfirmReset() {
   cursor: not-allowed;
 }
 </style>
+

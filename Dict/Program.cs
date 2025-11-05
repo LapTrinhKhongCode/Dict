@@ -85,7 +85,7 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();  // Cho phép tất cả các headers
     });
 });
-
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddControllers();
 builder.Services.AddMemoryCache();
@@ -106,6 +106,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<IBlobService, BlobService>();
 builder.Services.AddScoped<IOcrProcessingService, OcrProcessingService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

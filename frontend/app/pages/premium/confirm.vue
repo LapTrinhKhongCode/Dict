@@ -98,6 +98,7 @@ import { useJwt } from '~/composables/useJwt';
 const { username, email } = useJwt();
 
 function goBackToPremium() {
+  navigateTo('/');
   navigateTo('/premium');
 }
 
