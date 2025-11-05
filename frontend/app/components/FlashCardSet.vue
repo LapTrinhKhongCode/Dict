@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-neutral-900 relative transition-colors"
+    class="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-gray-900 relative transition-colors"
   >
     <div
       v-if="isLoading"
@@ -63,8 +63,12 @@ import { ref, computed, onMounted } from 'vue';
 import FlashCard from './FlashCard.vue';
 import type { CardDto, AnswerRequestDto } from '~/types/index';
 import { useJwt } from '~/composables/useJwt';
+// ✅ THÊM: Import useToast
+import { useToast } from '~/composables/useToast';
 
 const { jwt } = useJwt();
+// ✅ THÊM: Khởi tạo showToast
+const { showToast } = useToast();
 
 const props = defineProps<{ deckId: number }>();
 const emit = defineEmits(['go-to-list']);
@@ -158,17 +162,14 @@ async function onAnswer(difficulty: 'again' | 'hard' | 'good' | 'easy') {
     }
   } catch (err: any) {
     console.error("Không thể lưu tiến độ:", err);
-    alert(`Không thể lưu tiến độ của bạn: ${err.message}`);
+    // ✅ THAY THẾ: alert() bằng showToast()
+    showToast(`Không thể lưu tiến độ của bạn: ${err.message}`, 'error');
   }
 }
 </script>
 
 <style scoped>
-/* THAY ĐỔI:
-  - Tách style mặc định (light mode) ra.
-  - Bọc các style cũ (dark mode) trong class .dark
-*/
-
+/* (Style này đã chính xác, giữ nguyên) */
 /* --- LIGHT MODE (MẶC ĐỊNH) --- */
 .nav-btn {
   position: absolute;

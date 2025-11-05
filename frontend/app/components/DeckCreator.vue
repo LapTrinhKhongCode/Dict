@@ -280,8 +280,12 @@
 import { ref, computed, watch } from 'vue';
 import type { DeckCreateDto, CardCreateDto } from '~/types';
 import { useJwt } from '~/composables/useJwt';
+// ✅ 1. Import useToast
+import { useToast } from '~/composables/useToast';
 
 const { username, avatarUrl, isAuthenticated, logout, jwt } = useJwt();
+// ✅ 2. Khởi tạo showToast
+const { showToast } = useToast();
 
 const emit = defineEmits(['go-back', 'deck-created']);
 
@@ -340,9 +344,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 function addCardToList() {
-  // ... (implementation remains the same) ...
+  // ✅ 3. THAY THẾ ALERT
   if (!newCardInput.value.frontText || !newCardInput.value.backText) {
-    alert("Ký tự và Nghĩa là bắt buộc.");
+    showToast("Ký tự và Nghĩa là bắt buộc.", 'error');
     return;
   }
   newDeck.value.cards.push({
@@ -354,16 +358,16 @@ function addCardToList() {
 }
 
 function removeCardFromList(index: number) {
-  // ... (implementation remains the same) ...
   newDeck.value.cards.splice(index, 1);
 }
 
 async function createDeck() {
-  // ... (implementation remains the same) ...
+  // ✅ 3. THAY THẾ ALERT
   if (!newDeck.value.title.trim()) {
-    alert("Tên bộ thẻ là bắt buộc.");
+    showToast("Tên bộ thẻ là bắt buộc.", 'error');
     return;
   }
+  // (Giữ nguyên confirm)
   if (newDeck.value.cards.length === 0 && !confirm("Bạn chưa thêm thẻ nào. Vẫn muốn tạo bộ thẻ trống?")) {
     return;
   }
@@ -379,7 +383,10 @@ async function createDeck() {
       body: JSON.stringify(newDeck.value)
     });
     const createdDeckData = await handleResponse<{ id: number }>(response);
-    alert('Đã tạo bộ thẻ thành công!');
+    
+    // ✅ 3. THAY THẾ ALERT
+    showToast('Đã tạo bộ thẻ thành công!', 'success');
+    
     if (createdDeckData?.id) {
       emit('deck-created', createdDeckData.id);
     } else {
@@ -387,7 +394,8 @@ async function createDeck() {
       emit('go-back');
     }
   } catch (err: any) {
-    alert(`Lỗi tạo bộ thẻ: ${err.message}`);
+    // ✅ 3. THAY THẾ ALERT
+    showToast(`Lỗi tạo bộ thẻ: ${err.message}`, 'error');
     console.error("createDeck Error:", err);
   } finally {
     isSaving.value = false;
@@ -405,7 +413,13 @@ function closeImportModal() {
 }
 
 function importCards() {
+  // ✅ 3. THÊM KIỂM TRA VÀ TOAST
+  if (parsedCards.value.length === 0) {
+    showToast("Không có thẻ hợp lệ nào để import.", 'error');
+    return;
+  }
   newDeck.value.cards.push(...parsedCards.value);
+  showToast(`Đã thêm ${parsedCards.value.length} thẻ vào danh sách chờ.`, 'success');
   closeImportModal();
 }
 
@@ -424,11 +438,7 @@ function handleTab(event: KeyboardEvent) {
 </script>
 
 <style scoped>
-/* THAY ĐỔI:
-  - Tách style mặc định (light mode) ra.
-  - Bọc các style cũ (dark mode) trong class .dark
-*/
-
+/* (Style giữ nguyên từ code của bạn) */
 /* --- LIGHT MODE (MẶC ĐỊNH) --- */
 .form-input {
   width: 100%;

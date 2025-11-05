@@ -4,8 +4,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-// ✨ Add this using statement to access ClaimTypes
-using System.Security.Claims;
+using System.Collections.Generic; // Thêm
+using System.Linq; // Thêm
 
 namespace Dict.Service
 {
@@ -18,31 +18,34 @@ namespace Dict.Service
             _config = config;
         }
 
-        public string GenerateToken(User user)
+        // 1. CẬP NHẬT CHỮ KÝ: (Đã đúng)
+        public string GenerateToken(ApplicationUser user, IList<string> roles)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            // ✨ FIX: Use a List<Claim> to easily add new claims
+            // 2. DÙNG List<Claim>
             var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Username),
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("userId", user.Id.ToString()), // This is correct for your controller's GetAdminId()
+                new Claim("userId", user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 
-                // ✨ FIX: Add the Role claim
-                // We cast the enum Role (which is an int) to a string (e.g., "1", "2")
-                // This is what [Authorize(Roles = Role.ADMIN)] will check against.
-                new Claim(ClaimTypes.Role, ((user.Role).ToString()))
+                // << --- ĐÃ XÓA KHỐI CODE "user.Role" BỊ LỖI Ở ĐÂY --- >>
             };
+
+            // 3. THÊM TẤT CẢ CÁC ROLE CỦA USER VÀO CLAIMS (Đây là code đúng)
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
 
             var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
-                claims: claims, // Pass the list of claims
-                                // ✨ FIX: Use DateTime.UtcNow for standardized time
-                expires: DateTime.UtcNow.AddHours(240000), // Token expires in 100 days
+                claims: claims, // Sử dụng danh sách claims đã cập nhật
+                expires: DateTime.Now.AddHours(2400), // Token hết hạn sau 100 ngày
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

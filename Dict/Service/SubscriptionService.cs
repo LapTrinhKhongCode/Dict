@@ -136,7 +136,7 @@ namespace Dict.Service
             var vietnamTime = DateTime.UtcNow.AddHours(7);
             var appTransId = $"{vietnamTime:yyMMdd}_{Guid.NewGuid():N}".Substring(0, 18);
             var appTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var appUser = user.Username ?? $"user_{userId}";
+            var appUser = user.UserName ?? $"user_{userId}";
             var description = string.Format(descriptionTemplate, appTransId);
             var embedData = new ZaloPayEmbedData { UserId = userId };
             var embedDataJson = JsonSerializer.Serialize(embedData);
@@ -230,18 +230,18 @@ namespace Dict.Service
                 return;
             }
 
-            if (user.Role == Role.USER)
-            {
-                user.Role = Role.PREMIUM_USER;
-                user.UpdatedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
+            //if (user.Role == Role.USER)
+            //{
+            //    user.Role = Role.PREMIUM_USER;
+            //    user.UpdatedAt = DateTime.UtcNow;
+            //    await _context.SaveChangesAsync();
 
-                _logger.LogInformation("User {UserId} upgraded to PREMIUM_USER (Sandbox immediate upgrade). AppTransId: {AppTransId}", userId, appTransId);
-            }
-            else
-            {
-                _logger.LogInformation("User {UserId} already has role {Role}. Skip upgrade.", userId, user.Role);
-            }
+            //    _logger.LogInformation("User {UserId} upgraded to PREMIUM_USER (Sandbox immediate upgrade). AppTransId: {AppTransId}", userId, appTransId);
+            //}
+            //else
+            //{
+            //    _logger.LogInformation("User {UserId} already has role {Role}. Skip upgrade.", userId, user.Role);
+            //}
         }
 
     }

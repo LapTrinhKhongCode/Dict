@@ -4,7 +4,7 @@ import { useToast } from '@/composables/useToast'
 const { toasts } = useToast()
 </script>
 <template>
-  <div class="fixed top-6 right-6 z-50 flex flex-col space-y-2 items-end">
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 items-end">
     <transition-group name="toast" tag="div">
       <div
         v-for="toast in toasts" :key="toast.id"

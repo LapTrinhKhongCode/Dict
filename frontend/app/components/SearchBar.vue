@@ -39,7 +39,7 @@
 
     <div
       v-if="showSuggestions && suggestions.length > 0"
-      class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto suggestions-list"
+      class="absolute z-1000 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto suggestions-list"
     >
       <ul ref="suggestionsListEl">
         <li
@@ -95,16 +95,14 @@
         </p>
       </div>
 
-      <!-- Inline backgroundColor binding + opacity -->
       <canvas
         ref="canvasRef"
         width="256"
         height="256"
         class="handwriting-canvas"
         style="width: 256px; height: 256px; margin: 0 auto"
-        :style="{ opacity: isPredicting ? 0.7 : 1, backgroundColor: (isDark.value ? '#1f2937' : '#ffffff') }"
+        :style="{ opacity: isPredicting ? 0.7 : 1 }"
       ></canvas>
-
       <div class="flex justify-center items-center gap-x-4 mt-4">
         <button
           @click.prevent="undo"
@@ -236,74 +234,85 @@
 </template>
 
 <style scoped>
+/* ✅ SỬA LỖI Ở ĐÂY: CSS cho canvas và scrollbar */
+
+/* --- Canvas Styling --- */
 .handwriting-canvas {
-  border: 2px solid #d1d5db;
+  /* Light Mode (Mặc định) */
+  border: 2px solid #d1d5db; /* gray-300 */
   border-radius: 8px;
   cursor: crosshair;
-  width: 256px;
-  height: 256px;
-  /* keep default, inline style will override when necessary */
+  background-color: #ffffff; /* NỀN TRẮNG (cho light mode) */
 }
 .dark .handwriting-canvas {
-  border: 2px solid #4b5563;
+  /* Dark Mode */
+  border: 2px solid #4b5563; /* gray-600 */
+  background-color: #1f2937; /* NỀN TỐI (cho dark mode) */
 }
+/* (Logic MÀU BÚT VẼ nằm trong <script setup>) */
 
-/* Scrollbar styling */
+
+/* --- Scrollbar Styling (Chung cho cả 2 list) --- */
 .suggestions-list::-webkit-scrollbar,
-.ocr-results-ref::-webkit-scrollbar {
+.ocr-results-ref::-webkit-scrollbar { /* Sửa tên class cho đúng */
   width: 8px;
 }
+/* Light Mode */
 .suggestions-list::-webkit-scrollbar-track,
 .ocr-results-ref::-webkit-scrollbar-track {
-  background: #f9fafb;
+  background: #f9fafb; /* gray-50 */
   border-radius: 10px;
 }
 .suggestions-list::-webkit-scrollbar-thumb,
 .ocr-results-ref::-webkit-scrollbar-thumb {
-  background-color: #d1d5db;
+  background-color: #d1d5db; /* gray-300 */
   border-radius: 10px;
-  border: 2px solid #f9fafb;
+  border: 2px solid #f9fafb; /* gray-50 */
   background-clip: padding-box;
 }
 .suggestions-list::-webkit-scrollbar-thumb:hover,
 .ocr-results-ref::-webkit-scrollbar-thumb:hover {
-  background-color: #9ca3af;
+  background-color: #9ca3af; /* gray-400 */
 }
+/* Dark Mode */
 .dark .suggestions-list::-webkit-scrollbar-track,
 .dark .ocr-results-ref::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: #1f2937; /* gray-800 */
 }
 .dark .suggestions-list::-webkit-scrollbar-thumb,
 .dark .ocr-results-ref::-webkit-scrollbar-thumb {
-  background-color: #4b5563;
-  border: 2px solid #1f2937;
+  background-color: #4b5563; /* gray-600 */
+  border: 2px solid #1f2937; /* gray-800 */
 }
 .dark .suggestions-list::-webkit-scrollbar-thumb:hover,
 .dark .ocr-results-ref::-webkit-scrollbar-thumb:hover {
-  background-color: #6b7280;
+  background-color: #6b7280; /* gray-500 */
 }
 </style>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from "vue";
+// ✅ SỬA LỖI Ở ĐÂY: Thêm useColorMode
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { toKana } from "wanakana";
-import { useColorMode } from "#imports";
+import { useColorMode } from "#imports"; // <-- THÊM DÒNG NÀY
 
+// --- Props & Emits ---
 const props = defineProps({
   modelValue: {
     type: String,
     default: "",
   },
   searchResultRef: {
-    type: Object,
+    type: Object, // Đây là một cái 'ref'
     default: null,
   },
 });
 const emit = defineEmits(["update:modelValue", "search"]);
 
 const config = useRuntimeConfig();
-const colorMode = useColorMode();
+const colorMode = useColorMode(); // <-- THÊM DÒNG NÀY
 
+// --- Internal State ---
 const internalSearchWord = ref(props.modelValue);
 const suggestions = ref<any[]>([]);
 const showSuggestions = ref(false);
@@ -314,6 +323,7 @@ const suggestionsListEl = ref<HTMLUListElement | null>(null);
 const isProgrammaticUpdate = ref(false);
 const abortController = ref<AbortController | null>(null);
 
+// --- Drawing Pad State ---
 const showDrawingPad = ref(false);
 const penButtonRef = ref<HTMLButtonElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -324,26 +334,20 @@ const history = ref<ImageData[]>([]);
 const historyIndex = ref(-1);
 const isPredicting = ref(false);
 const predictionLabels = ref<string[]>([]);
-const predictionAbortController = ref<AbortController | null>(null);
-const canUndo = computed(() => historyIndex.value > 0);
-const canRedo = computed(() => historyIndex.value < history.value.length - 1);
+// const isHandlingPredictionClick = ref(false);
 
+const predictionAbortController = ref<AbortController | null>(null);
+
+// --- NEW: OCR Pad State ---
 const showOcrPad = ref(false);
 const ocrResultsRef = ref<HTMLDivElement | null>(null);
 const ocrFileInputRef = ref<HTMLInputElement | null>(null);
-const ocrResults = ref<any[]>([]);
+const ocrResults = ref<any[]>([]); // Sửa thành any[] để nhận { text: "..." }
 const isDragging = ref(false);
 const isOcrLoading = ref(false);
 const ocrStatus = ref("");
 
-// reliable boolean for dark mode
-const isDark = computed(() => {
-  if (typeof (colorMode as any) === "string") return (colorMode as any) === "dark";
-  if ((colorMode as any)?.value !== undefined) return (colorMode as any).value === "dark";
-  if ((colorMode as any)?.preference !== undefined) return (colorMode as any).preference === "dark";
-  return false;
-});
-
+// --- Watcher to sync prop to internal state ---
 watch(
   () => props.modelValue,
   (newValue) => {
@@ -354,14 +358,17 @@ watch(
   }
 );
 
+// --- Watcher for Autocomplete ---
 watch(internalSearchWord, (newValue) => {
   emit("update:modelValue", newValue);
 
+  // If update came from code (e.g., prediction click), stop.
   if (isProgrammaticUpdate.value) {
     isProgrammaticUpdate.value = false;
     return;
   }
-
+  
+  // (Logic debounce giữ nguyên)
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
@@ -384,60 +391,65 @@ watch(internalSearchWord, (newValue) => {
     try {
       const convertedWord = toKana(trimmed);
       const res = await fetch(
-        `${config.public.apiBaseUrl}/api/Search/autocomplete/${encodeURIComponent(convertedWord)}`,
+        `${
+          config.public.apiBaseUrl
+        }/api/Search/autocomplete/${encodeURIComponent(convertedWord)}`,
         { signal }
       );
       if (!res.ok) throw new Error("Autocomplete fetch failed");
+
       const data = await res.json();
       suggestions.value = data || [];
+
+      // Check that drawing pad isn't open *before* showing suggestions
       if (!showDrawingPad.value) {
         showSuggestions.value = suggestions.value.length > 0;
       }
     } catch (e: any) {
       if (e.name === "AbortError") {
+        console.log("Autocomplete fetch aborted.");
         return;
       }
+      console.error("Autocomplete error:", e);
       suggestions.value = [];
       showSuggestions.value = false;
     }
   }, 350);
 });
 
+// --- Watcher to manage canvas listeners ---
 watch(showDrawingPad, (isShowing) => {
   if (isShowing) {
+    // Wait for canvas to be in the DOM, then initialize
     nextTick(() => {
       initializeCanvas();
     });
   } else {
+    // Remove listeners when pad is hidden to prevent errors
     destroyCanvasListeners();
   }
 });
 
-// when theme changes, update canvas style + redraw background and stroke
-watch(isDark, (newVal) => {
-  if (!canvasRef.value) return;
-  // inline style ensures visual background updates immediately
-  canvasRef.value.style.backgroundColor = newVal ? "#1f2937" : "#ffffff";
-  if (ctx.value) {
-    ctx.value.strokeStyle = newVal ? "white" : "black";
-    // ensure pixel data matches background
-    clearCanvas();
-  }
-});
+// --- Methods ---
 
 const onInputFocus = () => {
+  // Khi focus, chỉ cần hiện gợi ý (nếu có) và tắt OCR pad
   showSuggestions.value = suggestions.value.length > 0;
   showOcrPad.value = false;
+  // KHÔNG tắt drawing pad ở đây nữa
 };
 
 const onPenClick = () => {
+  // Toggle the drawing pad
   showDrawingPad.value = !showDrawingPad.value;
+
   showSuggestions.value = false;
-  showOcrPad.value = false;
+  showOcrPad.value = false; // <-- ADD THIS
 };
 
 const onImageClick = () => {
   showOcrPad.value = !showOcrPad.value;
+  // Hide other panels
   showSuggestions.value = false;
   showDrawingPad.value = false;
 };
@@ -454,21 +466,31 @@ const onSearch = () => {
 
 const onSelectSuggestion = (suggestion: any) => {
   if (!suggestion) return;
+
   isProgrammaticUpdate.value = true;
   internalSearchWord.value = suggestion.word;
+
   showSuggestions.value = false;
   selectedIndex.value = -1;
+
   emit("search", suggestion.word);
 };
 
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as Node;
+
+  // Kiểm tra 1: Click có bên trong SearchBar không?
   if (searchContainer.value && searchContainer.value.contains(target)) {
-    return;
+    return; // Nếu có, không làm gì cả
   }
-  if (props.searchResultRef && (props.searchResultRef as any).contains && (props.searchResultRef as any).contains(target)) {
-    return;
+
+  // ✅ SỬA LỖI: (props.searchResultRef as any)
+  // Kiểm tra 2: Click có bên trong SearchResult (dùng prop) không?
+  if (props.searchResultRef && (props.searchResultRef as any).contains(target)) {
+    return; // Nếu có, không làm gì cả
   }
+
+  // Nếu click ra ngoài cả 2, thì TẮT
   showSuggestions.value = false;
   showDrawingPad.value = false;
   showOcrPad.value = false;
@@ -477,8 +499,11 @@ const handleClickOutside = (event: MouseEvent) => {
 
 const scrollToSelected = async () => {
   if (selectedIndex.value < 0 || !suggestionsListEl.value) return;
+
   await nextTick();
-  const selectedEl = suggestionsListEl.value.children[selectedIndex.value] as HTMLLIElement;
+  const selectedEl = suggestionsListEl.value.children[
+    selectedIndex.value
+  ] as HTMLLIElement;
   if (selectedEl) {
     selectedEl.scrollIntoView({
       block: "nearest",
@@ -488,6 +513,7 @@ const scrollToSelected = async () => {
 };
 
 const handleKeydown = (event: KeyboardEvent) => {
+  // Don't handle keys if drawing pad is open
   if (showDrawingPad.value) return;
 
   if (showSuggestions.value && suggestions.value.length > 0) {
@@ -523,27 +549,31 @@ const autoScrollOcrResults = () => {
   });
 };
 
-/* Canvas methods */
+// --- Canvas Drawing Methods ---
+
+// ✅ SỬA LỖI Ở ĐÂY: Cập nhật hàm này
 const initializeCanvas = () => {
   if (!canvasRef.value) return;
-  // set inline background to match current theme immediately
-  canvasRef.value.style.backgroundColor = isDark.value ? "#1f2937" : "#ffffff";
-
-  ctx.value = canvasRef.value.getContext("2d", { willReadFrequently: true });
+  // Thêm { willReadFrequently: true } để tối ưu getImageData
+  ctx.value = canvasRef.value.getContext("2d", { willReadFrequently: true }); 
   if (!ctx.value) return;
 
+  // Đặt style bút vẽ dựa trên theme
+  ctx.value.strokeStyle = colorMode.value === "dark" ? "white" : "black"; // <-- SỬA Ở ĐÂY
   ctx.value.lineWidth = 12;
   ctx.value.lineCap = "round";
   ctx.value.lineJoin = "round";
-  ctx.value.strokeStyle = isDark.value ? "white" : "black";
 
-  clearCanvas();
-
+  clearCanvas(); // Đặt nền ban đầu
+  
+  // Add listeners
   canvasRef.value.addEventListener("mousedown", startDrawing);
   canvasRef.value.addEventListener("mousemove", draw);
   canvasRef.value.addEventListener("mouseup", stopDrawing);
   canvasRef.value.addEventListener("mouseleave", stopDrawing);
-  canvasRef.value.addEventListener("touchstart", startDrawing, { passive: false });
+  canvasRef.value.addEventListener("touchstart", startDrawing, {
+    passive: false,
+  });
   canvasRef.value.addEventListener("touchmove", draw, { passive: false });
   canvasRef.value.addEventListener("touchend", stopDrawing);
   canvasRef.value.addEventListener("touchcancel", stopDrawing);
@@ -551,6 +581,7 @@ const initializeCanvas = () => {
 
 const destroyCanvasListeners = () => {
   if (!canvasRef.value) return;
+  // Remove listeners
   canvasRef.value.removeEventListener("mousedown", startDrawing);
   canvasRef.value.removeEventListener("mousemove", draw);
   canvasRef.value.removeEventListener("mouseup", stopDrawing);
@@ -562,23 +593,25 @@ const destroyCanvasListeners = () => {
 };
 
 const getCoordinates = (event: MouseEvent | TouchEvent) => {
-  event.preventDefault();
+  event.preventDefault(); // Prevents page scrolling while drawing
   if (!canvasRef.value) return { x: 0, y: 0 };
 
   const rect = canvasRef.value.getBoundingClientRect();
-  let x: number, y: number;
+  let x, y;
 
   if (event instanceof TouchEvent) {
     x = event.touches[0].clientX - rect.left;
     y = event.touches[0].clientY - rect.top;
   } else {
-    x = (event as MouseEvent).clientX - rect.left;
-    y = (event as MouseEvent).clientY - rect.top;
+    // MouseEvent
+    x = event.clientX - rect.left;
+    y = event.clientY - rect.top;
   }
   return { x, y };
 };
 
 const startDrawing = (event: MouseEvent | TouchEvent) => {
+  // Truncate history if we draw after undoing
   if (historyIndex.value < history.value.length - 1) {
     history.value = history.value.slice(0, historyIndex.value + 1);
   }
@@ -609,16 +642,18 @@ const stopDrawing = () => {
   }
 };
 
+// ✅ SỬA LỖI Ở ĐÂY: Cập nhật hàm này
 const clearCanvas = () => {
   if (!ctx.value || !canvasRef.value) return;
-
-  // ensure the CSS inline background matches and pixel data filled
-  const bg = isDark.value ? "#1f2937" : "#ffffff";
-  canvasRef.value.style.backgroundColor = bg;
-  ctx.value.fillStyle = bg;
+  
+  // 1. Đặt MÀU NỀN (Fill) dựa trên theme
+  // (CSS trong <style> cũng đặt màu nền, nhưng hàm fillRect này
+  // đảm bảo hình ảnh export ra (getMatrix) có nền đúng)
+  ctx.value.fillStyle = colorMode.value === "dark" ? "#1f2937" : "#ffffff"; // gray-800 / white
   ctx.value.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height);
 
-  ctx.value.strokeStyle = isDark.value ? "white" : "black";
+  // 2. Đặt MÀU BÚT VẼ (Stroke) dựa trên theme
+  ctx.value.strokeStyle = colorMode.value === "dark" ? "white" : "black"; // <-- SỬA Ở ĐÂY
 
   history.value = [];
   historyIndex.value = -1;
@@ -631,7 +666,12 @@ const clearCanvas = () => {
 
 const saveHistory = () => {
   if (!ctx.value || !canvasRef.value) return;
-  const data = ctx.value.getImageData(0, 0, canvasRef.value.width, canvasRef.value.height);
+  const data = ctx.value.getImageData(
+    0,
+    0,
+    canvasRef.value.width,
+    canvasRef.value.height
+  );
   history.value.push(data);
   historyIndex.value = history.value.length - 1;
 };
@@ -656,7 +696,8 @@ const undo = () => {
 };
 
 const redo = () => {
-  if (historyIndex.value >= history.value.length - 1 || isPredicting.value) return;
+  if (historyIndex.value >= history.value.length - 1 || isPredicting.value)
+    return;
 
   historyIndex.value++;
   restoreHistory();
@@ -665,44 +706,54 @@ const redo = () => {
 
 const onSelectPrediction = (label: string) => {
   isProgrammaticUpdate.value = true;
+  // Concatenate the label to the existing search word
   internalSearchWord.value = internalSearchWord.value + label;
+
+  // Clear the canvas and predictions
   clearCanvas();
+
   penButtonRef.value?.focus();
 };
 
+// ✅ SỬA LỖI Ở ĐÂY: Cập nhật hàm này
 const getMatrixFromCanvas = () => {
   const processingCanvas = document.createElement("canvas");
   processingCanvas.width = 64;
   processingCanvas.height = 64;
-  const pCtx = processingCanvas.getContext("2d", { willReadFrequently: true });
+  const pCtx = processingCanvas.getContext("2d", { willReadFrequently: true }); // Thêm willReadFrequently
   if (!pCtx) return [];
 
-  const dark = isDark.value;
+  const isDark = colorMode.value === 'dark';
 
-  // match clearCanvas background
-  const bg = dark ? "#1f2937" : "#ffffff";
-  pCtx.fillStyle = bg;
+  // 1. Vẽ nền (giống hệt clearCanvas)
+  pCtx.fillStyle = isDark ? "#1f2937" : "#ffffff"; // Match background
   pCtx.fillRect(0, 0, 64, 64);
-
+  
+  // 2. Vẽ hình ảnh đã thu nhỏ
   if (canvasRef.value) {
     pCtx.drawImage(canvasRef.value, 0, 0, 256, 256, 0, 0, 64, 64);
   }
 
   const imageData = pCtx.getImageData(0, 0, 64, 64);
   const data = imageData.data;
-  const matrix = Array(64).fill(0).map(() => Array(64).fill(0));
+  const matrix = Array(64)
+    .fill(0)
+    .map(() => Array(64).fill(0));
 
-  // thresholds chosen so that:
-  // - dark pad (dark background): stroke is white -> detect bright pixels
-  // - light pad (white background): stroke is black -> detect dark pixels
-  const threshold = dark ? 200 : 50;
+  // 3. Đặt ngưỡng (threshold)
+  const threshold = isDark ? 50 : 200; // Ngưỡng cho màu trắng (dark) / màu đen (light)
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
     const grayscale = (r + g + b) / 3;
-    const binaryValue = dark ? (grayscale > threshold ? 1 : 0) : (grayscale < threshold ? 1 : 0);
+    
+    // 4. Kiểm tra pixel "nét vẽ"
+    // Dark mode: nét vẽ là MÀU TRẮNG (grayscale > 50)
+    // Light mode: nét vẽ là MÀU ĐEN (grayscale < 200)
+    const binaryValue = isDark ? (grayscale > threshold ? 1 : 0) : (grayscale < threshold ? 1 : 0);
+
     if (binaryValue === 1) {
       const pixelIndex = i / 4;
       const x = pixelIndex % 64;
@@ -713,33 +764,45 @@ const getMatrixFromCanvas = () => {
   return matrix;
 };
 
+// (Các hàm còn lại: runPrediction, OCR, Lifecycle... giữ nguyên)
+// ...
 const runPrediction = async () => {
+  // --- NEW: Abort previous request ---
   if (predictionAbortController.value) {
     predictionAbortController.value.abort("New prediction started");
   }
   predictionAbortController.value = new AbortController();
   const signal = predictionAbortController.value.signal;
+  // --- END NEW ---
 
   isPredicting.value = true;
   predictionLabels.value = [];
 
   const matrixData = getMatrixFromCanvas();
   const token = localStorage.getItem("jwt_token");
+
+  // ✅ SỬA LỖI: Bỏ kiểm tra token (theo yêu cầu trước)
+  /*
   if (!token) {
+    console.error("Prediction error: Not logged in");
     isPredicting.value = false;
     return;
   }
+  */
 
   try {
-    const response = await fetch(`${config.public.apiBaseUrl}/api/infer/predict`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ matrix: matrixData }),
-      signal,
-    });
+    const response = await fetch(
+      `${config.public.apiBaseUrl}/api/infer/predict`,
+      {
+        method: "POST",
+        headers: {
+          // Authorization: `Bearer ${token}`, // <-- Đã bỏ
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ matrix: matrixData }),
+        signal: signal,
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -754,16 +817,19 @@ const runPrediction = async () => {
       predictionLabels.value = [];
     }
   } catch (error: any) {
+    // --- NEW: Handle AbortError ---
     if (error.name === "AbortError") {
-      return;
+      console.log("Prediction aborted:", error.message);
+      return; // Don't set error, this is intentional
     }
+    // --- END NEW ---
+    console.error("Error during handwriting prediction:", error);
     predictionLabels.value = [];
   } finally {
     isPredicting.value = false;
   }
 };
 
-/* OCR upload/stream */
 const onUploadAreaClick = () => {
   ocrFileInputRef.value?.click();
 };
@@ -793,6 +859,9 @@ const handleDrop = (event: DragEvent) => {
   }
 };
 
+/**
+ * Placeholder for processing the uploaded file.
+ */
 const processFile = async (file: File) => {
   ocrResults.value = [];
   isOcrLoading.value = true;
@@ -809,11 +878,14 @@ const processFile = async (file: File) => {
   }
 
   try {
-    const response = await fetch(`${config.public.apiBaseUrl}/api/Infer/stream`, {
-      method: "POST",
-      body: formData,
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await fetch(
+      `${config.public.apiBaseUrl}/api/Infer/stream`,
+      {
+        method: "POST",
+        body: formData,
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Server error: ${response.statusText}`);
@@ -830,11 +902,14 @@ const processFile = async (file: File) => {
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        console.log("Stream finished.");
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n\n");
-      buffer = lines.pop() || "";
+      buffer = lines.pop() || ""; // Keep the last incomplete part
 
       for (const line of lines) {
         if (line.startsWith("data:")) {
@@ -843,7 +918,7 @@ const processFile = async (file: File) => {
             const data = JSON.parse(jsonString);
 
             if (data.status === "result" && data.text) {
-              ocrResults.value.push(data);
+              ocrResults.value.push(data); // Push the whole { text: "..." } object
               autoScrollOcrResults();
             } else {
               ocrStatus.value = data.message || data.status;
@@ -855,22 +930,28 @@ const processFile = async (file: File) => {
       }
     }
   } catch (error: any) {
+    console.error("Error during OCR streaming:", error);
     ocrStatus.value = `Lỗi: ${error.message}`;
   } finally {
     isOcrLoading.value = false;
-    if (ocrResults.value.length > 0) ocrStatus.value = `${ocrResults.value.length} dòng.`;
-    else if (!ocrStatus.value.startsWith("Error")) ocrStatus.value = "Không tìm thấy văn bản tiếng Nhật.";
+    if (ocrResults.value.length > 0) {
+      ocrStatus.value = `${ocrResults.value.length} dòng.`;
+    } else if (!ocrStatus.value.startsWith("Error")) {
+      ocrStatus.value = "Không tìm thấy văn bản tiếng Nhật.";
+    }
   }
 };
 
-/* lifecycle */
+// --- Lifecycle Hooks ---
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("click", handleClickOutside);
-  if (debounceTimer) clearTimeout(debounceTimer);
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
   destroyCanvasListeners();
 });
 </script>
