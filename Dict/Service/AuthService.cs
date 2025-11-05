@@ -40,14 +40,15 @@ namespace Dict.Service
         // ✨ THAY ĐỔI: Hàm RegisterAsync
         public async Task<string> RegisterAsync(RegistrationRequestDto request)
         {
-            // BƯỚC 1: Kiểm tra mật khẩu (giữ nguyên)
             var passwordError = ValidatePassword(request.Password);
             if (!string.IsNullOrEmpty(passwordError))
             {
                 throw new InvalidOperationException(passwordError);
             }
 
-            // BƯỚC 2: Kiểm tra User/Email (vẫn cần kiểm tra)
+            if (!Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
+                throw new InvalidOperationException("Username chỉ được chứa chữ cái, số hoặc dấu gạch dưới, không có khoảng trắng hoặc dấu.");
+
             var existingUser = await _context.Users
                 .FirstOrDefaultAsync(u => u.Username == request.Username || u.Email == request.Email);
             if (existingUser != null)
@@ -55,35 +56,23 @@ namespace Dict.Service
                 throw new InvalidOperationException("Username or Email already exists.");
             }
 
-            // BƯỚC 3: Hash mật khẩu
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
-            // BƯỚC 4: Tạo Token tạm thời (Key cho cache)
-            var confirmationToken = Guid.NewGuid().ToString();
-
-            // ✨ BƯỚC 5: KHÔNG LƯU VÀO DB. Lưu vào Cache trong 30 phút.
-            // Chúng ta lưu (DTO request + HashedPassword) vào cache
-            var cacheEntry = new { RequestData = request, HashedPassword = hashedPassword };
-            _cache.Set(confirmationToken, cacheEntry, TimeSpan.FromMinutes(30));
-
-            // BƯỚC 6: Tạo link và gửi email
-            var frontendUrl = _configuration["FrontendUrl"];
-            if (string.IsNullOrEmpty(frontendUrl))
+            var user = new User
             {
-                throw new Exception("FrontendUrl is not configured");
-            }
+                Username = request.Username,
+                Email = request.Email,
+                PasswordHash = hashedPassword,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                Role = Role.USER,
+                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/17cbb928-af2d-4d11-9397-102f8d3d332f.png",
+            };
 
-            // ✨ Link này sẽ trỏ đến trang frontend xử lý xác nhận
-            var confirmationUrl = $"{frontendUrl}/confirm-account?token={confirmationToken}";
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
 
-            var subject = "Chào mừng bạn đến với Miyo Dictionary - Xác nhận tài khoản";
-            var body = $"Cảm ơn bạn đã đăng ký. Vui lòng nhấp vào link sau để hoàn tất tạo tài khoản:<br/>" +
-                       $"<a href='{confirmationUrl}' style='...'>Click để Xác nhận Tài khoản</a>" +
-                       $"<br/><br/>Link này sẽ hết hạn sau 30 phút.";
-
-            await _emailService.SendEmailAsync(request.Email, subject, body);
-
-            return "Registration successful. Please check your email to confirm your account.";
+            return "Registration successful.";
         }
 
         // ✨ HÀM MỚI: Dùng để xác nhận
@@ -117,7 +106,7 @@ namespace Dict.Service
                 IsActive = true, // Kích hoạt ngay
                 CreatedAt = DateTime.UtcNow,
                 Role = Role.USER,
-                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/106449882_p0.png",
+                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/17cbb928-af2d-4d11-9397-102f8d3d332f.png",
             };
 
             // BƯỚC 5: Lưu vào DB

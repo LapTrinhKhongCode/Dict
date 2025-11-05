@@ -76,15 +76,14 @@ async function handleAuth() {
       return
     }
     if (data.result.token) {
-login(
-  data.result.token,
-  data.result.username,
-  data.result.avatarUrl,
-  data.result.email,
-  data.result.role,
-  data.result.userId
-)
-
+      login(
+        data.result.token,
+        data.result.username,
+        data.result.avatarUrl,
+        data.result.email,
+        data.result.role,
+        data.result.userId
+      )
 
       showToast('Login successful!', 'success')
       await router.push('/')
@@ -98,42 +97,127 @@ login(
   }
 }
 </script>
+
 <template>
-  <div class="flex items-center justify-center min-h-screen bg-neutral-900">
-    <div class="bg-neutral-800 rounded-lg shadow-lg p-8 w-full max-w-md">
+  <div
+    class="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-neutral-900 transition-colors"
+  >
+    <div
+      class="bg-white dark:bg-neutral-800 rounded-lg shadow-lg p-8 w-full max-w-md border border-gray-200 dark:border-transparent"
+    >
       <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold text-white">
-          {{ mode === 'login' ? 'ĐĂNG NHẬP' : 'ĐĂNG KÍ' }}
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+          {{ mode === "login" ? "ĐĂNG NHẬP" : "ĐĂNG KÍ" }}
         </h2>
-        <button @click="() => {mode = (mode === 'login' ? 'register' : 'login'); touched = false; fieldErrors = {}; success = ''}" class="text-primary-400 hover:underline text-sm">
-          {{ mode === 'login' ? 'Bạn chưa có tài khoản? ĐĂNG KÍ' : 'Bạn đã có tài khoản? ĐĂNG NHẬP' }}
+        <button
+          @click="
+            () => {
+              mode = mode === 'login' ? 'register' : 'login';
+              touched = false;
+              fieldErrors = {};
+              success = '';
+            }
+          "
+          class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
+        >
+          {{
+            mode === "login"
+              ? "Bạn chưa có tài khoản? ĐĂNG KÍ"
+              : "Bạn đã có tài khoản? ĐĂNG NHẬP"
+          }}
         </button>
       </div>
-      <div v-if="success" class="mb-4 text-green-400">
+      <div v-if="success" class="mb-4 text-green-600 dark:text-green-400">
         {{ success }}
       </div>
       <div class="mb-4">
-        <label class="block text-gray-200 mb-1">Username</label>
-        <input v-model="username" class="w-full px-3 py-2 rounded bg-neutral-700 text-white focus:outline-none" />
-        <div v-if="touched && !username" class="text-xs text-red-400 mt-1">Không được để trống username</div>
-        <div v-if="fieldErrors.username" class="text-xs text-red-400 mt-1">{{ fieldErrors.username }}</div>
+        <label class="block text-gray-700 dark:text-gray-200 mb-1"
+          >Username</label
+        >
+        <input
+          v-model="username"
+          class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white border border-gray-300 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+        <div
+          v-if="touched && !username"
+          class="text-xs text-red-600 dark:text-red-400 mt-1"
+        >
+          Không được để trống username
+        </div>
+        <div
+          v-if="fieldErrors.username"
+          class="text-xs text-red-600 dark:text-red-400 mt-1"
+        >
+          {{ fieldErrors.username }}
+        </div>
       </div>
       <div v-if="mode === 'register'" class="mb-4">
-        <label class="block text-gray-200 mb-1">Email</label>
-        <input v-model="email" type="email" class="w-full px-3 py-2 rounded bg-neutral-700 text-white focus:outline-none" />
-        <div v-if="touched && !email" class="text-xs text-red-400 mt-1">Email is required</div>
-        <div v-if="touched && email && !isEmailValid()" class="text-xs text-red-400 mt-1">Email không hợp lệ</div>
-        <div v-if="fieldErrors.email" class="text-xs text-red-400 mt-1">{{ fieldErrors.email }}</div>
+        <label class="block text-gray-700 dark:text-gray-200 mb-1"
+          >Email</label
+        >
+        <input
+          v-model="email"
+          type="email"
+          class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white border border-gray-300 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+        <div
+          v-if="touched && !email"
+          class="text-xs text-red-600 dark:text-red-400 mt-1"
+        >
+          Email is required
+        </div>
+        <div
+          v-if="touched && email && !isEmailValid()"
+          class="text-xs text-red-600 dark:text-red-400 mt-1"
+        >
+          Email không hợp lệ
+        </div>
+        <div
+          v-if="fieldErrors.email"
+          class="text-xs text-red-600 dark:text-red-400 mt-1"
+        >
+          {{ fieldErrors.email }}
+        </div>
       </div>
       <div class="mb-4">
-        <label class="block text-gray-200 mb-1">Password</label>
-        <input v-model="password" type="password" class="w-full px-3 py-2 rounded bg-neutral-700 text-white focus:outline-none" />
-        <div v-if="touched && !password" class="text-xs text-red-400 mt-1">Không được để trống password</div>
-        <div v-if="fieldErrors.password" class="text-xs text-red-400 mt-1">{{ fieldErrors.password }}</div>
+        <label class="block text-gray-700 dark:text-gray-200 mb-1"
+          >Password</label
+        >
+        <input
+          v-model="password"
+          type="password"
+          class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white border border-gray-300 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+        <div
+          v-if="touched && !password"
+          class="text-xs text-red-600 dark:text-red-400 mt-1"
+        >
+          Không được để trống password
+        </div>
+        <div
+          v-if="fieldErrors.password"
+          class="text-xs text-red-600 dark:text-red-400 mt-1"
+        >
+          {{ fieldErrors.password }}
+        </div>
       </div>
-      <div v-if="error" class="text-red-400 mb-4">{{ error }}</div>
-      <button @click="handleAuth" :disabled="loading || !isFormValid()" class="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded disabled:opacity-60">
-        {{ loading ? (mode === 'login' ? 'Logging in...' : 'Registering...') : (mode === 'login' ? 'Login' : 'Register') }}
+      <div v-if="error" class="text-red-600 dark:text-red-400 mb-4">
+        {{ error }}
+      </div>
+      <button
+        @click="handleAuth"
+        :disabled="loading || !isFormValid()"
+        class="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded disabled:opacity-60"
+      >
+        {{
+          loading
+            ? mode === "login"
+              ? "Logging in..."
+              : "Registering..."
+            : mode === "login"
+            ? "Login"
+            : "Register"
+        }}
       </button>
     </div>
   </div>

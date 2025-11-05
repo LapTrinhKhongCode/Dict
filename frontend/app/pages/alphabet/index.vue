@@ -1,87 +1,103 @@
 <template>
-  <h3 class="flex justify-center text-3xl font-medium">BẢNG CHỮ CÁI</h3>
+  <h3
+    class="flex justify-center text-3xl font-medium text-gray-900 dark:text-white"
+  >
+    BẢNG CHỮ CÁI
+  </h3>
   <div class="p-6">
-    <!-- Tabs -->
-    <div class="flex mb-4 justify-center ">
+    <div class="flex mb-4 justify-center">
       <button
         class="px-20 py-2 text-center font-medium transition"
-        :class="activeTab === 'hiragana' ? 'bg-sky-900 text-white' : 'bg-sky-700 text-gray-200'"
+        :class="
+          activeTab === 'hiragana'
+            ? 'bg-primary-600 text-white dark:bg-sky-900 dark:text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-sky-700 dark:text-gray-200'
+        "
         @click="activeTab = 'hiragana'"
       >
         Hiragana
       </button>
       <button
         class="px-20 py-2 text-center font-medium transition"
-        :class="activeTab === 'katakana' ? 'bg-sky-900 text-white' : 'bg-sky-700 text-gray-200'"
+        :class="
+          activeTab === 'katakana'
+            ? 'bg-primary-600 text-white dark:bg-sky-900 dark:text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-sky-700 dark:text-gray-200'
+        "
         @click="activeTab = 'katakana'"
       >
         Katakana
       </button>
     </div>
 
-    <!-- Hiển thị Hiragana -->
-<div v-if="activeTab === 'hiragana'">
-<div
-  v-for="(row, rowIndex) in hiraganaGroups"
-  :key="'hira-' + rowIndex"
-  class="flex flex-wrap gap-4 mb-6 justify-between"
->
-  <div
-    v-for="(item, index) in row"
-    :key="index"
-    class="border rounded-lg h-28 flex flex-col items-center justify-center p-6 
-           hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md  sm:w-20 lg:w-35"
-    @click="selectedCharacter = { ...item, src: `/hiragana/${item.romaji}.png` }"
-  >
-    <span class="text-2xl sm:text-3xl md:text-=4xl lg:text-5xl font-japanese text-sky-200">{{ item.char }}</span>
-    <span class="text-base sm:text-lg text-sky-200">{{ item.romaji }}</span>
-  </div>
-</div>
-
-
-</div>
-
-<!-- Katakana -->
-<div v-else>
-  <div
-    v-for="(row, rowIndex) in katakanaGroups"
-    :key="'kata-' + rowIndex"
-  class="flex flex-wrap gap-4 mb-6 justify-between"
-  >
-    <div
-      v-for="(item, index) in row"
-      :key="index"
-      class="border rounded-lg h-28 flex flex-col items-center justify-center p-6 
-           hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md sm:w-20 lg:w-35"
-      @click="selectedCharacter = { ...item, src: `/katakana/${item.romaji}.png` }"
-    >
-      <span class="text-2xl sm:text-3xl md:text-=4xl lg:text-5xl font-japanese text-sky-200">{{ item.char }}</span>
-      <span class="text-base sm:text-lg text-sky-200">{{ item.romaji }}</span>
+    <div v-if="activeTab === 'hiragana'">
+      <div
+        v-for="(row, rowIndex) in hiraganaGroups"
+        :key="'hira-' + rowIndex"
+        class="flex flex-wrap gap-4 mb-6 justify-between"
+      >
+        <div
+          v-for="(item, index) in row"
+          :key="index"
+          class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-28 flex flex-col items-center justify-center p-6 hover:bg-gray-100 dark:hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md sm:w-20 lg:w-35"
+          @click="
+            selectedCharacter = {
+              ...item,
+              src: `/hiragana/${item.romaji}.png`,
+            }
+          "
+        >
+          <span
+            class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-japanese text-gray-800 dark:text-sky-200"
+            >{{ item.char }}</span
+          >
+          <span class="text-base sm:text-lg text-gray-600 dark:text-sky-200">{{
+            item.romaji
+          }}</span>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
+    <div v-else>
+      <div
+        v-for="(row, rowIndex) in katakanaGroups"
+        :key="'kata-' + rowIndex"
+        class="flex flex-wrap gap-4 mb-6 justify-between"
+      >
+        <div
+          v-for="(item, index) in row"
+          :key="index"
+          class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-28 flex flex-col items-center justify-center p-6 hover:bg-gray-100 dark:hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md sm:w-20 lg:w-35"
+          @click="
+            selectedCharacter = {
+              ...item,
+              src: `/katakana/${item.romaji}.png`,
+            }
+          "
+        >
+          <span
+            class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-japanese text-gray-800 dark:text-sky-200"
+            >{{ item.char }}</span
+          >
+          <span class="text-base sm:text-lg text-gray-600 dark:text-sky-200">{{
+            item.romaji
+          }}</span>
+        </div>
+      </div>
+    </div>
 
-    <!-- Popup -->
     <div
       v-if="selectedCharacter"
-      class="fixed inset-0  bg-black/70 flex items-center justify-center p-6 z-50"
-         @click="selectedCharacter = null"
+      class="fixed inset-0 bg-black/70 flex items-center justify-center p-6 z-50"
+      @click="selectedCharacter = null"
     >
-      <div class="relative w-full max-w-lg bg-transparent rounded-lg p-6 text-white text-center shadow-xl">
-        <!-- <button
-          @click="selectedCharacter = null"
-          class="absolute top-3 right-3 text-gray-400 hover:text-white transition duration-200 ease-in-out focus:outline-none"
-        >
-          ✕
-        </button> -->
-
+      <div
+        class="relative w-full max-w-lg bg-transparent rounded-lg p-6 text-white text-center shadow-xl"
+      >
         <div class="flex flex-col items-center justify-center pt-8 pb-4">
-          <!-- <span class="text-7xl font-japanese mb-4 animate-fadeIn">{{ selectedCharacter.char }}</span> -->
           <img
             v-if="selectedCharacter.src"
             :src="selectedCharacter.src"
-            b
             alt="Ảnh ký tự"
             class="w-90 h-90 object-contain mx-auto border rounded bg-white p-2 shadow"
           />
@@ -104,52 +120,52 @@ onMounted(async () => {
   const res = await fetch("/kana_list.csv");
   const text = await res.text();
   const parsed = Papa.parse(text, { header: true });
-  const rows = parsed.data.filter(r => r.romaji && r.hira && r.kata);
+  const rows = parsed.data.filter((r) => r.romaji && r.hira && r.kata);
 
   // Nhóm kana theo hàng
   const groups = [
-    ["a","i","u","e","o"],
-    ["ka","ki","ku","ke","ko"],
-    ["sa","shi","su","se","so"],
-    ["ta","chi","tsu","te","to"],
-    ["na","ni","nu","ne","no"],
-    ["ha","hi","fu","he","ho"],
-    ["ma","mi","mu","me","mo"],
-    ["ya","yu","yo"],
-    ["ra","ri","ru","re","ro"],
-    ["wa","wo"],
+    ["a", "i", "u", "e", "o"],
+    ["ka", "ki", "ku", "ke", "ko"],
+    ["sa", "shi", "su", "se", "so"],
+    ["ta", "chi", "tsu", "te", "to"],
+    ["na", "ni", "nu", "ne", "no"],
+    ["ha", "hi", "fu", "he", "ho"],
+    ["ma", "mi", "mu", "me", "mo"],
+    ["ya", "yu", "yo"],
+    ["ra", "ri", "ru", "re", "ro"],
+    ["wa", "wo"],
     ["n"],
 
-    ["ga","gi","gu","ge","go"],
-    ["za","ji","zu","ze","zo"],
-    ["da","de","do"],
-    ["ba","bi","bu","be","bo"],
-    ["pa","pi","pu","pe","po"],
+    ["ga", "gi", "gu", "ge", "go"],
+    ["za", "ji", "zu", "ze", "zo"],
+    ["da", "de", "do"],
+    ["ba", "bi", "bu", "be", "bo"],
+    ["pa", "pi", "pu", "pe", "po"],
 
-    ["kya","kyu","kyo"],
-    ["gya","gyu","gyo"],
-    ["sha","shu","sho"],
-    ["ja","ju","jo"],
-    ["cha","chu","cho"],
-    ["nya","nyu","nyo"],
-    ["hya","hyu","hyo"],
-    ["bya","byu","byo"],
-    ["pya","pyu","pyo"],
-    ["mya","myu","myo"],
-    ["rya","ryu","ryo"]
+    ["kya", "kyu", "kyo"],
+    ["gya", "gyu", "gyo"],
+    ["sha", "shu", "sho"],
+    ["ja", "ju", "jo"],
+    ["cha", "chu", "cho"],
+    ["nya", "nyu", "nyo"],
+    ["hya", "hyu", "hyo"],
+    ["bya", "byu", "byo"],
+    ["pya", "pyu", "pyo"],
+    ["mya", "myu", "myo"],
+    ["rya", "ryu", "ryo"],
   ];
 
   // Gom thành nhóm
-  hiraganaGroups.value = groups.map(g =>
-    g.map(r => {
-      const row = rows.find(x => x.romaji === r);
+  hiraganaGroups.value = groups.map((g) =>
+    g.map((r) => {
+      const row = rows.find((x) => x.romaji === r);
       return { romaji: r, char: row ? row.hira : "" };
     })
   );
 
-  katakanaGroups.value = groups.map(g =>
-    g.map(r => {
-      const row = rows.find(x => x.romaji === r);
+  katakanaGroups.value = groups.map((g) =>
+    g.map((r) => {
+      const row = rows.find((x) => x.romaji === r);
       return { romaji: r, char: row ? row.kata : "" };
     })
   );

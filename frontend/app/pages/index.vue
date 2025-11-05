@@ -1,6 +1,8 @@
 <template>
-  <div class="p-6 space-y-6">
-    <div class="bg-gray-900 rounded-xl p-4 space-y-4">
+  <div class="p-6 space-y-6 bg-gray-50 dark:bg-neutral-900 transition-colors">
+    <div
+      class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-4 space-y-4"
+    >
       <SearchBar v-model="searchWord" @search="onSearch" />
 
       <div class="flex items-center space-x-2">
@@ -9,8 +11,8 @@
           :class="[
             'px-4 py-2 rounded-lg font-medium transition-all border',
             viewMode === 'word'
-              ? 'bg-gray-900 text-green-500 border-green-500 font-semibold'
-              : 'bg-gray-900 text-gray-400 border-transparent',
+              ? 'text-primary-600 border-primary-500 font-semibold dark:text-green-500 dark:border-green-500' // Active state
+              : 'text-gray-500 border-transparent hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200', // Inactive state
           ]"
         >
           <div class="flex items-center space-x-2 cursor-pointer">
@@ -18,13 +20,14 @@
             <span>Từ vựng</span>
           </div>
         </button>
+
         <button
           @click="setView('kanji')"
           :class="[
             'px-4 py-2 rounded-lg font-medium transition-all border',
             viewMode === 'kanji'
-              ? 'bg-gray-900 text-green-500 border-green-500 font-semibold'
-              : 'bg-gray-900 text-gray-400 border-transparent',
+              ? 'text-primary-600 border-primary-500 font-semibold dark:text-green-500 dark:border-green-500' // Active state
+              : 'text-gray-500 border-transparent hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200', // Inactive state
           ]"
         >
           <div class="flex items-center space-x-2 cursor-pointer">
@@ -47,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from "vue"; 
+import { ref, onMounted, watch, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import conjugationsData from "~/data/conjugations_normalized.json";
 import { toKana } from "wanakana";
@@ -75,7 +78,7 @@ const config = useRuntimeConfig();
 // --- Computed properties to drive the UI ---
 const viewMode = computed(() => {
   if (route.query.view === "kanji") return "kanji";
-  return "word"; 
+  return "word";
 });
 
 const currentResult = computed(() => {
@@ -148,7 +151,7 @@ const fetchAll = async (word: string) => {
     try {
       const conjugation = checkConjugation(word);
       if (conjugation) {
-        conjugationResult.value = conjugation; 
+        conjugationResult.value = conjugation;
       }
       const dictionaryForm = getDictionaryForm(word);
       const apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(
@@ -237,7 +240,7 @@ watch(
     if (queryValue) {
       searchWord.value = queryValue;
       searchedTerm.value = queryValue;
-      fetchAll(queryValue); 
+      fetchAll(queryValue);
     } else {
       hasSearched.value = false;
       searchWord.value = "";

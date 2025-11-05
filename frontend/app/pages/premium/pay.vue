@@ -52,7 +52,7 @@ import { useJwt } from '~/composables/useJwt';
 
 const config = useRuntimeConfig()
 const BASE_URL = config.public.apiBaseUrl || 'https://localhost:7084';
-const { jwt, userId } = useJwt();
+const { jwt, userId, role } = useJwt();
 
 const isLoading = ref(true);
 const isSuccess = ref(false);
@@ -139,6 +139,7 @@ async function checkPaymentStatus() {
       resultText.value = '';
       errorText.value = '';
       isSuccess.value = true;
+      role.value = 'PREMIUM_USER';
       stopCheckingPaymentStatus();
     } else {
       statusText.value = 'Chưa thanh toán hoặc đang xử lý...';
@@ -198,4 +199,3 @@ onUnmounted(() => {
   line-height: 1;
 }
 </style>
-

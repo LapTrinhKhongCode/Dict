@@ -1,10 +1,12 @@
 <template>
-  <div>
+  <div
+    class="min-h-screen bg-gray-50 text-gray-900 dark:bg-neutral-900 dark:text-white p-4 sm:p-8 transition-colors"
+  >
     <div v-if="cardSafe" class="w-full max-w-xl mx-auto">
       <div class="mb-4">
         <button
           @click="emit('go-back')"
-          class="flex items-center text-sm text-sky-400 hover:text-sky-300 transition-colors"
+          class="flex items-center text-sm text-primary-600 hover:text-primary-500 dark:text-sky-400 dark:hover:text-sky-300 transition-colors"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -24,19 +26,23 @@
         </button>
       </div>
 
-      <div class="bg-gray-800 rounded-lg shadow-xl p-6 font-sans text-white">
+      <div
+        class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl p-6 font-sans text-gray-900 dark:text-white"
+      >
         <div class="mb-6">
           <div class="card-scene cursor-pointer" @click="flip = !flip">
             <div :class="['card-inner', { 'is-flipped': flip }]">
               <div class="card-face card-front">
                 <div class="text-6xl">{{ cardSafe.charBig }}</div>
-                <div class="text-lg text-gray-400 mt-2">
+                <div class="text-lg text-gray-500 dark:text-gray-400 mt-2">
                   {{ cardSafe.pinyin }}
                 </div>
               </div>
               <div class="card-face card-back">
                 <div class="font-semibold text-3xl">{{ cardSafe.meaning }}</div>
-                <div class="mt-4 text-sm text-gray-400">Nhấn để lật lại</div>
+                <div class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                  Nhấn để lật lại
+                </div>
               </div>
             </div>
           </div>
@@ -45,16 +51,16 @@
         <div class="flex justify-center">
           <button
             @click="openDetailModal"
-            class="text-sm font-medium text-sky-400 hover:text-sky-300 transition-all focus:outline-none px-4 py-2 rounded-lg hover:bg-gray-700"
+            class="text-sm font-medium text-primary-600 hover:text-primary-500 dark:text-sky-400 dark:hover:text-sky-300 transition-all focus:outline-none px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             XEM CHI TIẾT
           </button>
         </div>
-        <div class="border-t border-gray-700 my-4"></div>
+        <div class="border-t border-gray-200 dark:border-gray-700 my-4"></div>
 
         <div v-if="flip" class="animate-fade-in">
           <div
-            class="flex justify-between text-sm text-gray-400 mb-3 text-center"
+            class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-3 text-center"
           >
             <div class="flex-1" v-for="btn in BUTTONS" :key="btn.key">
               {{ btn.labelTime }}
@@ -89,11 +95,14 @@
         </div>
 
         <div
-          class="flex items-center justify-between text-sm text-gray-400 h-8"
+          class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 h-8"
         >
           <div v-if="!flip">
             Còn lại:
-            <span class="text-sky-400 font-semibold">{{ remaining }} thẻ</span>
+            <span
+              class="text-primary-600 dark:text-sky-400 font-semibold"
+              >{{ remaining }} thẻ</span
+            >
           </div>
           <div v-else></div>
         </div>
@@ -160,7 +169,7 @@ const BUTTONS = [
 </script>
 
 <style scoped>
-/* (CSS giữ nguyên, không thay đổi) */
+/* (Các style cấu trúc & animation giữ nguyên) */
 .card-scene {
   perspective: 1000px;
   height: 12rem;
@@ -185,11 +194,26 @@ const BUTTONS = [
   align-items: center;
   justify-content: center;
   border-radius: 0.5rem;
-  background-color: #374151; /* bg-gray-700 */
+  /* THAY ĐỔI:
+    - Thêm style cho light mode (mặc định)
+    - Bọc style dark mode (cũ) trong .dark
+  */
+  /* Light Mode */
+  background-color: #f9fafb; /* bg-gray-50 */
+  border: 1px solid #e5e7eb; /* border-gray-200 */
+  color: #111827; /* text-gray-900 */
 }
 .card-back {
   transform: rotateY(180deg);
 }
+
+/* Dark Mode */
+.dark .card-face {
+  background-color: #374151; /* bg-gray-700 */
+  border: none;
+  color: white;
+}
+
 .answer-btn {
   flex: 1;
   padding-top: 0.5rem;
