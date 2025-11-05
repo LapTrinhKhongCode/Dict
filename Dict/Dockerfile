@@ -5,6 +5,7 @@ WORKDIR /src
 # Sao chép file dự án & restore
 COPY Dict/Dict.csproj ./Dict/
 COPY Import/Import.csproj ./Import/
+COPY Dict.Tests/Dict.Tests.csproj ./Dict.Tests/
 COPY Dict/Dict.sln ./Dict/
 RUN dotnet restore Dict/Dict.sln
 
