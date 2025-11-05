@@ -266,8 +266,81 @@ namespace Dict.Controllers
             }
         }
 
-        // 15. THÊM DTO MỚI (AdminUpdateUserRolesDto)
-        // (Bạn cần tạo file DTO này, hoặc tôi giả định nó ở đây)
+        /// <summary>
+        /// Thống kê 20 từ được tra cứu thành công nhiều nhất.
+        /// </summary>
+        [HttpGet("statistics/top-searched")]
+        public async Task<IActionResult> GetTopSearchedWords()
+        {
+            try
+            {
+                _response.Result = await _adminService.GetTopSearchedWordsAsync();
+                _response.Message = "Top searched words retrieved successfully.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting top searched words (Admin: {AdminId})", GetAdminId());
+                _response.IsSuccess = false; _response.Message = ex.Message; return StatusCode(500, _response);
+            }
+        }
+
+        /// <summary>
+        /// Thống kê 20 từ khóa người dùng tìm nhưng không thấy (Lỗ hổng nội dung).
+        /// </summary>
+        [HttpGet("statistics/search-misses")]
+        public async Task<IActionResult> GetTopSearchMisses()
+        {
+            try
+            {
+                _response.Result = await _adminService.GetTopSearchMissesAsync();
+                _response.Message = "Top search misses retrieved successfully.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting top search misses (Admin: {AdminId})", GetAdminId());
+                _response.IsSuccess = false; _response.Message = ex.Message; return StatusCode(500, _response);
+            }
+        }
+
+        /// <summary>
+        /// Thống kê hiệu suất API (Thời gian phản hồi và Tỷ lệ lỗi).
+        /// </summary>
+        [HttpGet("statistics/api-performance")]
+        public async Task<IActionResult> GetApiPerformanceStats()
+        {
+            try
+            {
+                _response.Result = await _adminService.GetApiPerformanceStatsAsync();
+                _response.Message = "API performance stats retrieved successfully.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting API performance stats (Admin: {AdminId})", GetAdminId());
+                _response.IsSuccess = false; _response.Message = ex.Message; return StatusCode(500, _response);
+            }
+        }
+
+        /// <summary>
+        /// Lấy danh sách các Job hệ thống bị lỗi (OCR/Import).
+        /// </summary>
+        [HttpGet("statistics/failed-jobs")]
+        public async Task<IActionResult> GetFailedSystemJobs()
+        {
+            try
+            {
+                _response.Result = await _adminService.GetFailedSystemJobsAsync();
+                _response.Message = "Failed system jobs retrieved successfully.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting failed system jobs (Admin: {AdminId})", GetAdminId());
+                _response.IsSuccess = false; _response.Message = ex.Message; return StatusCode(500, _response);
+            }
+        }
     }
 
     // Bạn cần một DTO mới cho việc cập nhật nhiều Role

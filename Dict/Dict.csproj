@@ -35,4 +35,10 @@
 	  <PackageReference Include="VaultSharp" Version="1.17.5.1" />
   </ItemGroup>
 
+    <ItemGroup>
+      <None Update=".env">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>
