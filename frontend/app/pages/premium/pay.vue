@@ -1,20 +1,37 @@
 <template>
-  <div class="min-h-screen bg-gray-900 text-white p-4 sm:p-8 flex items-center justify-center">
-    <div class="max-w-md w-full bg-gray-800 rounded-lg p-6 shadow-xl">
-      
+  <div
+    class="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white p-4 sm:p-8 flex items-center justify-center transition-colors"
+  >
+    <div
+      class="max-w-md w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-transparent rounded-lg p-6 shadow-xl"
+    >
       <div v-if="!isSuccess" class="mb-4">
-         <button @click="goBackToConfirm" class="flex items-center text-sm text-sky-400 hover:text-sky-300 transition-colors">
+        <button
+          @click="goBackToConfirm"
+          class="flex items-center text-sm text-primary-600 hover:text-primary-500 dark:text-sky-400 dark:hover:text-sky-300 transition-colors"
+        >
           &larr; Quay lại
         </button>
       </div>
 
-      <h1 class="text-2xl font-bold text-sky-400 mb-4 text-center">Thanh toán ZaloPay</h1>
+      <h1
+        class="text-2xl font-bold text-primary-600 dark:text-sky-400 mb-4 text-center"
+      >
+        Thanh toán ZaloPay
+      </h1>
 
       <div v-if="isSuccess" class="text-center">
         <div class="success-tick mb-4">✓</div>
-        <h2 class="text-2xl font-bold text-green-400 mb-2">Thanh toán thành công!</h2>
-        <p class="text-gray-300 mb-6">Tài khoản của bạn đã được nâng cấp trọn đời.</p>
-        <button @click="goHome" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 rounded-lg transition-colors">
+        <h2 class="text-2xl font-bold text-green-500 dark:text-green-400 mb-2">
+          Thanh toán thành công!
+        </h2>
+        <p class="text-gray-700 dark:text-gray-300 mb-6">
+          Tài khoản của bạn đã được nâng cấp trọn đời.
+        </p>
+        <button
+          @click="goHome"
+          class="w-full bg-primary-600 hover:bg-primary-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white font-bold py-3 rounded-lg transition-colors"
+        >
           Quay về trang chủ
         </button>
       </div>
@@ -22,31 +39,62 @@
       <div v-else>
         <div id="qrcode-container" class="flex justify-center my-4">
           <div class="qr-code-box">
-             <div v-if="isLoading" class="flex items-center justify-center h-full text-gray-400">
-               <svg class="animate-spin h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-             </div>
-             <!-- ✅ SỬA: Thay thế component bằng thẻ <img> -->
-             <img 
-                v-if="qrCodeDataUrl" 
-                :src="qrCodeDataUrl" 
-                alt="Mã QR ZaloPay"
-                class="qr-image"
-              />
+            <div
+              v-if="isLoading"
+              class="flex items-center justify-center h-full text-gray-400 dark:text-gray-500"
+            >
+              <svg
+                class="animate-spin h-8 w-8"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </div>
+            <img
+              v-if="qrCodeDataUrl"
+              :src="qrCodeDataUrl"
+              alt="Mã QR ZaloPay"
+              class="qr-image"
+            />
           </div>
         </div>
-        
-        <div id="result" class="text-center text-gray-300 mb-2 h-5">{{ resultText }}</div>
-        <div id="status" class="text-center text-yellow-400 font-semibold h-5 mb-2">{{ statusText }}</div>
-        <div id="error" class="text-center text-red-400 h-5">{{ errorText }}</div>
-      </div>
 
+        <div
+          id="result"
+          class="text-center text-gray-700 dark:text-gray-300 mb-2 h-5"
+        >
+          {{ resultText }}
+        </div>
+        <div
+          id="status"
+          class="text-center text-yellow-500 dark:text-yellow-400 font-semibold h-5 mb-2"
+        >
+          {{ statusText }}
+        </div>
+        <div id="error" class="text-center text-red-500 dark:text-red-400 h-5">
+          {{ errorText }}
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-// ✅ SỬA: Import thư viện 'qrcode' gốc
 import QRCode from 'qrcode';
 import { useJwt } from '~/composables/useJwt';
 
@@ -59,7 +107,6 @@ const isSuccess = ref(false);
 const resultText = ref('');
 const errorText = ref('');
 const statusText = ref('');
-// ✅ SỬA: Đổi tên biến để chứa Data URL của ảnh QR
 const qrCodeDataUrl = ref<string | null>(null);
 
 let checkStatusInterval: ReturnType<typeof setInterval> | null = null;
@@ -86,14 +133,13 @@ async function createLifetimeOrder() {
 
     resultText.value = 'Quét mã QR bằng ZaloPay Sandbox App.';
     
-    // ✅ SỬA: Tạo mã QR thành Data URL
     qrCodeDataUrl.value = await QRCode.toDataURL(newOrderUrl, {
-        width: 256,
-        margin: 1, // Để vừa khít với box 276px (256 + 10*2 padding)
-        color: {
-            dark: "#000000",
-            light: "#FFFFFF"
-        }
+      width: 256,
+      margin: 1, // Để vừa khít với box 276px (256 + 10*2 padding)
+      color: {
+          dark: "#000000",
+          light: "#FFFFFF"
+      }
     });
     
     startCheckingPaymentStatus();
@@ -139,7 +185,7 @@ async function checkPaymentStatus() {
       resultText.value = '';
       errorText.value = '';
       isSuccess.value = true;
-      role.value = 'PREMIUM_USER';
+      role.value = 'PREMIUM_USER'; // <-- LOGIC CỐT LÕI CỦA BẠN
       stopCheckingPaymentStatus();
     } else {
       statusText.value = 'Chưa thanh toán hoặc đang xử lý...';
@@ -172,29 +218,40 @@ onMounted(() => {
 onUnmounted(() => {
   stopCheckingPaymentStatus();
 });
-
 </script>
 
 <style scoped>
+/*
+  ✅ SỬA LỖI:
+  - Tái cấu trúc .qr-code-box để sửa lỗi cú pháp CSS
+*/
 .qr-code-box {
   width: 276px;
   height: 276px;
-  border: 1px solid #4b5563;
   padding: 10px;
-  background-color: white;
   border-radius: 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  
+  /* Light Mode (Mặc định) */
+  border: 1px solid #d1d5db; /* border-gray-300 */
+  background-color: white; /* Luôn là nền trắng */
 }
-/* ✅ SỬA: Style cho thẻ <img> */
+
+/* Dark Mode */
+.dark .qr-code-box {
+  border: 1px solid #4b5563; /* dark:border-gray-600 */
+  /* background-color: white; (Nền trắng được kế thừa) */
+}
+
 .qr-image {
-    width: 256px;
-    height: 256px;
+  width: 256px;
+  height: 256px;
 }
 .success-tick {
   font-size: 100px;
-  color: #10B981;
+  color: #10B981; /* Giữ màu xanh này */
   text-align: center;
   line-height: 1;
 }

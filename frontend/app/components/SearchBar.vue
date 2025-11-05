@@ -1,9 +1,11 @@
 <template>
   <div ref="searchContainer" class="relative w-full">
-    <div class="flex items-center border rounded-2xl px-3 py-2 w-full">
+    <div
+      class="flex items-center border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-2xl px-3 py-2 w-full"
+    >
       <button
         @click="onSearch"
-        class="text-gray-500 hover:text-gray-700 transition mr-3"
+        class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition mr-3"
       >
         <UIcon name="i-lucide-search" class="size-5" />
       </button>
@@ -11,7 +13,7 @@
         v-model="internalSearchWord"
         type="text"
         placeholder="日本語, にほんご, nihongo..."
-        class="flex-grow bg-transparent outline-none text-base"
+        class="flex-grow bg-transparent outline-none text-base text-gray-900 dark:text-white"
         @keyup.enter="onSearch"
         @focus="onInputFocus"
         @keydown="handleKeydown"
@@ -20,16 +22,16 @@
       <button
         ref="penButtonRef"
         @click="onPenClick"
-        class="text-gray-500 hover:text-gray-700 transition ml-3"
-        :class="{ 'text-blue-500': showDrawingPad }"
+        class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition ml-3"
+        :class="{ 'text-blue-500 dark:text-blue-400': showDrawingPad }"
       >
         <UIcon name="i-lucide-pen" class="size-5" />
       </button>
 
       <button
         @click="onImageClick"
-        class="text-gray-500 hover:text-gray-700 transition ml-2"
-        :class="{ 'text-blue-500': showOcrPad }"
+        class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition ml-2"
+        :class="{ 'text-blue-500 dark:text-blue-400': showOcrPad }"
       >
         <UIcon name="i-lucide-image" class="size-5" />
       </button>
@@ -37,21 +39,25 @@
 
     <div
       v-if="showSuggestions && suggestions.length > 0"
-      class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto suggestions-list"
+      class="absolute z-1000 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-y-auto suggestions-list"
     >
       <ul ref="suggestionsListEl">
         <li
           v-for="(suggestion, index) in suggestions"
           :key="suggestion.word + suggestion.reading"
-          class="px-4 py-3 border-b border-gray-700 last:border-b-0 cursor-pointer hover:bg-gray-700"
-          :class="{ 'bg-gray-700': index === selectedIndex }"
+          class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+          :class="{ 'bg-gray-100 dark:bg-gray-700': index === selectedIndex }"
           @click="onSelectSuggestion(suggestion)"
         >
           <div class="flex items-baseline gap-x-2">
-            <span class="font-medium text-white">{{ suggestion.word }}</span>
-            <span class="text-sm text-blue-400">{{ suggestion.reading }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">{{
+              suggestion.word
+            }}</span>
+            <span class="text-sm text-blue-500 dark:text-blue-400">{{
+              suggestion.reading
+            }}</span>
           </div>
-          <p class="text-sm text-gray-300 mt-1">
+          <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
             {{ suggestion.meaning }}
           </p>
         </li>
@@ -60,15 +66,12 @@
 
     <div
       v-if="showDrawingPad"
-      class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 z-1000"
+      class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-1000"
     >
       <div class="min-h-[48px] mb-3 flex items-center justify-center">
-        <div
-          v-if="isPredicting"
-          class="flex items-center justify-center h-full"
-        >
+        <div v-if="isPredicting" class="flex items-center justify-center h-full">
           <div
-            class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"
+            class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 dark:border-blue-400"
           ></div>
         </div>
 
@@ -79,14 +82,14 @@
           <button
             v-for="label in predictionLabels"
             :key="label"
-            class="px-3 py-1 bg-gray-700 text-white rounded-md text-center font-medium hover:bg-gray-600 transition"
+            class="px-3 py-1 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 rounded-md text-center font-medium transition"
             @click="onSelectPrediction(label)"
           >
             {{ label }}
           </button>
         </div>
 
-        <p v-else class="text-sm text-gray-500 text-center py-2">
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
           Vẽ chữ Kanji hoặc Kana vào khung bên dưới và chọn từ gợi ý để thêm vào
           ô tìm kiếm.
         </p>
@@ -100,41 +103,45 @@
         style="width: 256px; height: 256px; margin: 0 auto"
         :style="{ opacity: isPredicting ? 0.7 : 1 }"
       ></canvas>
-
       <div class="flex justify-center items-center gap-x-4 mt-4">
         <button
           @click.prevent="undo"
           :disabled="historyIndex <= 0 || isPredicting"
-          class="text-gray-300 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed"
+          class="text-gray-500 hover:text-gray-800 disabled:text-gray-300 dark:text-gray-400 dark:hover:text-white dark:disabled:text-gray-600 disabled:cursor-not-allowed"
         >
           <UIcon name="i-lucide-undo-2" class="size-5" />
         </button>
         <button
           @click.prevent="redo"
           :disabled="historyIndex >= history.length - 1 || isPredicting"
-          class="text-gray-300 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed"
+          class="text-gray-500 hover:text-gray-800 disabled:text-gray-300 dark:text-gray-400 dark:hover:text-white dark:disabled:text-gray-600 disabled:cursor-not-allowed"
         >
           <UIcon name="i-lucide-redo-2" class="size-5" />
         </button>
 
-        <div class="border-l border-gray-600 h-6"></div>
+        <div class="border-l border-gray-300 dark:border-gray-600 h-6"></div>
 
         <button
           @click.prevent="clearCanvas"
           :disabled="isPredicting"
-          class="text-gray-300 hover:text-white disabled:text-gray-600"
+          class="text-gray-500 hover:text-gray-800 disabled:text-gray-300 dark:text-gray-400 dark:hover:text-white dark:disabled:text-gray-600"
         >
           Xóa
         </button>
       </div>
     </div>
+
     <div
       v-if="showOcrPad"
-      class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 z-1000"
+      class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-1000"
     >
       <div class="flex" style="min-height: 250px">
-        <div class="w-1/2 pr-3 border-r border-gray-600 flex flex-col">
-          <h4 class="text-xs font-semibold text-gray-400 uppercase mb-2">
+        <div
+          class="w-1/2 pr-3 border-r border-gray-300 dark:border-gray-600 flex flex-col"
+        >
+          <h4
+            class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2"
+          >
             Văn bản được nhận dạng
           </h4>
 
@@ -144,7 +151,7 @@
           >
             <p
               v-if="ocrResults.length === 0 && !isOcrLoading && !ocrStatus"
-              class="text-sm text-gray-500"
+              class="text-sm text-gray-500 dark:text-gray-400"
             >
               Chưa có kết quả nào. Vui lòng tải lên hình ảnh chứa văn bản tiếng
               Nhật.
@@ -154,21 +161,25 @@
               <p
                 v-for="(result, index) in ocrResults"
                 :key="index"
-                class="w-full text-left p-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition"
+                class="w-full text-left p-2 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 rounded-md transition"
               >
                 {{ result.text }}
               </p>
             </div>
           </div>
 
-          <div class="pt-2 mt-auto border-t border-gray-700 min-h-[2.5rem]">
+          <div
+            class="pt-2 mt-auto border-t border-gray-300 dark:border-gray-700 min-h-[2.5rem]"
+          >
             <div v-if="isOcrLoading" class="flex items-center gap-2">
               <div
-                class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"
+                class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 dark:border-blue-400"
               ></div>
-              <span class="text-sm text-gray-400">{{ ocrStatus }}</span>
+              <span class="text-sm text-gray-500 dark:text-gray-400">{{
+                ocrStatus
+              }}</span>
             </div>
-            <p v-else-if="ocrStatus" class="text-sm text-gray-400">
+            <p v-else-if="ocrStatus" class="text-sm text-gray-500 dark:text-gray-400">
               {{ ocrStatus }}
             </p>
           </div>
@@ -189,27 +200,32 @@
             @dragover.prevent="handleDragOver"
             @dragleave.prevent="handleDragLeave"
             @drop.prevent="handleDrop"
-            class="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 transition"
-            :class="{ 'border-blue-500 bg-gray-700': isDragging }"
+            class="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition"
+            :class="{
+              'border-blue-500 bg-blue-50 dark:bg-gray-700': isDragging,
+            }"
           >
             <UIcon
               name="i-lucide-upload-cloud"
-              class="size-10 text-gray-500 mb-3"
+              class="size-10 text-gray-400 dark:text-gray-500 mb-3"
             />
-            <p class="text-sm text-gray-400">
-              <span class="font-semibold text-blue-400"
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              <span
+                class="font-semibold text-blue-500 dark:text-blue-400"
                 >Click vào để upload</span
               >
               hoặc kéo thả ảnh vào đây
             </p>
-            <p class="text-xs text-gray-500">Định dạng (PNG, JPG, etc.)</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500">
+              Định dạng (PNG, JPG, etc.)
+            </p>
           </div>
 
           <div
             v-else
-            class="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-lg"
+            class="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg"
           >
-            <p class="text-sm text-gray-400">Processing...</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Processing...</p>
           </div>
         </div>
       </div>
@@ -218,39 +234,67 @@
 </template>
 
 <style scoped>
-/* NEW: Dark background for the canvas */
+/* ✅ SỬA LỖI Ở ĐÂY: CSS cho canvas và scrollbar */
+
+/* --- Canvas Styling --- */
 .handwriting-canvas {
-  border: 2px solid #4b5563; /* gray-600 */
+  /* Light Mode (Mặc định) */
+  border: 2px solid #d1d5db; /* gray-300 */
   border-radius: 8px;
   cursor: crosshair;
-  background-color: #1f2937; /* gray-800 */
+  background-color: #ffffff; /* NỀN TRẮNG (cho light mode) */
 }
+.dark .handwriting-canvas {
+  /* Dark Mode */
+  border: 2px solid #4b5563; /* gray-600 */
+  background-color: #1f2937; /* NỀN TỐI (cho dark mode) */
+}
+/* (Logic MÀU BÚT VẼ nằm trong <script setup>) */
 
+
+/* --- Scrollbar Styling (Chung cho cả 2 list) --- */
 .suggestions-list::-webkit-scrollbar,
-.ocr-results-panel::-webkit-scrollbar {
+.ocr-results-ref::-webkit-scrollbar { /* Sửa tên class cho đúng */
   width: 8px;
 }
+/* Light Mode */
 .suggestions-list::-webkit-scrollbar-track,
-.ocr-results-panel::-webkit-scrollbar-track {
-  background: #1f2937;
+.ocr-results-ref::-webkit-scrollbar-track {
+  background: #f9fafb; /* gray-50 */
   border-radius: 10px;
 }
 .suggestions-list::-webkit-scrollbar-thumb,
-.ocr-results-panel::-webkit-scrollbar-thumb {
-  background-color: #4b5563;
+.ocr-results-ref::-webkit-scrollbar-thumb {
+  background-color: #d1d5db; /* gray-300 */
   border-radius: 10px;
-  border: 2px solid #1f2937;
+  border: 2px solid #f9fafb; /* gray-50 */
   background-clip: padding-box;
 }
 .suggestions-list::-webkit-scrollbar-thumb:hover,
-.ocr-results-panel::-webkit-scrollbar-thumb:hover {
-  background-color: #6b7280;
+.ocr-results-ref::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af; /* gray-400 */
+}
+/* Dark Mode */
+.dark .suggestions-list::-webkit-scrollbar-track,
+.dark .ocr-results-ref::-webkit-scrollbar-track {
+  background: #1f2937; /* gray-800 */
+}
+.dark .suggestions-list::-webkit-scrollbar-thumb,
+.dark .ocr-results-ref::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* gray-600 */
+  border: 2px solid #1f2937; /* gray-800 */
+}
+.dark .suggestions-list::-webkit-scrollbar-thumb:hover,
+.dark .ocr-results-ref::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280; /* gray-500 */
 }
 </style>
 
 <script setup lang="ts">
+// ✅ SỬA LỖI Ở ĐÂY: Thêm useColorMode
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { toKana } from "wanakana";
+import { useColorMode } from "#imports"; // <-- THÊM DÒNG NÀY
 
 // --- Props & Emits ---
 const props = defineProps({
@@ -266,6 +310,7 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "search"]);
 
 const config = useRuntimeConfig();
+const colorMode = useColorMode(); // <-- THÊM DÒNG NÀY
 
 // --- Internal State ---
 const internalSearchWord = ref(props.modelValue);
@@ -297,7 +342,7 @@ const predictionAbortController = ref<AbortController | null>(null);
 const showOcrPad = ref(false);
 const ocrResultsRef = ref<HTMLDivElement | null>(null);
 const ocrFileInputRef = ref<HTMLInputElement | null>(null);
-const ocrResults = ref<string[]>([]); // For now, an array of strings
+const ocrResults = ref<any[]>([]); // Sửa thành any[] để nhận { text: "..." }
 const isDragging = ref(false);
 const isOcrLoading = ref(false);
 const ocrStatus = ref("");
@@ -322,20 +367,8 @@ watch(internalSearchWord, (newValue) => {
     isProgrammaticUpdate.value = false;
     return;
   }
-
-  // If user types, hide the drawing pad
-  // if (showDrawingPad.value) {
-  //   showDrawingPad.value = false;
-  // }
-
-  // if (showDrawingPad.value) {
-  //   showDrawingPad.value = false;
-  // }
-  // if (showOcrPad.value) {
-  //   // <-- ADD THIS
-  //   showOcrPad.value = false;
-  // }
-
+  
+  // (Logic debounce giữ nguyên)
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
@@ -451,8 +484,9 @@ const handleClickOutside = (event: MouseEvent) => {
     return; // Nếu có, không làm gì cả
   }
 
+  // ✅ SỬA LỖI: (props.searchResultRef as any)
   // Kiểm tra 2: Click có bên trong SearchResult (dùng prop) không?
-  if (props.searchResultRef && props.searchResultRef.contains(target)) {
+  if (props.searchResultRef && (props.searchResultRef as any).contains(target)) {
     return; // Nếu có, không làm gì cả
   }
 
@@ -517,19 +551,21 @@ const autoScrollOcrResults = () => {
 
 // --- Canvas Drawing Methods ---
 
+// ✅ SỬA LỖI Ở ĐÂY: Cập nhật hàm này
 const initializeCanvas = () => {
   if (!canvasRef.value) return;
-  ctx.value = canvasRef.value.getContext("2d");
+  // Thêm { willReadFrequently: true } để tối ưu getImageData
+  ctx.value = canvasRef.value.getContext("2d", { willReadFrequently: true }); 
   if (!ctx.value) return;
 
-  // Set pen styles for a dark background
-  ctx.value.strokeStyle = "white"; // Draw in white
+  // Đặt style bút vẽ dựa trên theme
+  ctx.value.strokeStyle = colorMode.value === "dark" ? "white" : "black"; // <-- SỬA Ở ĐÂY
   ctx.value.lineWidth = 12;
   ctx.value.lineCap = "round";
   ctx.value.lineJoin = "round";
 
-  clearCanvas(); // Set initial background
-
+  clearCanvas(); // Đặt nền ban đầu
+  
   // Add listeners
   canvasRef.value.addEventListener("mousedown", startDrawing);
   canvasRef.value.addEventListener("mousemove", draw);
@@ -606,10 +642,18 @@ const stopDrawing = () => {
   }
 };
 
+// ✅ SỬA LỖI Ở ĐÂY: Cập nhật hàm này
 const clearCanvas = () => {
   if (!ctx.value || !canvasRef.value) return;
-  ctx.value.fillStyle = "#1f2937"; // bg-gray-800
+  
+  // 1. Đặt MÀU NỀN (Fill) dựa trên theme
+  // (CSS trong <style> cũng đặt màu nền, nhưng hàm fillRect này
+  // đảm bảo hình ảnh export ra (getMatrix) có nền đúng)
+  ctx.value.fillStyle = colorMode.value === "dark" ? "#1f2937" : "#ffffff"; // gray-800 / white
   ctx.value.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height);
+
+  // 2. Đặt MÀU BÚT VẼ (Stroke) dựa trên theme
+  ctx.value.strokeStyle = colorMode.value === "dark" ? "white" : "black"; // <-- SỬA Ở ĐÂY
 
   history.value = [];
   historyIndex.value = -1;
@@ -671,15 +715,21 @@ const onSelectPrediction = (label: string) => {
   penButtonRef.value?.focus();
 };
 
+// ✅ SỬA LỖI Ở ĐÂY: Cập nhật hàm này
 const getMatrixFromCanvas = () => {
   const processingCanvas = document.createElement("canvas");
   processingCanvas.width = 64;
   processingCanvas.height = 64;
-  const pCtx = processingCanvas.getContext("2d");
+  const pCtx = processingCanvas.getContext("2d", { willReadFrequently: true }); // Thêm willReadFrequently
   if (!pCtx) return [];
 
-  pCtx.fillStyle = "#1f2937";
+  const isDark = colorMode.value === 'dark';
+
+  // 1. Vẽ nền (giống hệt clearCanvas)
+  pCtx.fillStyle = isDark ? "#1f2937" : "#ffffff"; // Match background
   pCtx.fillRect(0, 0, 64, 64);
+  
+  // 2. Vẽ hình ảnh đã thu nhỏ
   if (canvasRef.value) {
     pCtx.drawImage(canvasRef.value, 0, 0, 256, 256, 0, 0, 64, 64);
   }
@@ -690,12 +740,19 @@ const getMatrixFromCanvas = () => {
     .fill(0)
     .map(() => Array(64).fill(0));
 
+  // 3. Đặt ngưỡng (threshold)
+  const threshold = isDark ? 50 : 200; // Ngưỡng cho màu trắng (dark) / màu đen (light)
+
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
     const grayscale = (r + g + b) / 3;
-    const binaryValue = grayscale > 50 ? 1 : 0;
+    
+    // 4. Kiểm tra pixel "nét vẽ"
+    // Dark mode: nét vẽ là MÀU TRẮNG (grayscale > 50)
+    // Light mode: nét vẽ là MÀU ĐEN (grayscale < 200)
+    const binaryValue = isDark ? (grayscale > threshold ? 1 : 0) : (grayscale < threshold ? 1 : 0);
 
     if (binaryValue === 1) {
       const pixelIndex = i / 4;
@@ -707,6 +764,8 @@ const getMatrixFromCanvas = () => {
   return matrix;
 };
 
+// (Các hàm còn lại: runPrediction, OCR, Lifecycle... giữ nguyên)
+// ...
 const runPrediction = async () => {
   // --- NEW: Abort previous request ---
   if (predictionAbortController.value) {
@@ -720,17 +779,16 @@ const runPrediction = async () => {
   predictionLabels.value = [];
 
   const matrixData = getMatrixFromCanvas();
-
-  // ▼▼▼ BỎ PHẦN NÀY ▼▼▼
-  /*
   const token = localStorage.getItem("jwt_token");
+
+  // ✅ SỬA LỖI: Bỏ kiểm tra token (theo yêu cầu trước)
+  /*
   if (!token) {
     console.error("Prediction error: Not logged in");
     isPredicting.value = false;
     return;
   }
   */
-  // ▲▲▲ BỎ PHẦN NÀY ▲▲▲
 
   try {
     const response = await fetch(
@@ -738,8 +796,7 @@ const runPrediction = async () => {
       {
         method: "POST",
         headers: {
-          // ▼▼▼ BỎ DÒNG NÀY ▼▼▼
-          // Authorization: `Bearer ${token}`,
+          // Authorization: `Bearer ${token}`, // <-- Đã bỏ
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ matrix: matrixData }),

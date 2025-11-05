@@ -408,8 +408,12 @@ import { ref, reactive, computed } from 'vue';
 import type { DeckDetailDto, CardDto, DeckUpdateDto, CardCreateDto, CardUpdateDto } from '~/types';
 import ConfirmationModal from './ConfirmationModal.vue';
 import { useJwt } from '~/composables/useJwt';
+// ✅ 1. Import useToast
+import { useToast } from '~/composables/useToast';
 
 const { jwt } = useJwt();
+// ✅ 2. Khởi tạo showToast
+const { showToast } = useToast();
 
 interface EditableCardDto extends Omit<CardDto, 'id'> {
   id?: number;
@@ -489,7 +493,8 @@ async function saveDeckInfoOnly() {
     await handleResponse(response);
     return true;
   } catch (err: any) {
-    alert(`Lỗi cập nhật Deck: ${err.message}`);
+    // ✅ 3. THAY THẾ ALERT
+    showToast(`Lỗi cập nhật Deck: ${err.message}`, 'error');
     console.error("saveDeckInfoOnly Error:", err);
     return false;
   } finally {
@@ -514,10 +519,12 @@ async function handleConfirmDeleteDeck() {
       headers: { 'Authorization': `Bearer ${jwt.value}` }
     });
     await handleResponse(response);
-    alert('Đã xóa Deck thành công.');
+    // ✅ 3. THAY THẾ ALERT
+    showToast('Đã xóa Deck thành công.', 'success');
     emit('go-to-list');
   } catch (err: any) {
-    alert(`Lỗi xóa Deck: ${err.message}`);
+    // ✅ 3. THAY THẾ ALERT
+    showToast(`Lỗi xóa Deck: ${err.message}`, 'error');
     console.error("handleConfirmDeleteDeck Error:", err);
   } finally {
     isSavingDeck.value = false;
@@ -528,7 +535,11 @@ async function handleConfirmDeleteDeck() {
 function addCardToList() {
   const front = newCardInput.value.frontText?.trim();
   const back = newCardInput.value.backText?.trim();
-  if (!front || !back) { alert("Mặt trước và Mặt sau là bắt buộc."); return; }
+  // ✅ 3. THAY THẾ ALERT
+  if (!front || !back) { 
+    showToast("Mặt trước và Mặt sau là bắt buộc.", 'error'); 
+    return; 
+  }
   const tempCard: EditableCardDto = {
     tempId: `new-${Date.now()}-${Math.random()}`,
     charBig: front,
@@ -557,7 +568,12 @@ async function updateCard(card: EditableCardDto) {
       body: JSON.stringify(cardDto)
     });
     await handleResponse(response);
-  } catch (err: any) { alert(`Lỗi cập nhật thẻ ${cardId}: ${err.message}`); }
+    // ✅ 3. THÊM TOAST (Tùy chọn)
+    showToast(`Đã cập nhật thẻ "${card.charBig}"`, 'success');
+  } catch (err: any) { 
+    // ✅ 3. THAY THẾ ALERT
+    showToast(`Lỗi cập nhật thẻ ${cardId}: ${err.message}`, 'error'); 
+  }
   finally { card.isSaving = false; }
 }
 
@@ -601,8 +617,11 @@ async function handleConfirmDeleteCard() {
     if (indexToRemove !== null) {
       editableSet.cards.splice(indexToRemove, 1);
     }
+    // ✅ 3. THÊM TOAST
+    showToast(`Đã xóa thẻ "${card.charBig}"`, 'success');
   } catch (err: any) {
-    alert(`Lỗi xóa thẻ ${cardId}: ${err.message}`);
+    // ✅ 3. THAY THẾ ALERT
+    showToast(`Lỗi xóa thẻ ${cardId}: ${err.message}`, 'error');
     console.error("deleteCard Error:", err);
     if (card) card.isDeleting = false;
   }
@@ -632,7 +651,11 @@ const parsedCards = computed(() => {
 
 function importCardsToList() {
   const cardsToImport = parsedCards.value;
-  if (cardsToImport.length === 0) { alert("Không có thẻ hợp lệ nào để import."); return; }
+  // ✅ 3. THAY THẾ ALERT
+  if (cardsToImport.length === 0) { 
+    showToast("Không có thẻ hợp lệ nào để import.", 'error'); 
+    return; 
+  }
   cardsToImport.forEach(parsedCard => {
     const tempCard: EditableCardDto = {
       tempId: `new-${Date.now()}-${Math.random()}`,
@@ -645,7 +668,8 @@ function importCardsToList() {
     editableSet.cards.push(tempCard);
   });
   closeImportModal();
-  alert(`Đã thêm ${cardsToImport.length} thẻ vào danh sách chờ lưu.`);
+  // ✅ 3. THAY THẾ ALERT
+  showToast(`Đã thêm ${cardsToImport.length} thẻ vào danh sách chờ lưu.`, 'success');
 }
 
 function openImportModal() {
@@ -700,7 +724,8 @@ async function saveAllChanges() {
         cardAddSuccess = false;
       }
     } catch (err: any) {
-      alert(`Lỗi khi lưu các thẻ mới: ${err.message}`);
+      // ✅ 3. THAY THẾ ALERT
+      showToast(`Lỗi khi lưu các thẻ mới: ${err.message}`, 'error');
       cardAddSuccess = false;
     } finally {
       isAddingCard.value = false;
@@ -710,21 +735,19 @@ async function saveAllChanges() {
   isSavingDeck.value = false;
 
   if (deckSaveSuccess && cardAddSuccess) {
-    alert('Đã lưu tất cả thay đổi thành công!');
+    // ✅ 3. THAY THẾ ALERT
+    showToast('Đã lưu tất cả thay đổi thành công!', 'success');
     emit('deck-updated');
   } else if (deckSaveSuccess && !cardAddSuccess) {
-    //  alert('Đã lưu thông tin deck, nhưng có lỗi khi lưu thẻ mới. Vui lòng tải lại trang.');
+    // ✅ 3. THAY THẾ ALERT (và bỏ comment)
+    showToast('Đã lưu thông tin deck, nhưng có lỗi khi lưu thẻ mới.', 'error');
     emit('deck-updated');
   }
 }
 </script>
 
 <style scoped>
-/* THAY ĐỔI:
-  - Tách style mặc định (light mode) ra.
-  - Bọc các style cũ (dark mode) trong class .dark
-*/
-
+/* (Style giữ nguyên từ code của bạn) */
 /* --- LIGHT MODE (MẶC ĐỊNH) --- */
 .form-input {
   width: 100%;
