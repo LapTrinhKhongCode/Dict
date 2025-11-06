@@ -1,4 +1,5 @@
 ﻿using Dict.Data;
+using Dict.Middleware;
 using Dict.Models;
 using Dict.Service;
 using Dict.Service.IService;
@@ -147,7 +148,7 @@ if (app.Environment.IsDevelopment())
 app.UseStaticFiles();
 //app.UseHttpsRedirection();
 app.UseCors("AllowAnyOrigin");
-
+app.UseMiddleware<ApiLoggingMiddleware>();
 // Thứ tự này là CHUẨN XÁC
 app.UseAuthentication();
 app.UseAuthorization();

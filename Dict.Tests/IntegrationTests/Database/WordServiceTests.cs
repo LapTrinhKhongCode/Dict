@@ -1,26 +1,38 @@
 ﻿using Dict.Data;
 using Dict.Models;
 using Dict.Service; // Namespace của WordService
+using Dict.Service.IService; // THÊM (cho IWordService)
 using Dict.Tests.Setup; // Namespace của TestApplicationDbContext
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Xunit;
+using Microsoft.Extensions.Logging; // THÊM
+using Moq; // THÊM
+using System.Threading.Tasks; // THÊM
+using System.Linq; // THÊM
 
 namespace Dict.Tests.IntegrationTests.Database;
 
-// 1. Đổi tên class cho đúng. Bỏ IClassFixture, chỉ cần IDisposable
 public class WordServiceTests : IDisposable
 {
     private readonly TestApplicationDbContext _context;
-    private readonly WordService _service;
+    // Sửa: Dùng Interface
+    private readonly IWordService _service;
     private readonly IDbContextTransaction _transaction;
+
+    // 1. THÊM MOCK LOGGER
+    private readonly Mock<ILogger<WordService>> _mockLogger;
 
     public WordServiceTests()
     {
         Env.Load();
 
         var connectionString = Environment.GetEnvironmentVariable("TEST_CONNECTION_STRING");
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            connectionString = "Server=.;Database=Dict_TestDB;Trusted_Connection=True;TrustServerCertificate=True;";
+        }
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(connectionString)
@@ -28,81 +40,99 @@ public class WordServiceTests : IDisposable
 
         _context = new TestApplicationDbContext(options);
 
-        // 4. Khởi tạo Service THẬT
-        _service = new WordService(_context);
+        // 2. KHỞI TẠO MOCK LOGGER
+        _mockLogger = new Mock<ILogger<WordService>>();
 
-        // 5. Bắt đầu transaction
-        // (Vẫn cần, phòng trường hợp bạn thêm test GHI/SỬA/XÓA sau này)
+        // 3. KHỞI TẠO SERVICE (ĐÃ SỬA)
+        _service = new WordService(_context, _mockLogger.Object); // Thêm Logger
+
         _transaction = _context.Database.BeginTransaction();
-
-        // 6. XÓA BỎ GỌI SEEDDATA()
-        // SeedData(); 
     }
 
-    // 7. XÓA BỎ CÁC HÀM SEEDDATA() VÀ CREATETESTENTRY()
-    // private void SeedData() { ... }
-    // private Entry CreateTestEntry(...) { ... }
-
-    // 8. Hàm dọn dẹp (Rollback) (Giữ nguyên)
     public void Dispose()
     {
-        _transaction.Rollback(); // Hoàn tác mọi thay đổi (thêm, sửa, xóa)
+        _transaction.Rollback();
         _transaction.Dispose();
         _context.Dispose();
     }
 
-    // ----- CÁC TEST (Sửa lại Assert) -----
+    // ----- CÁC TEST (Đã cập nhật Assert) -----
 
     [Fact]
-    public async Task GetWordJson_WhenSearchingByLabel_FindsCorrectEntry()
+    public async Task GetWordJson_WhenSearchingByLabel_FindsCorrectEntry_And_LogsHit()
     {
         // ARRANGE 
-        // Giả sử "日本語" tồn tại trong DB test của bạn
-        var labelToSearch = "日本語";
+        var labelToSearch = "日本語"; // Giả sử "日本語" tồn tại trong DB test
+
+        // Tìm EntryId thật trong DB Test để kiểm tra
+        var entryInDb = await _context.Entries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Type == "word" && e.Label == labelToSearch);
+
+        Assert.NotNull(entryInDb); // Đảm bảo data test tồn tại
 
         // ACT
         var result = await _service.GetWordJson(labelToSearch);
 
-        // ASSERT
-        // (Kiểm tra xem nó có lấy đúng entry "word" không)
+        // ASSERT (Kiểm tra kết quả)
         Assert.NotNull(result);
+        Assert.Equal(entryInDb.RawJson, result); // So sánh JSON thật
 
-        // THAY ĐỔI ASSERT NÀY:
-        // Bạn cần kiểm tra xem 'result' có chứa 
-        // một phần JSON thật từ DB của bạn
-        // Ví dụ: Assert.Contains("nghĩa là tiếng Nhật", result);
+        // ASSERT (Kiểm tra Log Hit)
+        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+        Assert.NotNull(stat);
+        Assert.Equal(1, stat.Occurrences);
+
+        // Đảm bảo nó không ghi log Miss
+        var miss = await _context.SearchMiss.FirstOrDefaultAsync(s => s.NormalizedTerm == labelToSearch.ToLower());
+        Assert.Null(miss);
     }
 
     [Fact]
-    public async Task GetWordJson_WhenSearchingByPhonetic_FindsCorrectEntry()
+    public async Task GetWordJson_WhenSearchingByPhoneticLabel_FindsCorrectEntry_And_LogsHit()
     {
         // ARRANGE
-        // Giả sử "てすと" (test) tồn tại trong DB test của bạn
-        var phoneticToSearch = "アイテム";
+        var phoneticToSearch = "アイテム"; // Giả sử "アイテム" (item) tồn tại
+
+        var entryInDb = await _context.Entries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Type == "word" && e.Label == phoneticToSearch);
+
+        Assert.NotNull(entryInDb); // Đảm bảo data test tồn tại
 
         // ACT
         var result = await _service.GetWordJson(phoneticToSearch);
 
-        // ASSERT
+        // ASSERT (Kiểm tra kết quả)
         Assert.NotNull(result);
+        Assert.Equal(entryInDb.RawJson, result);
 
-        // THAY ĐỔI ASSERT NÀY:
-        // Bạn cần kiểm tra xem 'result' có chứa 
-        // một phần JSON thật từ DB của bạn
-        // Ví dụ: Assert.Contains("nghĩa là bài test", result);
+        // ASSERT (Kiểm tra Log Hit)
+        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+        Assert.NotNull(stat);
+        Assert.Equal(1, stat.Occurrences);
     }
 
     [Fact]
-    public async Task GetWordJson_WhenWordDoesNotExist_ReturnsNull()
+    public async Task GetWordJson_WhenWordDoesNotExist_ReturnsNull_And_LogsMiss()
     {
         // ARRANGE
-        // Test này hoàn hảo, không cần sửa
-        var labelToSearch = "存在しない_abc_123"; // Một chuỗi chắc chắn không có
+        var labelToSearch = "存在しない_abc_123";
 
         // ACT
         var result = await _service.GetWordJson(labelToSearch);
 
-        // ASSERT
+        // ASSERT (Kiểm tra kết quả)
         Assert.Null(result);
+
+        // ASSERT (Kiểm tra Log Miss)
+        // (Dùng tên bảng SearchMiss (số ít) như bạn đã sửa)
+        var miss = await _context.SearchMiss.FirstOrDefaultAsync(s => s.NormalizedTerm == labelToSearch.ToLower());
+        Assert.NotNull(miss);
+        Assert.Equal(1, miss.SearchCount);
+
+        // Đảm bảo nó không ghi log Hit
+        var statCount = await _context.StatsWordFreq.CountAsync();
+        Assert.Equal(0, statCount); // (Giả định DB trống lúc bắt đầu test)
     }
 }

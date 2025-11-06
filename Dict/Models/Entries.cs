@@ -45,5 +45,6 @@ namespace Dict.Models
         public virtual ICollection<WordToEntry> WordToEntries { get; set; }
         public virtual ICollection<Media> Media { get; set; }
         public virtual ICollection<Translation> Translations { get; set; }
+        public virtual ICollection<StatsWordFreq> FreqStats { get; set; }
     }
 }

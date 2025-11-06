@@ -61,7 +61,7 @@ namespace Dict.Service
             var newDecks = await _context.Decks.CountAsync(d => d.CreatedAt >= startOfMonth);
 
             // Sửa lại cách đếm Premium Users (dùng RoleManager)
-            var premiumRole = await _roleManager.FindByNameAsync("Premium_User"); // (Giả sử tên Role là "Premium_User")
+            var premiumRole = await _roleManager.FindByNameAsync("Premium"); // (Giả sử tên Role là "Premium")
             var premiumUsers = 0;
             if (premiumRole != null)
             {
@@ -242,7 +242,6 @@ namespace Dict.Service
         }
 
         // 9. SỬA LẠI HÀM LOCKSTATUS (DÙNG MANAGER)
-        // (Hàm này đang set cột IsActive tùy chỉnh của bạn, KHÔNG PHẢI LockoutEnabled của Identity)
         public async Task<bool> SetUserLockStatusAsync(int userId, bool isLocked)
         {
             var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -269,20 +268,17 @@ namespace Dict.Service
         }
 
         // 10. SỬA LẠI HOÀN TOÀN HÀM UPDATE ROLE
-        // (Hàm cũ của bạn chỉ cho phép 1 Role, hàm mới này cho phép nhiều Role)
         public async Task<bool> UpdateUserRolesAsync(int userId, List<string> newRoleNames)
         {
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
-            // Kiểm tra xem Admin có đang cố sửa Role của Admin khác không
             if (await _userManager.IsInRoleAsync(user, "Admin"))
             {
                 _logger.LogWarning("Admin {AdminId} attempted to change role of ADMIN {TargetUserId}", GetAdminId(), userId);
                 return false;
             }
 
-            // Kiểm tra xem các Role mới có hợp lệ không
             foreach (var roleName in newRoleNames)
             {
                 if (!await _roleManager.RoleExistsAsync(roleName))
@@ -293,8 +289,6 @@ namespace Dict.Service
             }
 
             var currentRoles = await _userManager.GetRolesAsync(user);
-
-            // Xóa các Role cũ và thêm các Role mới
             var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
             if (!removeResult.Succeeded) throw new Exception("Failed to remove old roles.");
 
@@ -307,7 +301,7 @@ namespace Dict.Service
 
         public async Task<bool> AdminDeleteDeckAsync(int deckId)
         {
-            // (Hàm này OK, không liên quan đến User)
+            // (Hàm này OK)
             var deck = await _context.Decks.Include(d => d.Cards).ThenInclude(c => c.CardStates).Include(d => d.Cards).ThenInclude(c => c.ReviewLogs).FirstOrDefaultAsync(d => d.Id == deckId);
             if (deck == null) { _logger.LogWarning("AdminDeleteDeckAsync: Deck not found: {DeckId}", deckId); return false; }
             foreach (var card in deck.Cards) { _context.ReviewLogs.RemoveRange(card.ReviewLogs); _context.CardStates.RemoveRange(card.CardStates); }
@@ -334,7 +328,7 @@ namespace Dict.Service
             {
                 // BƯỚC 1: Xóa thủ công các dependencies (OK)
                 var decks = await _context.Decks.Where(d => d.UserId == userId).ToListAsync();
-                foreach (var deck in decks) { await AdminDeleteDeckAsync(deck.Id); } // Tái sử dụng logic xóa deck
+                foreach (var deck in decks) { await AdminDeleteDeckAsync(deck.Id); }
 
                 var ocrJobs = await _context.OcrJobs.Where(j => j.UserId == userId).ToListAsync(); if (ocrJobs.Any()) _context.OcrJobs.RemoveRange(ocrJobs);
                 var media = await _context.MediaStore.Where(m => m.OwnerId == userId).ToListAsync(); if (media.Any()) _context.MediaStore.RemoveRange(media);
@@ -345,7 +339,6 @@ namespace Dict.Service
                 await _context.SaveChangesAsync();
 
                 // BƯỚC 2: Xóa User bằng UserManager (OK)
-                // (Nó sẽ tự động xóa AspNetUserRoles, Claims, Logins...)
                 var deleteResult = await _userManager.DeleteAsync(user);
 
                 if (!deleteResult.Succeeded)
@@ -363,25 +356,29 @@ namespace Dict.Service
             }
         }
 
+
+        // --- CÁC HÀM THỐNG KÊ NÂNG CAO (ĐÃ SỬA) ---
+
         /// <summary>
         /// Thống kê 20 từ được tra cứu nhiều nhất (tra thành công)
         /// </summary>
         public async Task<List<TopSearchItemDto>> GetTopSearchedWordsAsync()
         {
+            // === SỬA LỖI: JOIN VỚI entries THAY VÌ words ===
             var topWords = await _context.StatsWordFreq
                 .AsNoTracking()
                 .OrderByDescending(s => s.Occurrences)
                 .Take(20)
-                // Join với bảng Words để lấy WordText
-                .Join(_context.Words,
-                    stat => stat.WordId,
-                    word => word.Id,
-                    (stat, word) => new TopSearchItemDto
+                // Join với bảng Entries để lấy Label
+                .Join(_context.Entries, // <-- SỬA
+                    stat => stat.EntryId, // <-- SỬA (EntryId)
+                    entry => entry.Id,
+                    (stat, entry) => new TopSearchItemDto
                     {
-                        Term = word.WordText, // Dùng WordText làm Term
+                        Term = entry.Label, // <-- SỬA (Dùng Label của Entry)
                         Count = stat.Occurrences ?? 0,
-                        WordId = word.Id,
-                        ActualWord = word.WordText
+                        WordId = entry.Id, // (Tên DTO là WordId, nhưng nó đang là EntryId)
+                        ActualWord = entry.Label // <-- SỬA
                     })
                 .ToListAsync();
 
@@ -393,7 +390,7 @@ namespace Dict.Service
         /// </summary>
         public async Task<List<TopSearchItemDto>> GetTopSearchMissesAsync()
         {
-            // Truy vấn bảng SearchMisses mới mà chúng ta đã tạo
+            // (Code này đã đúng, vì nó dùng SearchMiss (số ít) như bạn đã sửa)
             var topMisses = await _context.SearchMiss
                 .AsNoTracking()
                 .OrderByDescending(sm => sm.SearchCount)
@@ -415,6 +412,7 @@ namespace Dict.Service
         /// </summary>
         public async Task<List<ApiStatItemDto>> GetApiPerformanceStatsAsync()
         {
+            // (Code này đúng, không phụ thuộc vào schema)
             var apiStats = await _context.ApiCalls
                 .GroupBy(a => a.Endpoint)
                 .Select(g => new ApiStatItemDto
@@ -424,12 +422,10 @@ namespace Dict.Service
                     ErrorCount = g.Count(a => a.ResponseStatus >= 400),
                     AvgResponseTimeMs = (int)g.Average(a => a.ResponseTimeMs),
                 })
-                // Sắp xếp theo tỷ lệ lỗi (cao nhất trước), sau đó là tốc độ chậm nhất
                 .OrderByDescending(a => (double)a.ErrorCount / a.TotalCalls)
                 .ThenByDescending(a => a.AvgResponseTimeMs)
                 .ToListAsync();
 
-            // Tính toán ErrorRate trong code (không thể làm trong SQL/LINQ)
             foreach (var stat in apiStats)
             {
                 stat.ErrorRate = stat.TotalCalls > 0 ? Math.Round((double)stat.ErrorCount / stat.TotalCalls * 100, 2) : 0;
@@ -443,7 +439,7 @@ namespace Dict.Service
         /// </summary>
         public async Task<List<FailedJobItemDto>> GetFailedSystemJobsAsync()
         {
-            // Lấy Job OCR bị lỗi
+            // (Code này đúng, không phụ thuộc vào schema)
             var failedOcrJobs = await _context.OcrJobs
                 .AsNoTracking()
                 .Where(j => j.Status == "Failed")
@@ -453,13 +449,12 @@ namespace Dict.Service
                     Id = j.Id,
                     JobType = "OCR",
                     Status = j.Status,
-                    ErrorMessage = "Check OcrJob details for specific error.", // Cần xem chi tiết
+                    ErrorMessage = "Check OcrJob details for specific error.",
                     StartedAt = j.CreatedAt ?? DateTime.MinValue
                 })
-                .Take(50) // Giới hạn 50 lỗi gần nhất
+                .Take(50)
                 .ToListAsync();
 
-            // Lấy Job Import bị lỗi
             var failedImportJobs = await _context.ImportJobs
                 .AsNoTracking()
                 .Where(j => j.Status == "Failed")
@@ -469,34 +464,31 @@ namespace Dict.Service
                     Id = j.Id,
                     JobType = j.JobType,
                     Status = j.Status,
-                    // Meta thường chứa thông tin lỗi JSON
                     ErrorMessage = EF.Functions.Like(j.Meta, "%error%") ? j.Meta.Substring(0, Math.Min(j.Meta.Length, 200)) : j.Meta,
                     StartedAt = j.StartedAt ?? DateTime.MinValue
                 })
-                .Take(50) // Giới hạn 50 lỗi gần nhất
+                .Take(50)
                 .ToListAsync();
 
             return failedOcrJobs.Concat(failedImportJobs)
                 .OrderByDescending(j => j.StartedAt)
                 .ToList();
         }
+
         // --- HÀM HELPER ---
 
-        // 12. SỬA LẠI HÀM MAPUSERTODTO (DÙNG ApplicationUser VÀ LẤY ROLE)
         private async Task<UserDto> MapUserToDto(ApplicationUser user)
         {
             string avatarUrl = string.IsNullOrEmpty(user.AvatarUrl) ? DefaultAvatarUrl : user.AvatarUrl;
-
-            // Lấy vai trò (roles)
             var roles = await _userManager.GetRolesAsync(user);
 
             return new UserDto
             {
                 Id = user.Id,
-                Username = user.UserName, // Sửa thành UserName
+                Username = user.UserName,
                 Email = user.Email,
                 IsActive = user.IsActive,
-                Role = roles.FirstOrDefault(), // Lấy vai trò đầu tiên
+                Role = roles.FirstOrDefault(),
                 AvatarUrl = avatarUrl,
                 CreatedAt = user.CreatedAt,
                 UpdatedAt = user.UpdatedAt,
@@ -508,13 +500,7 @@ namespace Dict.Service
         {
             var user = _httpContextAccessor.HttpContext?.User;
             if (user == null) return "UnknownAdmin (No HttpContext)";
-
-            // Dùng ClaimTypes.NameIdentifier (là UserId)
             return user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "UnknownAdmin (No Claim)";
         }
-
-        // 13. XÓA HÀM UpdateUserRoleAsync CŨ
-        // (Vì đã thay bằng hàm UpdateUserRolesAsync (số nhiều) ở trên)
-        // public async Task<bool> UpdateUserRoleAsync(int userId, string newRole) { ... }
     }
 }

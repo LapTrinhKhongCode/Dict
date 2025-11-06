@@ -89,10 +89,25 @@ namespace Dict.Service
             }
 
             // --- Logic Autocomplete Tối Ưu ---
+            // --- THÊM BƯỚC LÀM SẠCH (SANITIZE) ---
+            // Loại bỏ các ký tự đặc biệt của FTS để tránh lỗi SQL
+            string ftsSafeTerm = term
+                .Replace("\"", "") // Bỏ dấu nháy kép
+                .Replace("-", "")  // Bỏ dấu gạch ngang
+                .Replace("+", "")  // Bỏ dấu cộng
+                .Replace("(", "")  // Bỏ ngoặc
+                .Replace(")", "")
+                .Replace("*", ""); // Bỏ dấu sao
 
+            // Nếu sau khi làm sạch, term bị rỗng (ví dụ: người dùng chỉ gõ "-")
+            if (string.IsNullOrWhiteSpace(ftsSafeTerm))
+            {
+                return new List<AutocompleteSuggestionDto>();
+            }
             // Chuẩn bị các biến thể tìm kiếm cho FTS và LIKE
-            string ftsTerm = $"\"{term}*\""; // FTS prefix search (tìm từ bắt đầu bằng term)
-            string startsWithTerm = term + "%";
+            // SỬA LẠI CHO ĐÚNG
+            string ftsTerm = $"\"{ftsSafeTerm}*\"";
+            string startsWithTerm = ftsSafeTerm + "%";
 
             var suggestions = await _db.Entries
                 .AsNoTracking()

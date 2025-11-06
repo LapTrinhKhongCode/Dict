@@ -8,23 +8,33 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Moq;
 using Xunit;
+using Microsoft.Extensions.Logging; // <-- THÊM
+using System.Threading.Tasks; // <-- THÊM
+using System.Linq; // <-- THÊM
 
 namespace Dict.Tests.IntegrationTests.Database;
 
-// 1. Bỏ IClassFixture, chỉ cần IDisposable
 public class KanjiServiceTests : IDisposable
 {
     private readonly IKanjiService _service;
     private readonly TestApplicationDbContext _context;
     private readonly Mock<IJsonBuilderService> _mockJsonBuilder;
-    private readonly IDbContextTransaction _transaction;
 
+    // 1. THÊM MOCK LOGGER
+    private readonly Mock<ILogger<KanjiService>> _mockLogger;
+
+    private readonly IDbContextTransaction _transaction;
 
     public KanjiServiceTests()
     {
+        // (Env.Load() và ConnectionString giữ nguyên)
         Env.Load();
-
         var connectionString = Environment.GetEnvironmentVariable("TEST_CONNECTION_STRING");
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            // Cung cấp một giá trị dự phòng để tránh lỗi nếu .env không load được
+            connectionString = "Server=.;Database=Dict_TestDB;Trusted_Connection=True;TrustServerCertificate=True;";
+        }
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(connectionString)
@@ -32,19 +42,22 @@ public class KanjiServiceTests : IDisposable
 
         _context = new TestApplicationDbContext(options);
 
-        // 4. Bắt đầu Transaction
-        // (Vẫn cần thiết để rollback CÁC TEST GHI/SỬA/XÓA trong tương lai)
         _transaction = _context.Database.BeginTransaction();
 
         // 5. Khởi tạo Mock và Service
         _mockJsonBuilder = new Mock<IJsonBuilderService>();
+
+        // 6. KHỞI TẠO MOCK LOGGER MỚI
+        _mockLogger = new Mock<ILogger<KanjiService>>();
+
+        // 7. CẬP NHẬT CONSTRUCTOR (Thêm _mockLogger.Object)
         _service = new KanjiService(
             _context,
-            _mockJsonBuilder.Object
+            _mockJsonBuilder.Object,
+            _mockLogger.Object // <-- ĐÃ THÊM
         );
     }
 
-    // 6. Dọn dẹp bằng Rollback (chạy sau mỗi test)
     public void Dispose()
     {
         _transaction.Rollback();
@@ -57,12 +70,9 @@ public class KanjiServiceTests : IDisposable
     [Fact]
     public async Task GetKanjiInfoAsync_WhenKanjiExists_ReturnsFullDto()
     {
+        // (Test này giữ nguyên, nó không gọi hàm GetKanjiJson)
         // ----- ARRANGE -----
-        // Không cần, vì DB 'Dict_TestDB' đã có sẵn dữ liệu "vàng"
-        // từ lúc bạn Restore.
-
-        // Cần đảm bảo '試' tồn tại trong DB test
-        string kanjiToSearch = "試";
+        string kanjiToSearch = "試"; // Cần đảm bảo '試' tồn tại trong DB test
 
         // ----- ACT -----
         var result = await _service.GetKanjiInfoAsync(kanjiToSearch, "en");
@@ -70,55 +80,63 @@ public class KanjiServiceTests : IDisposable
         // ----- ASSERT -----
         Assert.NotNull(result);
         Assert.Equal(kanjiToSearch, result.Character);
-
-        // VÍ DỤ: Bạn hãy kiểm tra các giá trị thật từ DB
-        // Assert.Equal("Thí, thử", result.Meaning); 
-        // Assert.True(result.Words.Any()); 
     }
 
     [Fact]
-    public async Task GetKanjiJson_WhenSearchByPhonetic_FindsEntry()
+    public async Task GetKanjiJson_WhenSearchByPhonetic_FindsEntryAndLogsHit()
     {
         // ----- ARRANGE -----
-        // Không tạo data mới.
-        // Chúng ta giả định 'てすと' tồn tại trong "dữ liệu vàng"
-        string phoneticToSearch = "てすと";
+        string phoneticToSearch = "てすと"; // Giả định 'てすと' tồn tại
+
+        // Tìm EntryId thật trong DB Test để kiểm tra
+        var entryInDb = await _context.Entries
+            .FirstOrDefaultAsync(e => e.Type == "kanji" && e.Phonetic == phoneticToSearch);
+
+        // Nếu DB Test của bạn không có từ này, test sẽ thất bại (đây là điều tốt)
+        Assert.NotNull(entryInDb);
 
         // ----- ACT -----
         var result = await _service.GetKanjiJson(phoneticToSearch);
 
         // ----- ASSERT -----
-        // Bạn không thể dùng "{\"key\":\"phonetic-test\"}" nữa
-        // vì đó là data giả.
         Assert.NotNull(result);
-        // Kiểm tra xem JSON trả về có đúng là của 'てすと' không
-        // (Thay đổi 'expected_json_value' cho đúng)
-        // Assert.Contains("expected_json_value", result);
+        Assert.Equal(entryInDb.RawJson, result); // So sánh với JSON thật
+
+        // 8. KIỂM TRA LOGGING (QUAN TRỌNG)
+        // (Sau khi migration, chúng ta kiểm tra StatsWordFreq.EntryId)
+        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+        Assert.NotNull(stat); // Phải tạo ra 1 dòng log
+        Assert.Equal(1, stat.Occurrences); // Đếm là 1
     }
 
     [Fact]
-    public async Task GetKanjiJson_WhenSearchBySingleKanji_FindsEntry()
+    public async Task GetKanjiJson_WhenSearchBySingleKanji_FindsEntryAndLogsHit()
     {
         // ----- ARRANGE -----
-        // Không tạo data mới.
-        // Chúng ta giả định '試' tồn tại trong "dữ liệu vàng"
-        string kanjiToSearch = "試";
+        string kanjiToSearch = "試"; // Giả định '試' tồn tại
+
+        var entryInDb = await _context.Entries
+            .FirstOrDefaultAsync(e => e.Type == "kanji" && e.Label == kanjiToSearch);
+
+        Assert.NotNull(entryInDb);
 
         // ----- ACT -----
         var result = await _service.GetKanjiJson(kanjiToSearch);
 
         // ----- ASSERT -----
         Assert.NotNull(result);
-        // Kiểm tra xem JSON trả về có đúng là của '試' không
-        // (Thay đổi 'expected_json_value' cho đúng)
-        // Assert.Contains("expected_json_value", result); 
+        Assert.Equal(entryInDb.RawJson, result);
+
+        // 8. KIỂM TRA LOGGING (QUAN TRỌNG)
+        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+        Assert.NotNull(stat);
+        Assert.Equal(1, stat.Occurrences);
     }
 
     [Fact]
-    public async Task GetKanjiJson_WhenNoMatch_Returns404Json()
+    public async Task GetKanjiJson_WhenNoMatch_Returns404JsonAndLogsMiss()
     {
         // ----- ARRANGE -----
-        // (Không seed gì cả, test này chạy trên DB vàng)
         string nonExistentLabel = "abcxyz123";
 
         // ----- ACT -----
@@ -126,14 +144,20 @@ public class KanjiServiceTests : IDisposable
 
         // ----- ASSERT -----
         Assert.Contains("\"status\":404", result);
+
+        // 8. KIỂM TRA LOGGING (QUAN TRỌNG)
+        // (Dùng tên bảng SearchMiss (số ít) như bạn đã sửa)
+        var miss = await _context.SearchMiss.FirstOrDefaultAsync(s => s.NormalizedTerm == nonExistentLabel);
+        Assert.NotNull(miss);
+        Assert.Equal(1, miss.SearchCount);
     }
 
     [Fact]
     public async Task GetKanjiJson_WhenMultipleKanji_CallsRebuildService()
     {
+        // (Test này giữ nguyên, nó test Mock)
         // ----- ARRANGE -----
-        // (Test này không chạm vào DB, nó chỉ test Mock)
-        var searchLabel = "試験"; // 2 chữ kanji
+        var searchLabel = "試験";
         var expectedJson = "{\"rebuilt\":true}";
 
         _mockJsonBuilder
@@ -146,5 +170,9 @@ public class KanjiServiceTests : IDisposable
         // ----- ASSERT -----
         Assert.Equal(expectedJson, result);
         _mockJsonBuilder.Verify(j => j.RebuildJsonForKanjiAsync(searchLabel), Times.Once);
+
+        // 9. KIỂM TRA: Hàm này KHÔNG được ghi log Miss
+        var miss = await _context.SearchMiss.FirstOrDefaultAsync(s => s.NormalizedTerm == "試験");
+        Assert.Null(miss); // Không được ghi log miss
     }
 }

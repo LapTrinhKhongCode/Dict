@@ -15,11 +15,13 @@ namespace Dict.Service
     public class JsonBuilder : IJsonBuilderService
     {
         private readonly ApplicationDbContext _db;
+        private readonly ILogger<JsonBuilder> _logger;
         private readonly string _sensitiveCollation = "Japanese_CS_AS_KS_WS"; // Collation phân biệt Kana
 
-        public JsonBuilder(ApplicationDbContext db)
+        public JsonBuilder(ApplicationDbContext db, ILogger<JsonBuilder> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         #region --- 1. XỬ LÝ TÌM KIẾM TỪ VỰNG (Word) ---
@@ -35,39 +37,68 @@ namespace Dict.Service
 
             // === ƯU TIÊN 1: TÌM "TRÙNG KHỚP TUYỆT ĐỐI" (LABEL) ===
             var exactLabelMatch = await _db.Entries
-                .AsNoTracking()
+                .AsNoTrackingWithIdentityResolution()
                 .Where(e => EF.Functions.Collate(e.Label, _sensitiveCollation) == term && e.Type == "word")
-                .IncludeWordData() // Sử dụng extension method
+                .IncludeWordData()
                 .FirstOrDefaultAsync();
 
             if (exactLabelMatch != null)
             {
-                // TÌM THẤY 1 KẾT QUẢ (Ví dụ: tìm "食べる")
+                // Nếu tìm thấy exact label, dùng luôn bản đó (đã include đầy đủ)
                 mainEntries.Add(exactLabelMatch);
                 suggestionEntries = await GetSuggestionEntriesAsync(term, 20, new List<int> { exactLabelMatch.Id });
+
+                // dedupe suggestions by surface form (WordText+Phonetic)
+                suggestionEntries = suggestionEntries
+                    .GroupBy(e => (WordText: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.WordText ?? e.Label ?? "",
+                                  Phonetic: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.Phonetic ?? ""))
+                    .Select(g => SelectPreferredEntry(g))
+                    .ToList();
             }
             else
             {
                 // === ƯU TIÊN 2: TÌM THEO "CÁCH ĐỌC" (PHONETIC) ===
                 var homophoneMatches = await _db.Entries
-                    .AsNoTracking()
+                    .AsNoTrackingWithIdentityResolution()
                     .Where(e => e.Words.Any(w => EF.Functions.Collate(w.Phonetic, _sensitiveCollation) == term) && e.Type == "word")
-                    .OrderBy(e => e.Words.FirstOrDefault().Weight)
-                    .IncludeWordData() // Dùng extension method
+                    .OrderBy(e => e.Words.OrderBy(w => w.Id).Select(w => w.Weight).FirstOrDefault())
+                    .IncludeWordData()
                     .ToListAsync();
+
+                LogEntryChildrenCounts(homophoneMatches, "homophoneMatches after load");
 
                 if (homophoneMatches.Any())
                 {
-                    // TÌM THẤY DANH SÁCH ĐỒNG ÂM (Ví dụ: tìm "とる")
-                    mainEntries = homophoneMatches;
-                    var homophoneIds = homophoneMatches.Select(e => e.Id).ToList();
+                    // Dedupe theo surface form: WordText + Phonetic
+                    var deduped = homophoneMatches
+                        .GroupBy(e => (WordText: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.WordText ?? e.Label ?? "",
+                                      Phonetic: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.Phonetic ?? ""))
+                        .Select(g => SelectPreferredEntry(g))
+                        .ToList();
+
+                    mainEntries = deduped;
+                    var homophoneIds = mainEntries.Select(e => e.Id).ToList();
                     suggestionEntries = await GetSuggestionEntriesAsync(term, 20, homophoneIds);
+
+                    // dedupe suggestions as well
+                    suggestionEntries = suggestionEntries
+                        .GroupBy(e => (WordText: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.WordText ?? e.Label ?? "",
+                                      Phonetic: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.Phonetic ?? ""))
+                        .Select(g => SelectPreferredEntry(g))
+                        .ToList();
                 }
                 else
                 {
                     // === ƯU TIÊN 3: GỢI Ý CHUNG - KHÔNG CÓ KẾT QUẢ CHÍNH ===
                     mainEntries = new List<Entry>(); // Rỗng
                     suggestionEntries = await GetSuggestionEntriesAsync(term, 20);
+
+                    // dedupe suggestions
+                    suggestionEntries = suggestionEntries
+                        .GroupBy(e => (WordText: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.WordText ?? e.Label ?? "",
+                                      Phonetic: e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.Phonetic ?? ""))
+                        .Select(g => SelectPreferredEntry(g))
+                        .ToList();
                 }
             }
 
@@ -75,22 +106,55 @@ namespace Dict.Service
 
             // 1. Lấy danh sách Kanji ID cần thiết từ TẤT CẢ các kết quả chính
             var allKanjiChars = mainEntries
-                .SelectMany(e => e.Words.FirstOrDefault()?.WordKanji ?? new List<WordKanji>())
+                .SelectMany(e => e.Words.OrderBy(w => w.Id).FirstOrDefault()?.WordKanji ?? new List<WordKanji>())
                 .Select(wk => wk.Kanji?.Character)
                 .Where(c => c != null)
                 .Distinct()
                 .ToList();
 
+            // (không cần group by Id nữa vì đã dedupe theo surface form)
+            // 3. Map kết quả chính (sử dụng entry đã được chọn)
+            var mappedList = mainEntries.Select(entry => MapEntryToJsonWord(entry))
+                                       .Where(w => w != null)
+                                       .Cast<Dict.Models.JsonModels.Word>()
+                                       .ToList();
 
-            // 3. Map kết quả chính
-            data.Words = mainEntries.Select(entry => MapEntryToJsonWord(entry))
-                                   .Where(w => w != null)
-                                   .ToList()!;
+            // Debug: kiểm tra duplicate theo WordText+Phonetic (nên không còn)
+            var duplicateGroups = mappedList
+                .GroupBy(w => (w.WordText ?? "", w.Phonetic ?? ""))
+                .Where(g => g.Count() > 1)
+                .ToList();
+
+            if (duplicateGroups.Any())
+            {
+                foreach (var g in duplicateGroups)
+                {
+                    _logger.LogInformation("Duplicate form detected AFTER dedupe: WordText='{WordText}', Phonetic='{Phonetic}', Count={Count}, EntryIds={Ids}",
+                        g.Key.Item1, g.Key.Item2, g.Count(), string.Join(',', g.SelectMany(x => mainEntries.Where(e =>
+                            (e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.WordText ?? e.Label ?? "") == g.Key.Item1 &&
+                            (e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.Phonetic ?? "") == g.Key.Item2).Select(e => e.Id))));
+                }
+            }
+            else
+            {
+                _logger.LogInformation("No duplicate WordText+Phonetic groups found after dedupe+mapping.");
+            }
 
             // 4. Map gợi ý
             data.SuggestWords = suggestionEntries.Select(MapEntryToSuggestWord)
                                                 .Where(s => s != null)
                                                 .ToList()!;
+
+            // Set data.Words từ mappedList
+            data.Words = mappedList;
+
+            // Sau lấy mainEntries:
+            var ids = mainEntries.Select(e => e.Id).ToList();
+            _logger.LogInformation("mainEntries count={Count}, distinct={Distinct}", ids.Count, ids.Distinct().Count());
+
+            // Sau lấy suggestionEntries:
+            var sids = suggestionEntries.Select(e => e.Id).ToList();
+            _logger.LogInformation("suggestEntries count={Count}, distinct={Distinct}", sids.Count, sids.Distinct().Count());
 
             var rootObject = new RootObject { Status = 200, Data = data };
 
@@ -100,6 +164,7 @@ namespace Dict.Service
                 DefaultValueHandling = DefaultValueHandling.Ignore
             });
         }
+
 
         #endregion
 
@@ -194,56 +259,67 @@ namespace Dict.Service
                 return new List<Entry>();
 
             var sensitiveCollation = "Japanese_CS_AS_KS_WS";
-
-            // --- BƯỚC 1: PHÂN TÍCH TỪ KHÓA ---
-            // Tách riêng phần Hán tự
-            string kanjiPart = ExtractKanji(term); // Ví dụ: "穫る" -> "穫"
+            string kanjiPart = ExtractKanji(term);
             bool hasKanjiPart = !string.IsNullOrEmpty(kanjiPart);
 
-            // --- BƯỚC 2: TRUY VẤN ỨNG VIÊN (DÙNG LIKE, KHÔNG DÙNG FTS) ---
-            var candidatesQuery = _db.Entries
-                .AsNoTracking()
+            // Candidates base (no include, chỉ select Id + computed Score): STEP 1
+            var baseQuery = _db.Entries
+                .AsNoTracking() // chỉ để lấy id + score, no tracking is ok here
                 .Where(e => e.Type == "word" && (
-                    e.Label.Contains(term) ||    // Dùng LIKE N'%term%'
-                    e.Phonetic.Contains(term) || // Dùng LIKE N'%term%'
-                                                 // SỬA LỖI: Dùng C# .Contains() (tức LIKE N'%kanjiPart%')
+                    e.Label.Contains(term) ||
+                    e.Phonetic.Contains(term) ||
                     (hasKanjiPart && e.Label.Contains(kanjiPart))
                 ));
 
             if (excludeEntryIds != null && excludeEntryIds.Any())
-            {
-                candidatesQuery = candidatesQuery.Where(e => !excludeEntryIds.Contains(e.Id));
-            }
+                baseQuery = baseQuery.Where(e => !excludeEntryIds.Contains(e.Id));
 
-            // --- BƯỚC 3: CHẤM ĐIỂM VÀ SẮP XẾP ---
-            var rankedSuggestions = await candidatesQuery
+            // compute score in SQL projection
+            var scoredIds = await baseQuery
                 .Select(e => new
                 {
-                    Entry = e,
-                    WordInfo = e.Words.FirstOrDefault(),
-                    // --- HỆ THỐNG ĐIỂM HOÀN CHỈNH (DÙNG LIKE) ---
+                    e.Id,
                     Score =
                         (EF.Functions.Collate(e.Label, sensitiveCollation) == term ? 100 : 0) +
-                        (e.Words.FirstOrDefault() != null && EF.Functions.Collate(e.Words.FirstOrDefault().Phonetic, sensitiveCollation) == term ? 90 : 0) +
+                        (e.Words.Any() && EF.Functions.Collate(e.Words.OrderBy(w => w.Id).Select(w => w.Phonetic).FirstOrDefault(), sensitiveCollation) == term ? 90 : 0) +
                         (e.Label.StartsWith(term) ? 50 : 0) +
                         (e.Phonetic.StartsWith(term) ? 40 : 0) +
-                        // SỬA LỖI: Dùng C# .Contains() (LIKE)
                         (hasKanjiPart && e.Label.Contains(kanjiPart) ? 20 : 0) +
-                        (e.Label.Contains(term) ? 10 : 0) // Điểm "chứa" cơ bản
+                        (e.Label.Contains(term) ? 10 : 0)
                 })
-                .Where(x => x.Score > 0 && x.WordInfo != null)
+                .Where(x => x.Score > 0)
                 .OrderByDescending(x => x.Score)
-                .ThenBy(x => x.WordInfo!.Weight)
-                .ThenBy(x => x.Entry.Label.Length)
+                .ThenBy(x => x.Id) // tie-breaker, giữ đơn giản
                 .Take(limit)
-                .Select(x => x.Entry)
-                // Include dữ liệu cần thiết cho suggestWord (nhẹ)
-                .Include(e => e.Words)
-                .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.Glosses)
-                .AsSplitQuery()
+                .Select(x => x.Id)
                 .ToListAsync();
 
-            return rankedSuggestions;
+            if (!scoredIds.Any())
+                return new List<Entry>();
+
+            // STEP 2: load full entries + includes for those ids, with identity resolution (no tracking but resolve identity)
+            var entries = await _db.Entries
+                .AsNoTrackingWithIdentityResolution()
+                .Where(e => scoredIds.Contains(e.Id))
+                .Include(e => e.Words)
+                    .ThenInclude(w => w.Relations)
+                        .ThenInclude(r => r.RelatedWord)
+                .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.Glosses)
+                .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.Examples)
+                .Include(e => e.Media.Where(m => m.MediaType == "image"))
+                .Include(e => e.Senses.OrderBy(s => s.SenseOrder)).ThenInclude(s => s.SynsetEntries).ThenInclude(se => se.SynonymItems)
+                .Include(e => e.Words).ThenInclude(w => w.WordKanji).ThenInclude(wk => wk.Kanji).ThenInclude(k => k.KanjiExamples)
+                .AsSplitQuery()
+                .ToListAsync();
+            entries = entries.GroupBy(e => e.Id).Select(g => g.First()).ToList();
+            LogEntryChildrenCounts(entries, "SuggestionEntries after load");
+            // preserve original ranking order
+            var ordered = scoredIds
+                .Select(id => entries.FirstOrDefault(e => e.Id == id))
+                .Where(e => e != null)
+                .ToList()!;
+
+            return ordered;
         }
 
         // (Hàm ExtractKanji giữ nguyên)
@@ -259,7 +335,7 @@ namespace Dict.Service
         /// </summary>
         private Dict.Models.JsonModels.Word? MapEntryToJsonWord(Entry entryFromDb)
         {
-            var mainWordRecord = entryFromDb.Words?.FirstOrDefault();
+            var mainWordRecord = entryFromDb.Words?.OrderBy(w => w.Id).FirstOrDefault();
             if (mainWordRecord == null) return null;
 
             var wordObject = new Dict.Models.JsonModels.Word
@@ -431,6 +507,53 @@ namespace Dict.Service
             }
 
             return kanjiResult;
+        }
+        // Debug helper - chép vào class JsonBuilder
+        private void LogEntryChildrenCounts(IEnumerable<Entry> entries, string tag)
+        {
+            foreach (var e in entries)
+            {
+                var wordIds = e.Words?.Select(w => w.Id).ToList() ?? new List<int>();
+                var distinctWordIds = wordIds.Distinct().ToList();
+
+                var senseIds = e.Senses?.Select(s => s.Id).ToList() ?? new List<int>();
+                var distinctSenseIds = senseIds.Distinct().ToList();
+
+                // count nested
+                int synsetEntriesCount = e.Senses?.SelectMany(s => s.SynsetEntries ?? new List<SynsetEntry>()).Select(se => se.Id).Count() ?? 0;
+                int distinctSynsetEntriesCount = e.Senses?.SelectMany(s => s.SynsetEntries ?? new List<SynsetEntry>()).Select(se => se.Id).Distinct().Count() ?? 0;
+
+                int synonymItemsCount = e.Senses?.SelectMany(s => s.SynsetEntries ?? new List<SynsetEntry>())
+                                               .SelectMany(se => se.SynonymItems ?? new List<SynonymItem>())
+                                               .Select(si => si.Id).Count() ?? 0;
+                int distinctSynonymItemsCount = e.Senses?.SelectMany(s => s.SynsetEntries ?? new List<SynsetEntry>())
+                                               .SelectMany(se => se.SynonymItems ?? new List<SynonymItem>())
+                                               .Select(si => si.Id).Distinct().Count() ?? 0;
+
+                int kanjiExamplesCount = e.Words?.SelectMany(w => w.WordKanji ?? new List<WordKanji>())
+                                                 .SelectMany(wk => wk.Kanji?.KanjiExamples ?? new List<KanjiExample>())
+                                                 .Select(kex => kex.Id).Count() ?? 0;
+                int distinctKanjiExamplesCount = e.Words?.SelectMany(w => w.WordKanji ?? new List<WordKanji>())
+                                                 .SelectMany(wk => wk.Kanji?.KanjiExamples ?? new List<KanjiExample>())
+                                                 .Select(kex => kex.Id).Distinct().Count() ?? 0;
+
+                _logger.LogInformation("{Tag}: EntryId={EntryId} words={Words}/{DistinctWords} senses={Senses}/{DistinctSenses} synsetEntries={SE}/{DSE} synItems={SI}/{DSI} kanjiExamples={KE}/{DKE}",
+                    tag, e.Id, wordIds.Count, distinctWordIds.Count, senseIds.Count, distinctSenseIds.Count,
+                    synsetEntriesCount, distinctSynsetEntriesCount, synonymItemsCount, distinctSynonymItemsCount, kanjiExamplesCount, distinctKanjiExamplesCount);
+            }
+        }
+        // Chọn bản "chuẩn" trong 1 nhóm entries có cùng WordText+Phonetic
+        private Entry SelectPreferredEntry(IEnumerable<Entry> group)
+        {
+            // Tiêu chí (theo thứ tự ưu tiên):
+            // 1) nhiều Senses hơn (bản đầy đủ hơn)
+            // 2) highest main word weight (nếu có)
+            // 3) lowest Id (deterministic tie-breaker)
+            return group
+                .OrderByDescending(e => e.Senses?.Count ?? 0)
+                .ThenByDescending(e => e.Words?.OrderBy(w => w.Id).FirstOrDefault()?.Weight ?? 0)
+                .ThenBy(e => e.Id)
+                .First();
         }
 
         // Helper để kiểm tra Katakana (cho việc phân loại On/Kun)
