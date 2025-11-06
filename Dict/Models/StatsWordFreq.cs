@@ -7,11 +7,11 @@ namespace Dict.Models
     {
         public int Id { get; set; }
 
-        public int? WordId { get; set; }
-        public virtual Word Word { get; set; }
+        public int? EntryId { get; set; }
 
         public int? Occurrences { get; set; }
         public DateTime? LastSeenAt { get; set; }
+        public virtual Entry Entry { get; set; }
     }
 
 }

@@ -348,7 +348,6 @@ namespace Dict.Data
                 b.HasMany(x => x.Relations).WithOne(r => r.Word).HasForeignKey(r => r.WordId).OnDelete(DeleteBehavior.Restrict);
                 b.HasMany(x => x.WordTags).WithOne(wt => wt.Word).HasForeignKey(wt => wt.WordId).OnDelete(DeleteBehavior.Cascade);
                 b.HasMany(x => x.Translations).WithOne(t => t.Word).HasForeignKey(t => t.WordId).OnDelete(DeleteBehavior.Cascade);
-                b.HasMany(x => x.WordFreqStats).WithOne(s => s.Word).HasForeignKey(s => s.WordId).OnDelete(DeleteBehavior.Cascade);
                 b.HasMany(x => x.OcrResults).WithOne(o => o.LinkWord).HasForeignKey(o => o.LinkWordId).OnDelete(DeleteBehavior.SetNull);
                 b.HasMany(x => x.Cards).WithOne(c => c.Word).HasForeignKey(c => c.WordId).OnDelete(DeleteBehavior.SetNull);
 
@@ -605,9 +604,14 @@ namespace Dict.Data
             {
                 b.ToTable("stats_word_freq");
                 b.HasKey(x => x.Id);
+
+                b.HasOne(x => x.Entry)
+                    .WithMany(e => e.FreqStats) // Trỏ đến ICollection FreqStats ta vừa tạo
+                    .HasForeignKey(x => x.EntryId) // Dùng EntryId làm khóa ngoại
+                    .OnDelete(DeleteBehavior.Cascade); // (Nên dùng Cascade: Nếu Entry bị xóa, thống kê của nó cũng bị xóa)
+
                 b.Property(x => x.Occurrences);
                 b.Property(x => x.LastSeenAt);
-                b.HasOne(x => x.Word).WithMany(w => w.WordFreqStats).HasForeignKey(x => x.WordId).OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<SynonymsCache>(b =>
