@@ -20,6 +20,7 @@
     "@tailwindcss/vite": "^4.1.12",
     "@unhead/vue": "^2.0.14",
     "ant-design-vue": "^4.2.6",
+    "chart.js": "^4.5.1",
     "eslint": "^9.33.0",
     "hanzi-writer": "^3.7.2",
     "lucide-vue-next": "^0.542.0",
