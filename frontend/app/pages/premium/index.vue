@@ -7,7 +7,7 @@
         <img
           src="https://adsinhouse.eupgroup.net/uploads/images/3291_top4web_2_vi.webp"
           alt="3 bước nâng cấp"
-          class="w-full object-cover max-h-24 md:max-h-32"
+          class="w-full object-cover max-h-24 md:max-h-60"
         />
       </div>
 

@@ -10,8 +10,8 @@
         class="px-20 py-2 text-center font-medium transition"
         :class="
           activeTab === 'hiragana'
-            ? 'bg-primary-600 text-white dark:bg-sky-900 dark:text-white'
-            : 'bg-gray-200 text-gray-700 dark:bg-sky-700 dark:text-gray-200'
+            ? 'bg-primary-600 text-white dark:bg-sky-700 dark:text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-sky-900 dark:text-gray-200'
         "
         @click="activeTab = 'hiragana'"
       >
@@ -21,8 +21,8 @@
         class="px-20 py-2 text-center font-medium transition"
         :class="
           activeTab === 'katakana'
-            ? 'bg-primary-600 text-white dark:bg-sky-900 dark:text-white'
-            : 'bg-gray-200 text-gray-700 dark:bg-sky-700 dark:text-gray-200'
+            ? 'bg-primary-600 text-white dark:bg-sky-700 dark:text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-sky-900 dark:text-gray-200'
         "
         @click="activeTab = 'katakana'"
       >
@@ -39,7 +39,7 @@
         <div
           v-for="(item, index) in row"
           :key="index"
-          class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-28 flex flex-col items-center justify-center p-6 hover:bg-gray-100 dark:hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md sm:w-20 lg:w-35"
+          class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-28 flex flex-col items-center justify-center p-6 hover:bg-gray-100 dark:hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md sm:w-20 lg:w-40"
           @click="
             selectedCharacter = {
               ...item,
@@ -67,7 +67,7 @@
         <div
           v-for="(item, index) in row"
           :key="index"
-          class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-28 flex flex-col items-center justify-center p-6 hover:bg-gray-100 dark:hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md sm:w-20 lg:w-35"
+          class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg h-28 flex flex-col items-center justify-center p-6 hover:bg-gray-100 dark:hover:bg-sky-800 cursor-pointer transition duration-200 ease-in-out shadow-md sm:w-20 lg:w-40"
           @click="
             selectedCharacter = {
               ...item,

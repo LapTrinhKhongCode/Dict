@@ -158,21 +158,27 @@ function handleLogout() {
   showToast("Logout successful!", "success");
 }
 </script>
+
 <template>
-  <header class="bg-neutral-900 px-6 py-3 flex items-center justify-between">
+  <header
+    class="bg-white dark:bg-neutral-900 px-6 py-3 flex items-center justify-between border-b border-gray-200 dark:border-neutral-800 transition-colors"
+  >
     <div class="flex items-center space-x-10">
       <NuxtLink to="/">
         <img src="/miyo.png" alt="Logo" class="h-auto w-35" />
       </NuxtLink>
       <div class="relative flex items-center cursor-pointer group">
-        <UIcon name="i-lucide-calendar" class="text-4xl text-gray-300" />
+        <UIcon
+          name="i-lucide-calendar"
+          class="text-4xl text-gray-500 dark:text-gray-300"
+        />
         <span
-          class="absolute top-3.25 right-0.25 text-white text-xs font-bold rounded-full px-2 py-0.5"
+          class="absolute top-3.25 right-0.25 text-gray-800 dark:text-white text-xs font-bold rounded-full px-2 py-0.5"
         >
           {{ diffDay }}
         </span>
         <div
-          class="absolute top-10 left-20 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition duration-300 bg-primary-600 text-sm px-3 py-1 rounded-lg whitespace-nowrap shadow-lg"
+          class="absolute top-10 left-20 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition duration-300 bg-primary-600 text-white text-sm px-3 py-1 rounded-lg whitespace-nowrap shadow-lg"
         >
           Còn {{ diffDay }} ngày tới kỳ thi JLPT ({{ targetDateString }}) !
         </div>
@@ -187,7 +193,7 @@ function handleLogout() {
         @mouseleave="startInterval"
       >
         <div
-          class="relative h-6 overflow-hidden text-gray-400 text-sm group-hover:opacity-0 group-hover:pointer-events-none transition-opacity duration-300"
+          class="relative h-6 overflow-hidden text-gray-500 dark:text-gray-400 text-sm group-hover:opacity-0 group-hover:pointer-events-none transition-opacity duration-300"
         >
           <Transition name="slide-up">
             <span :key="currentNotification" class="notification-text glow">
@@ -204,17 +210,17 @@ function handleLogout() {
           class="absolute top-0 left-0 w-full opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 z-20"
         >
           <ul
-            class="w-full max-h-56 overflow-y-auto bg-neutral-800 border border-neutral-700 rounded-lg shadow-2xl p-2 space-y-1"
+            class="w-full max-h-56 overflow-y-auto bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-2xl p-2 space-y-1"
           >
             <li
               v-for="(msg, index) in notifications"
               :key="index"
-              class="p-2 flex items-center text-gray-300 hover:bg-neutral-700 rounded cursor-pointer text-sm"
-              @click="currentNotificationIndex.value = index"
+              class="p-2 flex items-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded cursor-pointer text-sm"
+              @click="currentNotificationIndex = index"
             >
               <UIcon
                 name="i-lucide-sparkles"
-                class="mr-3 text-primary-400 flex-shrink-0"
+                class="mr-3 text-primary-500 dark:text-primary-400 flex-shrink-0"
               />
               <span class="truncate">{{ msg }}</span>
             </li>
@@ -224,7 +230,10 @@ function handleLogout() {
     </div>
 
     <div class="flex items-center space-x-4 relative">
-      <span v-if="isAuthenticated" class="text-gray-300 whitespace-nowrap">
+      <span
+        v-if="isAuthenticated"
+        class="text-gray-700 dark:text-gray-300 whitespace-nowrap"
+      >
         {{ dynamicGreeting }}{{ username ? `、 ${username}` : "" }} !
       </span>
       <div class="relative group">
@@ -239,19 +248,19 @@ function handleLogout() {
           <UButton v-else icon="i-lucide-user" size="xl" variant="ghost" />
         </div>
         <div
-          class="absolute right-0 top-full w-32 bg-neutral-800 border border-neutral-700 rounded shadow-lg z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+          class="absolute right-0 top-full w-32 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded shadow-lg z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
         >
           <button
-            v-if="!isAuthenticated"
+            v_if="!isAuthenticated"
             @click="handleLogin"
-            class="block w-full px-4 py-2 text-left text-gray-200 hover:bg-neutral-700"
+            class="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-neutral-700"
           >
             Đăng nhập
           </button>
           <button
-            v-else
+            v_else
             @click="handleLogout"
-            class="block w-full px-4 py-2 text-left text-gray-200 hover:bg-neutral-700"
+            class="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-neutral-700"
           >
             Đăng xuất
           </button>
@@ -265,6 +274,7 @@ function handleLogout() {
 </template>
 
 <style>
+/* (Style giữ nguyên từ code của bạn) */
 /* Hiệu ứng slide-up (giữ nguyên) */
 .notification-text {
   display: flex;
@@ -312,7 +322,11 @@ function handleLogout() {
   }
 }
 
-.glow {
+/*
+  THAY ĐỔI:
+  - Chỉ áp dụng hiệu ứng glow cho dark mode
+*/
+.dark .glow {
   animation: glow 1.5s ease-in-out infinite alternate;
 }
 
