@@ -548,7 +548,7 @@ function onNodeClick(node: GraphNode | null) {
     <div class="header-section">
       <h1 class="main-title">Kanji Graph Explorer</h1>
       <div class="toggle-container">
-        <div class="mode-toggle">
+        <!-- <div class="mode-toggle">
           <span class="toggle-label">Mode:</span>
           <button
             :class="{ active: mode === 'composition' }"
@@ -568,7 +568,7 @@ function onNodeClick(node: GraphNode | null) {
           >
             Onyomi
           </button>
-        </div>
+        </div> -->
         <div class="dimension-toggle">
           <span class="toggle-label">View:</span>
           <button

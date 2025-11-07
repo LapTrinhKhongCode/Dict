@@ -115,6 +115,10 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from "vue";
 import HanziWriter from "hanzi-writer";
+import { useColorMode } from "#imports";
+
+
+const colorMode = useColorMode();
 
 // import Papa from "papaparse" // <-- XÓA
 
@@ -161,40 +165,36 @@ onMounted(async () => {
 
 // --- SỬA LỖI "KHÔNG VẼ" BẰNG WATCH ---
 // Watch này sẽ theo dõi CẢ kanji VÀ target DOM element
+const theme = inject<'dark' | 'light'>('theme', ref('dark'))
 watch(
-  [() => props.kanji, writerTarget],
-  ([newKanji, targetEl]) => {
-    // Chỉ chạy khi CẢ hai đều đã sẵn sàng
-    if (!newKanji || !targetEl) {
-      return;
-    }
+  [() => props.kanji, writerTarget, () => theme.value],
+  ([newKanji, targetEl, newTheme]) => {
+    if (!newKanji || !targetEl) return;
+    console.log("Theme hiện tại:", newTheme);
 
-    // Nếu chúng ta đã có cả kanji và div...
+    const isDark = newTheme === "dark";
+    const stroke = isDark ? "#FFFFFF" : "#000000"; // Dark: trắng, Light: đen
+    const outline = isDark ? "#000000" : "#FFFFFF"; // Dark: đen, Light: trắng
+
     if (writerInstance.value) {
-      // 1. Writer đã tồn tại (do click node graph): Chỉ cần set chữ
       console.log("Kanjistroke: Đang set character thành", newKanji);
       writerInstance.value.setCharacter(newKanji);
     } else {
-      // 2. Writer chưa tồn tại (do load từ Grid): Tạo mới
-      // (An toàn vì targetEl đã được đảm bảo tồn tại)
       console.log("Kanjistroke: Đang tạo writer cho", newKanji);
       writerInstance.value = HanziWriter.create(targetEl, newKanji, {
         width: 150,
         height: 150,
         padding: 20,
-        // THAY ĐỔI: Style nét vẽ cho phù hợp
-        strokeColor: "#333", // Nét vẽ màu đen (hoạt động trên cả 2 nền)
-        highlightColor: "#f00", // Màu highlight (đỏ)
-        outlineColor: "#ddd", // Màu outline (xám nhạt)
-        // Bỏ 'showOutline' và 'showCharacter' để dùng style nét vẽ
+        strokeColor: stroke,
+        highlightColor: "#f00",
+        outlineColor: outline,
         strokeAnimationSpeed: 1.2,
       });
     }
   },
-  {
-    immediate: true, // Chạy 1 lần ngay khi mount để thử tạo
-  }
+  { immediate: true }
 );
+
 // ------------------------------------------
 
 // --- Các hàm điều khiển (Giữ nguyên) ---
