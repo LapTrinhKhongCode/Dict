@@ -1,4 +1,4 @@
-﻿namespace Dict.DTO.Ocr
+﻿namespace Dict.DTO.OCR
 {
     // DTO này đại diện cho một kết quả nhận dạng duy nhất (một từ)
     public class OcrResultDto

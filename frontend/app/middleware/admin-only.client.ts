@@ -9,7 +9,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
     const token = localStorage.getItem('jwt_token');
     const storedRole = localStorage.getItem('user_role');
 
-    if (!token || storedRole !== 'Admin') {
+    if (!token || storedRole !== 'ADMIN') {
       showToast("Bạn không có quyền truy cập trang này.", "error");
       // If there's a previous page, stay on it; on hard refresh, redirect to home to avoid 404
       if (from && from.path && from.path !== to.path) {
@@ -23,7 +23,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
 
   // SSR or fallback safety using reactive state
   const { jwt, role } = useJwt();
-  if (!jwt.value || role.value !== 'Admin') {
+  if (!jwt.value || role.value !== 'ADMIN') {
     showToast("Bạn không có quyền truy cập trang này.", "error");
     if (from && from.path && from.path !== to.path) {
       return abortNavigation();

@@ -64,7 +64,7 @@
       Settings
     </div>
     <NuxtLink
-      v-if="isAuthenticated && role === 'Admin'"
+      v-if="isAuthenticated && role === 'ADMIN'"
       to="/admin"
       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-neutral-700 dark:hover:text-white [&.router-link-exact-active]:bg-primary-100 [&.router-link-exact-active]:text-primary-700 [&.router-link-exact-active]:font-semibold dark:[&.router-link-exact-active]:bg-neutral-700 dark:[&.router-link-exact-active]:text-primary-400"
     >
@@ -83,6 +83,6 @@
 </template>
 
 <script setup lang="ts">
-    import { useJwt } from "@/composables/useJwt";
-    const { isAuthenticated, role } = useJwt();
+import { useJwt } from "@/composables/useJwt";
+const { isAuthenticated, role } = useJwt();
 </script>

@@ -1,4 +1,4 @@
-﻿using Dict.DTO;
+﻿using Dict.DTO.OCR;
 
 namespace Dict.Service.IService
 {

@@ -1,4 +1,5 @@
-﻿using Dict.DTO.Admin;
+﻿using Dict.DTO;
+using Dict.DTO.Admin;
 using Dict.DTO.User;
 
 namespace Dict.Service.IService
@@ -6,7 +7,7 @@ namespace Dict.Service.IService
     public interface IAdminService
     {
         Task<AdminDashboardStatsDto> GetDashboardStatisticsAsync();
-        Task<PaginatedUsersDto> SearchUsersAsync(string? searchTerm, int page, int pageSize);
+        Task<PagedResult<UserDto>> SearchUsersAsync(string? searchTerm, int page, int pageSize);
         Task<HistoricalStatsDto> GetMonthlyGrowthStatisticsAsync();
         Task<bool> AdminResetUserPasswordAsync(int userId, string newPassword);
         Task<bool> SetDeckVisibilityAsync(int deckId, bool isPublic);
@@ -22,5 +23,6 @@ namespace Dict.Service.IService
         Task<List<TopSearchItemDto>> GetTopSearchMissesAsync();
         Task<List<ApiStatItemDto>> GetApiPerformanceStatsAsync();
         Task<List<FailedJobItemDto>> GetFailedSystemJobsAsync();
+        Task<PagedResult<DeckAdminDto>> SearchAllDecksAsync(string? searchTerm, int page, int pageSize);
     }
 }

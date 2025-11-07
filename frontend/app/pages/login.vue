@@ -1,79 +1,95 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useJwt } from '@/composables/useJwt'
-import { useToast } from '@/composables/useToast'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { useJwt } from "@/composables/useJwt";
+import { useToast } from "@/composables/useToast";
 
-const mode = ref<'login' | 'register'>('login')
-const username = ref('')
-const password = ref('')
-const email = ref('')
-const error = ref('')
-const success = ref('')
-const loading = ref(false)
-const touched = ref(false)
-const router = useRouter()
-const { login } = useJwt()
-const { showToast } = useToast()
-const config = useRuntimeConfig()
+const mode = ref<"login" | "register">("login");
+const username = ref("");
+const password = ref("");
+const email = ref("");
+const error = ref("");
+const success = ref("");
+const loading = ref(false);
+const touched = ref(false);
+const router = useRouter();
+const { login } = useJwt();
+const { showToast } = useToast();
+const config = useRuntimeConfig();
 
 // Field error state
-const fieldErrors = ref<{ [k: string]: string }>({})
+const fieldErrors = ref<{ [k: string]: string }>({});
 
-const isEmailValid = () => /.+@.+\..+/.test(email.value)
+const isEmailValid = () => /.+@.+\..+/.test(email.value);
 const isFormValid = () => {
-  if (mode.value === 'login') {
-    return username.value.trim() && password.value.trim()
+  if (mode.value === "login") {
+    return username.value.trim() && password.value.trim();
   } else {
-    return username.value.trim() && password.value.trim() && email.value.trim() && isEmailValid()
+    return (
+      username.value.trim() &&
+      password.value.trim() &&
+      email.value.trim() &&
+      isEmailValid()
+    );
   }
-}
+};
 
 async function handleAuth() {
-  touched.value = true
-  error.value = ''
-  success.value = ''
-  fieldErrors.value = {}
-  if (!isFormValid()) return
-  loading.value = true
+  touched.value = true;
+  error.value = "";
+  success.value = "";
+  fieldErrors.value = {};
+  if (!isFormValid()) return;
+  loading.value = true;
   try {
-    let response
+    let response;
     let fetchOptions = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: mode.value === 'login'
-        ? JSON.stringify({ username: username.value, password: password.value })
-        : JSON.stringify({ username: username.value, email: email.value, password: password.value })
-    }
-    const url = mode.value === 'login' ? `${config.public.apiBaseUrl}/api/Auth/login` : `${config.public.apiBaseUrl}/api/Auth/register`
-    response = await fetch(url, fetchOptions)
-    const data = await response.json()
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body:
+        mode.value === "login"
+          ? JSON.stringify({
+              username: username.value,
+              password: password.value,
+            })
+          : JSON.stringify({
+              username: username.value,
+              email: email.value,
+              password: password.value,
+            }),
+    };
+    const url =
+      mode.value === "login"
+        ? `${config.public.apiBaseUrl}/api/Auth/login`
+        : `${config.public.apiBaseUrl}/api/Auth/register`;
+    response = await fetch(url, fetchOptions);
+    const data = await response.json();
 
     // handle .errors for register validation
     if (data.errors) {
       Object.entries(data.errors).forEach(([key, msgs]) => {
-        if (Array.isArray(msgs)) fieldErrors.value[key.toLowerCase()] = msgs[0]
-      })
-      error.value = data.title || data.message || 'Validation error.'
-      return
+        if (Array.isArray(msgs)) fieldErrors.value[key.toLowerCase()] = msgs[0];
+      });
+      error.value = data.title || data.message || "Validation error.";
+      return;
     }
     // Handle registration success (result is null, isSuccess true)
-    if (mode.value === 'register' && data.isSuccess && !data.result) {
-      success.value = 'Đăng kí thành công!'
-      showToast('Đăng kí thành công!', 'success')
+    if (mode.value === "register" && data.isSuccess && !data.result) {
+      success.value = "Đăng kí thành công!";
+      showToast("Đăng kí thành công!", "success");
       // Autofill username and password
-      mode.value = 'login'
+      mode.value = "login";
       // wait a tick for template to update
       setTimeout(() => {
-        touched.value = false
-        password.value = password.value // keep as is
-        username.value = username.value // keep as is
-      }, 0)
-      return
+        touched.value = false;
+        password.value = password.value; // keep as is
+        username.value = username.value; // keep as is
+      }, 0);
+      return;
     }
     if (!data.isSuccess || !data.result) {
-      error.value = data.message || 'An error occurred'
-      return
+      error.value = data.message || "An error occurred";
+      return;
     }
     if (data.result.token) {
       login(
@@ -83,17 +99,17 @@ async function handleAuth() {
         data.result.email,
         data.result.role,
         data.result.userId
-      )
+      );
 
-      showToast('Login successful!', 'success')
-      await router.push('/')
+      showToast("Login successful!", "success");
+      await router.push("/");
     } else {
-      error.value = 'No token returned from server.'
+      error.value = "No token returned from server.";
     }
   } catch (e) {
-    error.value = 'Network error or invalid server response.'
+    error.value = "Network error or invalid server response.";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 </script>
@@ -131,11 +147,16 @@ async function handleAuth() {
         {{ success }}
       </div>
       <div class="mb-4">
-        <label class="block text-gray-700 dark:text-gray-200 mb-1"
-          >Username</label
+        <label
+          for="username"
+          class="block text-gray-700 dark:text-gray-200 mb-1"
         >
+          Username
+        </label>
         <input
+          id="username"
           v-model="username"
+          aria-label="Username"
           class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white border border-gray-300 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <div
@@ -152,9 +173,7 @@ async function handleAuth() {
         </div>
       </div>
       <div v-if="mode === 'register'" class="mb-4">
-        <label class="block text-gray-700 dark:text-gray-200 mb-1"
-          >Email</label
-        >
+        <label class="block text-gray-700 dark:text-gray-200 mb-1">Email</label>
         <input
           v-model="email"
           type="email"
@@ -180,12 +199,17 @@ async function handleAuth() {
         </div>
       </div>
       <div class="mb-4">
-        <label class="block text-gray-700 dark:text-gray-200 mb-1"
-          >Password</label
+        <label
+          for="password"
+          class="block text-gray-700 dark:text-gray-200 mb-1"
         >
+          Password
+        </label>
         <input
-          v-model="password"
+          id="password"
           type="password"
+          v-model="password"
+          aria-label="Password"
           class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white border border-gray-300 dark:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <div
