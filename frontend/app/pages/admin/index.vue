@@ -1,12 +1,16 @@
 <template>
   <ClientOnly>
-    <div class="min-h-screen text-white p-4 sm:p-8 bg-gray-900">
+    <div
+      class="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white p-4 sm:p-8"
+    >
       <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-bold text-white mb-6">Admin Dashboard</h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+          Admin Dashboard
+        </h1>
 
         <div class="mb-8">
           <nav
-            class="flex space-x-4 border-b border-gray-700"
+            class="flex space-x-4 border-b border-gray-200 dark:border-gray-700"
             aria-label="Tabs"
           >
             <button
@@ -16,8 +20,8 @@
               :class="[
                 'px-4 py-3 font-medium text-sm rounded-t-lg transition-colors',
                 activeTab === tab.id
-                  ? 'border-b-2 border-sky-500 text-sky-400'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800',
+                  ? 'border-b-2 border-primary-500 text-primary-500 dark:border-sky-500 dark:text-sky-400'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800',
               ]"
             >
               {{ tab.name }}
@@ -26,85 +30,109 @@
         </div>
 
         <div v-if="activeTab === 'overview'">
-          <div class="bg-gray-800 rounded-lg p-6 mb-8">
-            <h2 class="text-2xl font-bold text-white mb-6">Thống kê nhanh</h2>
-            <div v-if="isLoadingStats" class="text-gray-400">
+          <div
+            class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-8"
+          >
+            <h2
+              class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+            >
+              Thống kê nhanh
+            </h2>
+            <div v-if="isLoadingStats" class="text-gray-500 dark:text-gray-400">
               Đang tải thống kê...
             </div>
-            <div v-else-if="statsError" class="text-red-400">
+            <div v-else-if="statsError" class="text-red-500 dark:text-red-400">
               {{ statsError }}
             </div>
             <div v-else>
               <div
                 class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
               >
-                <div class="bg-gray-700 rounded-lg p-4">
-                  <div class="text-gray-400 text-sm mb-1">
+                <div
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4"
+                >
+                  <div class="text-gray-600 dark:text-gray-400 text-sm mb-1">
                     Tổng số người dùng
                   </div>
-                  <div class="text-2xl font-bold text-white">
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ statistics?.totalUsers || 0 }}
                   </div>
                 </div>
-                <div class="bg-gray-700 rounded-lg p-4">
-                  <div class="text-gray-400 text-sm mb-1">
+                <div
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4"
+                >
+                  <div class="text-gray-600 dark:text-gray-400 text-sm mb-1">
                     Người dùng mới tháng này
                   </div>
-                  <div class="text-2xl font-bold text-white">
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ statistics?.newUsersThisMonth || 0 }}
                   </div>
                 </div>
-                <div class="bg-gray-700 rounded-lg p-4">
-                  <div class="text-gray-400 text-sm mb-1">Tổng số bộ thẻ</div>
-                  <div class="text-2xl font-bold text-white">
+                <div
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4"
+                >
+                  <div class="text-gray-600 dark:text-gray-400 text-sm mb-1">
+                    Tổng số bộ thẻ
+                  </div>
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ statistics?.totalDecks || 0 }}
                   </div>
                 </div>
-                <div class="bg-gray-700 rounded-lg p-4">
-                  <div class="text-gray-400 text-sm mb-1">
+                <div
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4"
+                >
+                  <div class="text-gray-600 dark:text-gray-400 text-sm mb-1">
                     Bộ thẻ mới tháng này
                   </div>
-                  <div class="text-2xl font-bold text-white">
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ statistics?.newDecksThisMonth || 0 }}
                   </div>
                 </div>
-                <div class="bg-gray-700 rounded-lg p-4">
-                  <div class="text-gray-400 text-sm mb-1">
+                <div
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4"
+                >
+                  <div class="text-gray-600 dark:text-gray-400 text-sm mb-1">
                     Người dùng Premium
                   </div>
-                  <div class="text-2xl font-bold text-white">
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ statistics?.totalPremiumUsers || 0 }}
                   </div>
                 </div>
-                <div class="bg-gray-700 rounded-lg p-4">
-                  <div class="text-gray-400 text-sm mb-1">
+                <div
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4"
+                >
+                  <div class="text-gray-600 dark:text-gray-400 text-sm mb-1">
                     Job OCR (tháng này)
                   </div>
-                  <div class="text-2xl font-bold text-white">
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ statistics?.totalOcrJobsThisMonth || 0 }}
                   </div>
                 </div>
                 <div
-                  class="bg-gray-700 rounded-lg p-4 col-span-1 md:col-span-2"
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 col-span-1 md:col-span-2"
                 >
-                  <div class="text-gray-400 text-sm mb-1">
+                  <div class="text-gray-600 dark:text-gray-400 text-sm mb-1">
                     Tổng dung lượng lưu trữ (MB)
                   </div>
-                  <div class="text-2xl font-bold text-white">
+                  <div class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ statistics?.totalStorageUsedMb?.toFixed(2) || 0 }} MB
                   </div>
                 </div>
               </div>
 
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                <div class="bg-gray-700 rounded-lg p-6">
-                  <h3 class="text-xl font-bold text-white mb-4">
+                <div
+                  class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-6"
+                >
+                  <h3
+                    class="text-xl font-bold text-gray-900 dark:text-white mb-4"
+                  >
                     Tăng trưởng người dùng (6 tháng gần nhất)
                   </h3>
-                  <div v-if="isLoadingGrowth" class="text-gray-400">
+                  <div v-if="isLoadingGrowth" class="text-gray-500 dark:text-gray-400">
                     Đang tải dữ liệu...
                   </div>
-                  <div v-else-if="growthError" class="text-red-400">
+                  <div v-else-if="growthError" class="text-red-500 dark:text-red-400">
                     {{ growthError }}
                   </div>
                   <div v-else-if="userChartData.length > 0" class="relative">
@@ -130,7 +158,10 @@
                           />
                         </linearGradient>
                       </defs>
-                      <path :d="userAreaPath" fill="url(#userAreaGradient)" />
+                      <path
+                        :d="userAreaPath"
+                        fill="url(#userAreaGradient)"
+                      />
                       <path
                         :d="userLinePath"
                         fill="none"
@@ -146,8 +177,8 @@
                         :cy="point.y"
                         r="5"
                         fill="#0ea5e9"
-                        stroke="#1e293b"
                         stroke-width="2"
+                        class="stroke-white dark:stroke-gray-700"
                       >
                         <title>
                           {{ point.label }}: {{ point.value }} người dùng
@@ -159,8 +190,8 @@
                         :x="point.x"
                         :y="chartHeight - 10"
                         text-anchor="middle"
-                        fill="#9ca3af"
                         font-size="12"
+                        class="fill-gray-500 dark:fill-gray-400"
                       >
                         {{ point.monthLabel }}
                       </text>
@@ -169,23 +200,27 @@
                         :key="`user-y-${index}`"
                         x="10"
                         :y="tick.y + 4"
-                        fill="#9ca3af"
                         font-size="12"
                         text-anchor="start"
+                        class="fill-gray-500 dark:fill-gray-400"
                       >
                         {{ tick.value }}
                       </text>
                     </svg>
                   </div>
                 </div>
-                <div class="bg-gray-700 rounded-lg p-6">
-                  <h3 class="text-xl font-bold text-white mb-4">
+                <div
+                  class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-6"
+                >
+                  <h3
+                    class="text-xl font-bold text-gray-900 dark:text-white mb-4"
+                  >
                     Tăng trưởng bộ thẻ (6 tháng gần nhất)
                   </h3>
-                  <div v-if="isLoadingGrowth" class="text-gray-400">
+                  <div v-if="isLoadingGrowth" class="text-gray-500 dark:text-gray-400">
                     Đang tải dữ liệu...
                   </div>
-                  <div v-else-if="growthError" class="text-red-400">
+                  <div v-else-if="growthError" class="text-red-500 dark:text-red-400">
                     {{ growthError }}
                   </div>
                   <div v-else-if="deckChartData.length > 0" class="relative">
@@ -227,8 +262,8 @@
                         :cy="point.y"
                         r="5"
                         fill="#10b981"
-                        stroke="#1e293b"
                         stroke-width="2"
+                        class="stroke-white dark:stroke-gray-700"
                       >
                         <title>
                           {{ point.label }}: {{ point.value }} bộ thẻ
@@ -240,8 +275,8 @@
                         :x="point.x"
                         :y="chartHeight - 10"
                         text-anchor="middle"
-                        fill="#9ca3af"
                         font-size="12"
+                        class="fill-gray-500 dark:fill-gray-400"
                       >
                         {{ point.monthLabel }}
                       </text>
@@ -250,9 +285,9 @@
                         :key="`deck-y-${index}`"
                         x="10"
                         :y="tick.y + 4"
-                        fill="#9ca3af"
                         font-size="12"
                         text-anchor="start"
+                        class="fill-gray-500 dark:fill-gray-400"
                       >
                         {{ tick.value }}
                       </text>
@@ -264,14 +299,18 @@
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div class="bg-gray-800 rounded-lg p-6">
-              <h2 class="text-2xl font-bold text-white mb-6">
+            <div
+              class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6"
+            >
+              <h2
+                class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+              >
                 Top từ khóa được tra cứu
               </h2>
-              <div v-if="isLoadingOtherStats" class="text-gray-400">
+              <div v-if="isLoadingOtherStats" class="text-gray-500 dark:text-gray-400">
                 Đang tải...
               </div>
-              <div v-else-if="otherStatsError" class="text-red-400">
+              <div v-else-if="otherStatsError" class="text-red-500 dark:text-red-400">
                 {{ otherStatsError }}
               </div>
               <div v-else class="simple-table-container">
@@ -294,14 +333,18 @@
                 </table>
               </div>
             </div>
-            <div class="bg-gray-800 rounded-lg p-6">
-              <h2 class="text-2xl font-bold text-white mb-6">
+            <div
+              class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6"
+            >
+              <h2
+                class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+              >
                 Top từ khóa tìm hụt
               </h2>
-              <div v-if="isLoadingOtherStats" class="text-gray-400">
+              <div v-if="isLoadingOtherStats" class="text-gray-500 dark:text-gray-400">
                 Đang tải...
               </div>
-              <div v-else-if="otherStatsError" class="text-red-400">
+              <div v-else-if="otherStatsError" class="text-red-500 dark:text-red-400">
                 {{ otherStatsError }}
               </div>
               <div v-else class="simple-table-container">
@@ -328,8 +371,12 @@
         </div>
 
         <div v-if="activeTab === 'users'">
-          <div class="bg-gray-800 rounded-lg p-6">
-            <h2 class="text-2xl font-bold text-white mb-6">
+          <div
+            class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6"
+          >
+            <h2
+              class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+            >
               Quản lý Người dùng
             </h2>
             <div class="mb-6">
@@ -351,12 +398,14 @@
                 </button>
               </div>
             </div>
-            <div v-if="isSearching" class="text-gray-400">Đang tìm kiếm...</div>
-            <div v-else-if="searchError" class="text-red-400">
+            <div v-if="isSearching" class="text-gray-500 dark:text-gray-400">
+              Đang tìm kiếm...
+            </div>
+            <div v-else-if="searchError" class="text-red-500 dark:text-red-400">
               {{ searchError }}
             </div>
             <div v-else-if="searchResults.length > 0" class="space-y-4">
-              <div class="text-gray-400 text-sm mb-4">
+              <div class="text-gray-500 dark:text-gray-400 text-sm mb-4">
                 Tìm thấy {{ searchTotalCount }} người dùng (trang
                 {{ searchPage }}/{{ totalPages }})
               </div>
@@ -364,18 +413,20 @@
                 <div
                   v-for="user in searchResults"
                   :key="user.id"
-                  class="bg-gray-700 rounded-lg p-4 transition-all hover:bg-gray-600 flex items-center gap-4"
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 transition-all hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-4"
                 >
                   <div class="flex-shrink-0">
                     <img
                       :src="user.avatarUrl || '...'"
                       :alt="user.username"
-                      class="w-12 h-12 rounded-full object-cover bg-gray-600"
+                      class="w-12 h-12 rounded-full object-cover bg-gray-300 dark:bg-gray-600"
                     />
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                      <h3 class="text-lg font-semibold text-white truncate">
+                      <h3
+                        class="text-lg font-semibold text-gray-900 dark:text-white truncate"
+                      >
                         {{ user.username }}
                       </h3>
                       <span
@@ -389,7 +440,9 @@
                         >ĐÃ KHÓA</span
                       >
                     </div>
-                    <p class="text-gray-400 text-sm truncate">
+                    <p
+                      class="text-gray-600 dark:text-gray-400 text-sm truncate"
+                    >
                       {{ user.email }}
                     </p>
                   </div>
@@ -415,7 +468,7 @@
                 >
                   Trước
                 </button>
-                <span class="text-gray-400"
+                <span class="text-gray-500 dark:text-gray-400"
                   >Trang {{ searchPage }} / {{ totalPages }}</span
                 >
                 <button
@@ -427,38 +480,47 @@
                 </button>
               </div>
             </div>
-            <div v-else-if="hasSearched" class="text-gray-400">
+            <div v-else-if="hasSearched" class="text-gray-500 dark:text-gray-400">
               Không tìm thấy người dùng nào.
             </div>
           </div>
         </div>
 
         <div v-if="activeTab === 'health'">
-          <div class="bg-gray-800 rounded-lg p-6 mb-8">
-            <h2 class="text-2xl font-bold text-white mb-6">
+          <div
+            class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-8"
+          >
+            <h2
+              class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+            >
               Giám sát Hạ tầng Azure (1 Giờ qua)
             </h2>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div class="bg-gray-700 rounded-lg p-6">
+              <div
+                class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-6"
+              >
                 <div v-if="azureVmMetadata" class="mb-4">
-                  <h3 class="text-xl font-bold text-white">
+                  <h3
+                    class="text-xl font-bold text-gray-900 dark:text-white"
+                  >
                     {{ azureVmMetadata.name }}
                   </h3>
-                  <div class="text-sm text-gray-400">
-                    Đơn vị: {{ azureVmMetadata.unit }} | Khoảng thời gian: 1 giờ
+                  <div class="text-sm text-gray-600 dark:text-gray-400">
+                    Đơn vị: {{ azureVmMetadata.unit }} | Khoảng thời gian: 1
+                    giờ
                   </div>
-                  <div class="text-3xl font-bold text-fuchsia-400 mt-2">
+                  <div class="text-3xl font-bold text-fuchsia-500 dark:text-fuchsia-400 mt-2">
                     {{ azureVmMetadata.latestValue?.toFixed(2) ?? "..." }} %
                   </div>
                 </div>
-                <h3 v-else class="text-xl font-bold text-white mb-4">
+                <h3 v-else class="text-xl font-bold text-gray-900 dark:text-white mb-4">
                   Azure VM: % CPU
                 </h3>
 
-                <div v-if="isLoadingVmMetrics" class="text-gray-400">
+                <div v-if="isLoadingVmMetrics" class="text-gray-500 dark:text-gray-400">
                   Đang tải dữ liệu...
                 </div>
-                <div v-else-if="vmMetricsError" class="text-red-400">
+                <div v-else-if="vmMetricsError" class="text-red-500 dark:text-red-400">
                   {{ vmMetricsError }}
                 </div>
                 <div v-else-if="vmChartData.length > 0" class="relative">
@@ -500,8 +562,8 @@
                       :cy="point.y"
                       r="5"
                       fill="#d946ef"
-                      stroke="#1e293b"
                       stroke-width="2"
+                      class="stroke-white dark:stroke-gray-700"
                     >
                       <title>
                         {{ point.label }}: {{ point.value.toFixed(2) }} %
@@ -513,8 +575,8 @@
                       :x="point.x"
                       :y="chartHeight - 10"
                       text-anchor="middle"
-                      fill="#9ca3af"
                       font-size="12"
+                      class="fill-gray-500 dark:fill-gray-400"
                     >
                       {{ point.monthLabel }}
                     </text>
@@ -523,9 +585,9 @@
                       :key="`vm-y-${index}`"
                       x="10"
                       :y="tick.y + 4"
-                      fill="#9ca3af"
                       font-size="12"
                       text-anchor="start"
+                      class="fill-gray-500 dark:fill-gray-400"
                     >
                       {{ tick.value }}%
                     </text>
@@ -533,7 +595,7 @@
 
                   <details class="mt-4">
                     <summary
-                      class="cursor-pointer text-gray-400 hover:text-white"
+                      class="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
                     >
                       Xem dữ liệu thô
                     </summary>
@@ -562,32 +624,36 @@
                     </div>
                   </details>
                 </div>
-                <div v-else class="text-gray-400">
+                <div v-else class="text-gray-500 dark:text-gray-400">
                   Chưa có dữ liệu để hiển thị
                 </div>
               </div>
 
-              <div class="bg-gray-700 rounded-lg p-6">
+              <div
+                class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-6"
+              >
                 <div v-if="azureSqlMetadata" class="mb-4">
-                  <h3 class="text-xl font-bold text-white">
+                  <h3
+                    class="text-xl font-bold text-gray-900 dark:text-white"
+                  >
                     {{ azureSqlMetadata.name }}
                   </h3>
-                  <div class="text-sm text-gray-400">
+                  <div class="text-sm text-gray-600 dark:text-gray-400">
                     Đơn vị: {{ azureSqlMetadata.unit }} | Khoảng thời gian: 1
                     giờ
                   </div>
-                  <div class="text-3xl font-bold text-orange-400 mt-2">
+                  <div class="text-3xl font-bold text-orange-500 dark:text-orange-400 mt-2">
                     {{ azureSqlMetadata.latestValue?.toFixed(2) ?? "..." }} %
                   </div>
                 </div>
-                <h3 v-else class="text-xl font-bold text-white mb-4">
+                <h3 v-else class="text-xl font-bold text-gray-900 dark:text-white mb-4">
                   Azure SQL DB: % CPU
                 </h3>
 
-                <div v-if="isLoadingSqlMetrics" class="text-gray-400">
+                <div v-if="isLoadingSqlMetrics" class="text-gray-500 dark:text-gray-400">
                   Đang tải dữ liệu...
                 </div>
-                <div v-else-if="sqlMetricsError" class="text-red-400">
+                <div v-else-if="sqlMetricsError" class="text-red-500 dark:text-red-400">
                   {{ sqlMetricsError }}
                 </div>
                 <div v-else-if="sqlChartData.length > 0" class="relative">
@@ -629,8 +695,8 @@
                       :cy="point.y"
                       r="5"
                       fill="#f97316"
-                      stroke="#1e293b"
                       stroke-width="2"
+                      class="stroke-white dark:stroke-gray-700"
                     >
                       <title>
                         {{ point.label }}: {{ point.value.toFixed(2) }} %
@@ -642,8 +708,8 @@
                       :x="point.x"
                       :y="chartHeight - 10"
                       text-anchor="middle"
-                      fill="#9ca3af"
                       font-size="12"
+                      class="fill-gray-500 dark:fill-gray-400"
                     >
                       {{ point.monthLabel }}
                     </text>
@@ -652,9 +718,9 @@
                       :key="`sql-y-${index}`"
                       x="10"
                       :y="tick.y + 4"
-                      fill="#9ca3af"
                       font-size="12"
                       text-anchor="start"
+                      class="fill-gray-500 dark:fill-gray-400"
                     >
                       {{ tick.value }}%
                     </text>
@@ -662,7 +728,7 @@
 
                   <details class="mt-4">
                     <summary
-                      class="cursor-pointer text-gray-400 hover:text-white"
+                      class="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
                     >
                       Xem dữ liệu thô
                     </summary>
@@ -691,7 +757,7 @@
                     </div>
                   </details>
                 </div>
-                <div v-else class="text-gray-400">
+                <div v-else class="text-gray-500 dark:text-gray-400">
                   Chưa có dữ liệu để hiển thị
                 </div>
               </div>
@@ -699,12 +765,18 @@
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div class="bg-gray-800 rounded-lg p-6">
-              <h2 class="text-2xl font-bold text-white mb-6">Hiệu suất API</h2>
-              <div v-if="isLoadingOtherStats" class="text-gray-400">
+            <div
+              class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6"
+            >
+              <h2
+                class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+              >
+                Hiệu suất API
+              </h2>
+              <div v-if="isLoadingOtherStats" class="text-gray-500 dark:text-gray-400">
                 Đang tải...
               </div>
-              <div v-else-if="otherStatsError" class="text-red-400">
+              <div v-else-if="otherStatsError" class="text-red-500 dark:text-red-400">
                 {{ otherStatsError }}
               </div>
               <div v-else class="simple-table-container">
@@ -731,14 +803,18 @@
                 </table>
               </div>
             </div>
-            <div class="bg-gray-800 rounded-lg p-6">
-              <h2 class="text-2xl font-bold text-white mb-6">
+            <div
+              class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6"
+            >
+              <h2
+                class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+              >
                 Job hệ thống bị lỗi
               </h2>
-              <div v-if="isLoadingOtherStats" class="text-gray-400">
+              <div v-if="isLoadingOtherStats" class="text-gray-500 dark:text-gray-400">
                 Đang tải...
               </div>
-              <div v-else-if="otherStatsError" class="text-red-400">
+              <div v-else-if="otherStatsError" class="text-red-500 dark:text-red-400">
                 {{ otherStatsError }}
               </div>
               <div v-else class="simple-table-container">
@@ -756,7 +832,7 @@
                       <td>
                         {{ new Date(item.failedAt).toLocaleString("vi-VN") }}
                       </td>
-                      <td class="break-all text-red-400">
+                      <td class="break-all text-red-500 dark:text-red-400">
                         {{ item.errorMessage }}
                       </td>
                     </tr>
@@ -770,8 +846,12 @@
           </div>
         </div>
         <div v-if="activeTab === 'content'">
-          <div class="bg-gray-800 rounded-lg p-6">
-            <h2 class="text-2xl font-bold text-white mb-6">
+          <div
+            class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6"
+          >
+            <h2
+              class="text-2xl font-bold text-gray-900 dark:text-white mb-6"
+            >
               Quản lý Flashcard (Bộ thẻ)
             </h2>
 
@@ -795,14 +875,14 @@
               </div>
             </div>
 
-            <div v-if="isDeckSearching" class="text-gray-400">
+            <div v-if="isDeckSearching" class="text-gray-500 dark:text-gray-400">
               Đang tìm kiếm bộ thẻ...
             </div>
-            <div v-else-if="deckSearchError" class="text-red-400">
+            <div v-else-if="deckSearchError" class="text-red-500 dark:text-red-400">
               {{ deckSearchError }}
             </div>
             <div v-else-if="deckResults.length > 0" class="space-y-4">
-              <div class="text-gray-400 text-sm mb-4">
+              <div class="text-gray-500 dark:text-gray-400 text-sm mb-4">
                 Tìm thấy {{ deckSearchTotalCount }} bộ thẻ (trang
                 {{ deckSearchPage }}/{{ deckTotalPages }})
               </div>
@@ -810,13 +890,13 @@
                 <div
                   v-for="deck in deckResults"
                   :key="deck.id"
-                  class="bg-gray-700 rounded-lg p-4 transition-all"
+                  class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 transition-all"
                 >
                   <div class="flex items-center gap-4">
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-3">
                         <h3
-                          class="text-lg font-semibold text-white truncate"
+                          class="text-lg font-semibold text-gray-900 dark:text-white truncate"
                           :title="deck.name"
                         >
                           {{ deck.name }}
@@ -833,13 +913,13 @@
                         </span>
                       </div>
                       <p
-                        class="text-gray-400 text-sm truncate"
+                        class="text-gray-600 dark:text-gray-400 text-sm truncate"
                         :title="deck.description"
                       >
                         {{ deck.description || "Không có mô tả" }}
                       </p>
                       <div
-                        class="flex items-center gap-4 mt-2 text-xs text-gray-500"
+                        class="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400"
                       >
                         <span>ID: {{ deck.id }}</span>
                         <span
@@ -855,10 +935,10 @@
                         @click="handleSetVisibility(deck)"
                         :disabled="isActionLoading === deck.id"
                         :class="[
-                          'px-3 py-1.5 text-sm rounded-lg transition-colors font-medium',
+                          'px-3 py-1.5 text-sm rounded-lg transition-colors font-medium text-white',
                           deck.isPublic
-                            ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                            : 'bg-sky-600 hover:bg-sky-700 text-white',
+                            ? 'bg-yellow-600 hover:bg-yellow-700'
+                            : 'bg-sky-600 hover:bg-sky-700',
                         ]"
                         :title="
                           deck.isPublic
@@ -892,7 +972,7 @@
                 >
                   Trước
                 </button>
-                <span class="text-gray-400">
+                <span class="text-gray-500 dark:text-gray-400">
                   Trang {{ deckSearchPage }} / {{ deckTotalPages }}
                 </span>
                 <button
@@ -906,7 +986,7 @@
                 </button>
               </div>
             </div>
-            <div v-else-if="hasDeckSearched" class="text-gray-400">
+            <div v-else-if="hasDeckSearched" class="text-gray-500 dark:text-gray-400">
               Không tìm thấy bộ thẻ nào.
             </div>
           </div>
@@ -1666,26 +1746,33 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* (Style của bạn giữ nguyên) */
+/* ✅ THAY ĐỔI:
+  - Tái cấu trúc lại toàn bộ CSS
+  - Thêm style cho light mode (mặc định)
+  - Bọc style cho dark mode (cũ) trong class .dark
+*/
+
+/* --- LIGHT MODE (MẶC ĐỊNH) --- */
 .form-input {
   width: 100%;
-  background-color: #374151;
-  border: 1px solid #4b5563;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db; /* border-gray-300 */
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
-  color: white;
+  color: #111827; /* text-gray-900 */
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .form-input:focus {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.4);
+  border-color: #2563eb; /* primary-600 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
 }
 .form-input::placeholder {
-  color: #9ca3af;
+  color: #9ca3af; /* text-gray-400 */
 }
+
 .form-button-primary {
-  background-color: #0ea5e9;
+  background-color: #2563eb; /* primary-600 */
   color: white;
   font-weight: 600;
   padding: 0.75rem 1.5rem;
@@ -1695,19 +1782,20 @@ onMounted(() => {
   cursor: pointer;
 }
 .form-button-primary:hover:not(:disabled) {
-  background-color: #0284c7;
+  background-color: #1d4ed8; /* primary-700 */
 }
 .form-button-primary:disabled {
-  background-color: #4b5563;
-  opacity: 0.5;
+  background-color: #e5e7eb; /* bg-gray-200 */
+  color: #9ca3af; /* text-gray-400 */
+  opacity: 0.7;
   cursor: not-allowed;
 }
 
-/* (Style cho bảng giữ nguyên) */
+/* (Style cho bảng) */
 .simple-table-container {
   max-height: 400px;
   overflow-y: auto;
-  border: 1px solid #4b5563;
+  border: 1px solid #e5e7eb; /* border-gray-200 */
   border-radius: 0.5rem;
 }
 .simple-table {
@@ -1718,102 +1806,76 @@ onMounted(() => {
 .simple-table td {
   padding: 0.75rem 1rem;
   text-align: left;
-  border-bottom: 1px solid #4b5563;
+  border-bottom: 1px solid #e5e7eb; /* border-gray-200 */
+  color: #111827; /* text-gray-900 */
+}
+.dark .simple-table td {
+  color: #e5e7eb; /* text-gray-200 */
 }
 .simple-table th {
-  background-color: #374151;
+  background-color: #f9fafb; /* bg-gray-50 */
   font-weight: 600;
   position: sticky;
   top: 0;
+  color: #374151; /* text-gray-700 */
 }
 .simple-table tbody tr:last-child td {
   border-bottom: none;
 }
 .simple-table tbody tr:hover {
-  background-color: #3f4a5c;
+  background-color: #f9fafb; /* bg-gray-50 */
 }
 .simple-table td.text-center {
   text-align: center;
-  color: #9ca3af;
+  color: #6b7280; /* text-gray-500 */
   padding: 1.5rem;
+}
+.dark .simple-table td.text-center {
+  color: #6b7280; /* text-gray-500 */
 }
 .simple-table td.break-all {
   word-break: break-all;
 }
-</style>
-<style scoped>
-/* (Style cũ của bạn, giữ nguyên) */
-.form-input {
-  width: 100%;
+
+/* --- DARK MODE --- */
+.dark .form-input {
   background-color: #374151;
   border: 1px solid #4b5563;
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
   color: white;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.form-input:focus {
+.dark .form-input:focus {
   border-color: #0ea5e9;
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.4);
 }
-.form-input::placeholder {
+.dark .form-input::placeholder {
   color: #9ca3af;
-}
-.form-button-primary {
-  background-color: #0ea5e9;
-  color: white;
-  font-weight: 600;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  transition: background-color 0.2s;
-  border: none;
-  cursor: pointer;
-}
-.form-button-primary:hover:not(:disabled) {
-  background-color: #0284c7;
-}
-.form-button-primary:disabled {
-  background-color: #4b5563;
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
-/* (Style mới cho bảng) */
-.simple-table-container {
-  max-height: 400px;
-  overflow-y: auto;
+.dark .form-button-primary {
+  background-color: #0ea5e9; /* sky-500 */
+  color: white;
+}
+.dark .form-button-primary:hover:not(:disabled) {
+  background-color: #0284c7; /* sky-600 */
+}
+.dark .form-button-primary:disabled {
+  background-color: #4b5563;
+  opacity: 0.5;
+  color: #9ca3af;
+}
+
+.dark .simple-table-container {
   border: 1px solid #4b5563;
-  border-radius: 0.5rem;
 }
-.simple-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.simple-table th,
-.simple-table td {
-  padding: 0.75rem 1rem;
-  text-align: left;
+.dark .simple-table th,
+.dark .simple-table td {
   border-bottom: 1px solid #4b5563;
 }
-.simple-table th {
+.dark .simple-table th {
   background-color: #374151;
-  font-weight: 600;
-  position: sticky;
-  top: 0;
+  color: #e5e7eb; /* text-gray-200 */
 }
-.simple-table tbody tr:last-child td {
-  border-bottom: none;
-}
-.simple-table tbody tr:hover {
+.dark .simple-table tbody tr:hover {
   background-color: #3f4a5c;
-}
-.simple-table td.text-center {
-  text-align: center;
-  color: #9ca3af;
-  padding: 1.5rem;
-}
-.simple-table td.break-all {
-  word-break: break-all;
 }
 </style>

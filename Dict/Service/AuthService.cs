@@ -133,7 +133,7 @@ namespace Dict.Service
                 Email = requestData.Email,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
-                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/17cbb928-af2d-4d11-9397-102f8d3d332f.png",
+                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/523d68a2-cc64-4537-b8b0-dbf9d40b26a8.png",
                 // KHÔNG SET PASSWORD HASH Ở ĐÂY
             };
 
