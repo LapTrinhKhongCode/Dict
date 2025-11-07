@@ -1,5 +1,5 @@
 ﻿using Dict.Data;
-using Dict.DTO;
+using Dict.DTO.OCR;
 using Dict.Models;
 using Dict.Service.IService;
 

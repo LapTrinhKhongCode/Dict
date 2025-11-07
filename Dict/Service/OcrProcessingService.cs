@@ -1,5 +1,4 @@
 ﻿using Dict.Data;
-using Dict.DTO;
 using Dict.Models;
 using Dict.Service.IService;
 using System.Text.Json;
@@ -7,8 +6,8 @@ using System.Text.RegularExpressions;
 using System.Text;
 using System.Security.Cryptography;
 using System.Net.Http.Headers;
-using Dict.DTO.Ocr;
 using Microsoft.EntityFrameworkCore;
+using Dict.DTO.OCR;
 
 namespace Dict.Service
 {

@@ -24,6 +24,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using ImageMagick;
 using System.Text.Json;
+using Dict.DTO.OCR;
 [ApiController]
 [Route("api/[controller]")]
 public class InferController : ControllerBase
@@ -31,6 +32,7 @@ public class InferController : ControllerBase
 
     private readonly ILogger<InferController> _logger;
     private readonly IOcrProcessingService _ocrProcessingService; 
+    private readonly IOcrJobService _ocrJobService;
     private readonly ResponseDTO _response;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _pythonApiBaseUrl;
@@ -103,12 +105,13 @@ public class InferController : ControllerBase
     public InferController(
         ILogger<InferController> logger,
         IOcrProcessingService ocrProcessingService,
-        IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        IHttpClientFactory httpClientFactory, IConfiguration configuration, IOcrJobService ocrJobService)
         
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _ocrProcessingService = ocrProcessingService;
+        _ocrJobService = ocrJobService;
         _response = new ResponseDTO();
         _pythonApiBaseUrl = configuration["ServiceUrls:PythonApiBaseUrl"]
                             ?? "http://127.0.0.1:8000";
@@ -128,7 +131,7 @@ public class InferController : ControllerBase
     }
 
     [HttpPost("stream")]
-    // Nhận file từ form, giống hệt [FromForm] IFormFile
+    [Authorize] // 1. BẮT BUỘC [Authorize] để lấy GetUserId()
     public async Task StreamOcr(IFormFile file)
     {
         if (file == null || file.Length == 0)
@@ -138,51 +141,134 @@ public class InferController : ControllerBase
             return;
         }
 
+        OcrJobDto ocrJob = null;
+        var fullTextBuilder = new StringBuilder();
+        var resultsBatch = new List<CreateOcrResultDto>();
+        const int BATCH_SIZE = 20;
+        int userId = 0;
+
         try
         {
-            // 1. Dùng IHttpClientFactory (cách làm đúng trong dự án DI)
-            using var httpClient = _httpClientFactory.CreateClient();
+            // 2. Lấy UserId và Tạo Job trong DB
+            userId = GetUserId();
+            ocrJob = await _ocrJobService.CreateAsync(new OcrJobCreateDto
+            {
+                UserId = userId,
+                Status = "Processing",
+                DetectedText = ""
+            });
+            _logger.LogInformation("Đã tạo OcrJob {JobId} (Ảnh đơn) cho User {UserId}", ocrJob.Id, userId);
 
-            // 2. Tạo form-data để gửi file (giữ nguyên logic)
+            // 3. Gọi Python API (Giữ nguyên)
+            using var httpClient = _httpClientFactory.CreateClient();
             using var formData = new MultipartFormDataContent();
             var fileStreamContent = new StreamContent(file.OpenReadStream());
             fileStreamContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
             formData.Add(fileStreamContent, "file", file.FileName);
 
-            // 3. Tạo request POST đến Python (giữ nguyên logic)
-            var pythonRequest = new HttpRequestMessage(
-                HttpMethod.Post,
-                $"{_pythonApiBaseUrl}/ocr-stream"
-            );
+            var pythonRequest = new HttpRequestMessage(HttpMethod.Post, $"{_pythonApiBaseUrl}/ocr-stream");
             pythonRequest.Content = formData;
 
-            // 4. Gửi request và chỉ đọc HEADER (giữ nguyên logic)
             using var pythonResponse = await httpClient.SendAsync(
                 pythonRequest,
-                HttpCompletionOption.ResponseHeadersRead, // Chìa khóa stream
-                HttpContext.RequestAborted // Ngắt nếu client ngắt
+                HttpCompletionOption.ResponseHeadersRead,
+                HttpContext.RequestAborted
             );
 
-            // 5. Cài đặt Header cho Vue (giữ nguyên logic)
+            // 4. Cài đặt Header cho Vue (Giữ nguyên)
             HttpContext.Response.ContentType = "text/event-stream";
             HttpContext.Response.StatusCode = (int)pythonResponse.StatusCode;
 
             if (!pythonResponse.IsSuccessStatusCode)
             {
                 _logger.LogWarning($"Python API error: {pythonResponse.StatusCode}");
-                // Không cần làm gì thêm, Vue sẽ nhận được code lỗi
-                return;
+                // Ném lỗi để Catch xử lý (cập nhật Job = Failed)
+                throw new Exception($"Python API error: {pythonResponse.StatusCode}");
             }
 
-            // 6. Lấy stream từ Python (giữ nguyên logic)
             using var pythonStream = await pythonResponse.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(pythonStream);
 
-            // 7. Bơm stream từ Python về Vue (giữ nguyên logic)
-            await pythonStream.CopyToAsync(HttpContext.Response.Body, HttpContext.RequestAborted);
+            // 5. Đọc Stream, Gửi về Vue, VÀ Ghi log DB
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync();
+
+                if (string.IsNullOrEmpty(line))
+                {
+                    await HttpContext.Response.WriteAsync("\n\n");
+                    continue;
+                }
+
+                if (line.StartsWith("data:"))
+                {
+                    try
+                    {
+                        string jsonString = line.Substring(5).Trim();
+                        var data = JsonSerializer.Deserialize<OcrStreamResult>(jsonString);
+
+                        if (data != null && data.Status == "result")
+                        {
+                            data.PageNumber = 1; // Ảnh đơn luôn là trang 1
+
+                            // A. Thêm kết quả vào "túi" (Batch)
+                            resultsBatch.Add(new CreateOcrResultDto
+                            {
+                                PageNumber = 1,
+                                WordText = data.Text,
+                                BoundingBox = JsonSerializer.Serialize(data.Bbox)
+                            });
+                            fullTextBuilder.AppendLine(data.Text);
+
+                            // B. Nếu túi đầy, đổ túi vào DB
+                            if (resultsBatch.Count >= BATCH_SIZE)
+                            {
+                                await _ocrJobService.AppendResultsAsync(ocrJob.Id, resultsBatch);
+                                resultsBatch.Clear(); // Dọn túi
+                            }
+
+                            // C. Gửi JSON đã sửa đổi về Vue (Giữ nguyên)
+                            string modifiedJsonString = JsonSerializer.Serialize(data);
+                            await HttpContext.Response.WriteAsync($"data: {modifiedJsonString}\n\n");
+                            await HttpContext.Response.Body.FlushAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Lỗi parse JSON từ Python: {line}");
+                    }
+                }
+            }
+
+            // 6. LƯU NỐT PHẦN CÒN LẠI VÀ CẬP NHẬT TRẠNG THÁI
+            if (resultsBatch.Any())
+            {
+                await _ocrJobService.AppendResultsAsync(ocrJob.Id, resultsBatch);
+            }
+
+            await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
+            {
+                Status = "Completed",
+                DetectedText = fullTextBuilder.ToString()
+            });
+            _logger.LogInformation("Đã xử lý xong ảnh đơn cho Job {JobId}.", ocrJob.Id);
+
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Lỗi khi stream OCR");
+            _logger.LogError(ex, "Lỗi khi stream OCR (User: {UserId})", userId);
+
+            // 7. CẬP NHẬT JOB LÀ THẤT BẠI
+            if (ocrJob != null)
+            {
+                await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
+                {
+                    Status = "Failed",
+                    DetectedText = fullTextBuilder.ToString() + $"\n\nLỖI: {ex.Message}"
+                });
+                _logger.LogError("Đã đánh dấu Job {JobId} là Failed.", ocrJob.Id);
+            }
+
             if (!HttpContext.Response.HasStarted)
             {
                 HttpContext.Response.StatusCode = 500;
@@ -193,6 +279,7 @@ public class InferController : ControllerBase
 
 
     [HttpPost("pdf-stream")]
+    [Authorize] // 1. BẮT BUỘC [Authorize]
     public async Task StreamPdfOcr(IFormFile file)
     {
         if (file == null || file.Length == 0 || file.ContentType != "application/pdf")
@@ -202,41 +289,48 @@ public class InferController : ControllerBase
             return;
         }
 
-        // 1. Cài đặt stream về cho Vue (Giống hệt hàm cũ)
         HttpContext.Response.ContentType = "text/event-stream";
         HttpContext.Response.StatusCode = 200;
 
         int pageIndex = 1;
+        OcrJobDto ocrJob = null; // Biến để lưu Job DTO
+        var fullTextBuilder = new StringBuilder(); // Biến để lưu Full Text
+        var resultsBatch = new List<CreateOcrResultDto>(); // Biến để "tích" kết quả
+        const int BATCH_SIZE = 20; // Ghi xuống DB sau mỗi 20 dòng
+        int userId = 0;
 
         try
         {
-            // 2. Mở file PDF bằng Magick.NET
-            // Thư viện này sẽ đọc PDF và tách thành một bộ sưu tập ảnh
+            // 2. Lấy UserId và Tạo Job
+            userId = GetUserId();
+            ocrJob = await _ocrJobService.CreateAsync(new OcrJobCreateDto
+            {
+                UserId = userId,
+                Status = "Processing",
+                DetectedText = ""
+            });
+            _logger.LogInformation("Đã tạo OcrJob {JobId} (PDF Stream) cho User {UserId}", ocrJob.Id, userId);
+
+            // 3. Mở PDF (Giữ nguyên)
             using var images = new MagickImageCollection();
             await images.ReadAsync(file.OpenReadStream());
+            _logger.LogInformation($"Tách PDF thành công. Số trang: {images.Count} (Job: {ocrJob.Id})");
 
-            _logger.LogInformation($"Tách PDF thành công. Số trang: {images.Count}");
-
-            // 3. Lặp qua từng trang (từng ảnh)
+            // 4. Lặp qua từng trang (Giữ nguyên)
             foreach (var image in images)
             {
-                // Chuyển ảnh của trang hiện tại thành byte[] (định dạng Png)
                 image.Format = MagickFormat.Png;
                 byte[] imageBytes = image.ToByteArray();
+                _logger.LogInformation($"Đang xử lý trang {pageIndex} cho Job {ocrJob.Id}...");
 
-                _logger.LogInformation($"Đang xử lý trang {pageIndex}...");
-
-                // 4. Gọi API Python /ocr-stream (Tái sử dụng logic cũ của bạn)
+                // (Gọi Python API giữ nguyên...)
                 using var httpClient = _httpClientFactory.CreateClient();
                 using var formData = new MultipartFormDataContent();
                 var imageContent = new ByteArrayContent(imageBytes);
                 imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
                 formData.Add(imageContent, "file", $"page_{pageIndex}.png");
 
-                var pythonRequest = new HttpRequestMessage(
-                    HttpMethod.Post,
-                    $"{_pythonApiBaseUrl}/ocr-stream" // Gọi lại API OCR ảnh cũ
-                );
+                var pythonRequest = new HttpRequestMessage(HttpMethod.Post, $"{_pythonApiBaseUrl}/ocr-stream");
                 pythonRequest.Content = formData;
 
                 using var pythonResponse = await httpClient.SendAsync(
@@ -248,17 +342,16 @@ public class InferController : ControllerBase
                 if (!pythonResponse.IsSuccessStatusCode)
                 {
                     _logger.LogWarning($"Python API error (Page {pageIndex}): {pythonResponse.StatusCode}");
-                    continue; // Bỏ qua trang này, tiếp tục trang sau
+                    continue;
                 }
 
-                // 5. Đọc stream từ Python và bơm về cho Vue (ĐÃ NÂNG CẤP)
+                // 5. Đọc Stream, Gửi về Vue, VÀ Ghi log DB
                 using var pythonStream = await pythonResponse.Content.ReadAsStreamAsync();
                 using var reader = new StreamReader(pythonStream);
 
                 while (!reader.EndOfStream)
                 {
                     var line = await reader.ReadLineAsync();
-
                     if (string.IsNullOrEmpty(line))
                     {
                         await HttpContext.Response.WriteAsync("\n\n");
@@ -269,19 +362,33 @@ public class InferController : ControllerBase
                     {
                         try
                         {
-                            // Đọc JSON từ Python
                             string jsonString = line.Substring(5).Trim();
                             var data = JsonSerializer.Deserialize<OcrStreamResult>(jsonString);
 
-                            if (data != null)
+                            if (data != null && data.Status == "result")
                             {
-                                // Thêm số trang vào JSON
                                 data.PageNumber = pageIndex;
 
-                                // Gửi JSON đã sửa đổi về Vue
+                                // A. Thêm kết quả vào "túi" (Batch)
+                                resultsBatch.Add(new CreateOcrResultDto
+                                {
+                                    PageNumber = pageIndex,
+                                    WordText = data.Text,
+                                    BoundingBox = JsonSerializer.Serialize(data.Bbox)
+                                });
+                                fullTextBuilder.AppendLine(data.Text);
+
+                                // B. Nếu túi đầy, đổ túi vào DB
+                                if (resultsBatch.Count >= BATCH_SIZE)
+                                {
+                                    await _ocrJobService.AppendResultsAsync(ocrJob.Id, resultsBatch);
+                                    resultsBatch.Clear(); // Dọn túi
+                                }
+
+                                // C. Gửi JSON đã sửa đổi về Vue (Giữ nguyên)
                                 string modifiedJsonString = JsonSerializer.Serialize(data);
                                 await HttpContext.Response.WriteAsync($"data: {modifiedJsonString}\n\n");
-                                await HttpContext.Response.Body.FlushAsync(); // Đẩy dữ liệu đi ngay
+                                await HttpContext.Response.Body.FlushAsync();
                             }
                         }
                         catch (Exception ex)
@@ -290,15 +397,39 @@ public class InferController : ControllerBase
                         }
                     }
                 }
-
                 pageIndex++;
             } // Kết thúc vòng lặp ForEach
 
-            _logger.LogInformation("Đã xử lý xong tất cả các trang PDF.");
+            // === 6. LƯU NỐT PHẦN CÒN LẠI VÀ CẬP NHẬT TRẠNG THÁI ===
+            if (resultsBatch.Any())
+            {
+                await _ocrJobService.AppendResultsAsync(ocrJob.Id, resultsBatch);
+            }
+
+            await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
+            {
+                Status = "Completed",
+                DetectedText = fullTextBuilder.ToString()
+            });
+            _logger.LogInformation("Đã xử lý xong tất cả các trang PDF cho Job {JobId}.", ocrJob.Id);
+            // ================================================
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Lỗi khi xử lý stream PDF");
+            _logger.LogError(ex, "Lỗi khi xử lý stream PDF (User: {UserId})", userId);
+
+            // === 7. CẬP NHẬT JOB LÀ THẤT BẠI ===
+            if (ocrJob != null)
+            {
+                await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
+                {
+                    Status = "Failed",
+                    DetectedText = fullTextBuilder.ToString() + $"\n\n{ex.Message}"
+                });
+                _logger.LogError("Đã đánh dấu Job {JobId} là Failed.", ocrJob.Id);
+            }
+            // =================================
+
             if (!HttpContext.Response.HasStarted)
             {
                 HttpContext.Response.StatusCode = 500;
@@ -306,6 +437,7 @@ public class InferController : ControllerBase
             }
         }
     }
+
     [HttpPost("predict")]
     [AllowAnonymous]
     public async Task<IActionResult> PredictHandwriting([FromBody] PredictionRequestDto request)

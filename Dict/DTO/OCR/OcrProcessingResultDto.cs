@@ -1,4 +1,4 @@
-﻿namespace Dict.DTO
+﻿namespace Dict.DTO.OCR
 {
     public class OcrProcessingResultDto
     {

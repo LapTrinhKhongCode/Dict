@@ -1,22 +1,22 @@
 ﻿using Dict.Data;
+using Dict.DTO;
 using Dict.DTO.Admin;
 using Dict.DTO.Deck;
 using Dict.DTO.User;
 using Dict.Models;
 using Dict.Service.IService;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
-using Microsoft.Extensions.Logging;
-
 // 1. THÊM
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
+using System.Reflection;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 
 namespace Dict.Service
@@ -61,7 +61,7 @@ namespace Dict.Service
             var newDecks = await _context.Decks.CountAsync(d => d.CreatedAt >= startOfMonth);
 
             // Sửa lại cách đếm Premium Users (dùng RoleManager)
-            var premiumRole = await _roleManager.FindByNameAsync("Premium"); // (Giả sử tên Role là "Premium")
+            var premiumRole = await _roleManager.FindByNameAsync("PREMIUM_USER"); 
             var premiumUsers = 0;
             if (premiumRole != null)
             {
@@ -70,7 +70,20 @@ namespace Dict.Service
             }
 
             var ocrJobs = await _context.OcrJobs.CountAsync(j => j.CreatedAt >= startOfMonth);
-            var totalStorageBytes = await _context.MediaStore.SumAsync(m => (long?)m.SizeBytes) ?? 0L;
+            var dbSizeMb = 0.0;
+            try
+            {
+                var dbSizeResult = await _context.Database
+                    .SqlQueryRaw<decimal>("SELECT SUM(CAST(size AS DECIMAL(18,2))) * 8.0 / 1024.0 AS Value FROM sys.database_files")
+                    .FirstOrDefaultAsync();
+
+                dbSizeMb = (double)dbSizeResult;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Không thể truy vấn dung lượng database. Đảm bảo user database có quyền 'VIEW DATABASE STATE'.");
+                dbSizeMb = 0; // Đặt là 0 nếu có lỗi
+            }
 
             return new AdminDashboardStatsDto
             {
@@ -80,12 +93,12 @@ namespace Dict.Service
                 NewDecksThisMonth = newDecks,
                 TotalPremiumUsers = premiumUsers, // Đã sửa
                 TotalOcrJobsThisMonth = ocrJobs,
-                TotalStorageUsedMb = Math.Round(totalStorageBytes / (1024.0 * 1024.0), 2)
+                TotalStorageUsedMb = Math.Round(dbSizeMb, 2)
             };
         }
 
         // 5. SỬA LẠI HÀM SEARCHUSERS (DÙNG MANAGER VÀ SỬA VÒNG LẶP MAP)
-        public async Task<PaginatedUsersDto> SearchUsersAsync(string? searchTerm, int page, int pageSize)
+        public async Task<PagedResult<UserDto>> SearchUsersAsync(string? searchTerm, int page, int pageSize)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
@@ -95,8 +108,9 @@ namespace Dict.Service
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                var term = searchTerm.ToLower().Trim();
-                query = query.Where(u => u.UserName.ToLower().Contains(term) || u.Email.ToLower().Contains(term));
+                var lowerSearchTerm = searchTerm.ToLower();
+                query = query.Where(u => u.UserName.ToLower().Contains(lowerSearchTerm) ||
+                                         u.Email.ToLower().Contains(lowerSearchTerm));
             }
 
             var totalCount = await query.CountAsync();
@@ -116,9 +130,9 @@ namespace Dict.Service
                 userDtos.Add(await MapUserToDto(user));
             }
 
-            return new PaginatedUsersDto
+            return new PagedResult<UserDto>
             {
-                Users = userDtos, // Đã sửa
+                Items = userDtos, // Đã sửa
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
@@ -176,9 +190,9 @@ namespace Dict.Service
             }
 
             // Dùng IsInRoleAsync
-            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
             {
-                _logger.LogWarning("AdminResetUserPasswordAsync: Admin {AdminId} attempted to reset password of ADMIN account {TargetUserId}", GetAdminId(), userId);
+                _logger.LogWarning("ADMINResetUserPasswordAsync: ADMIN {ADMINId} attempted to reset password of ADMIN account {TargetUserId}", GetAdminId(), userId);
                 return false;
             }
 
@@ -247,7 +261,7 @@ namespace Dict.Service
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
-            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
             {
                 _logger.LogWarning("Admin {AdminId} attempted to lock ADMIN {TargetUserId}", GetAdminId(), userId);
                 return false;
@@ -273,7 +287,7 @@ namespace Dict.Service
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
-            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
             {
                 _logger.LogWarning("Admin {AdminId} attempted to change role of ADMIN {TargetUserId}", GetAdminId(), userId);
                 return false;
@@ -298,7 +312,53 @@ namespace Dict.Service
             _logger.LogInformation("Admin {AdminId} updated User {UserId} roles to {NewRoles}", GetAdminId(), userId, string.Join(", ", newRoleNames));
             return true;
         }
+        public async Task<PagedResult<DeckAdminDto>> SearchAllDecksAsync(string? searchTerm, int page, int pageSize)
+        {
+            // Bắt đầu query. KHÔNG lọc IsPublic, admin xem được tất cả.
+            var query = _context.Decks
+                                .Include(d => d.User) // Phải Include Author để lấy AuthorName
+                                .AsQueryable();
 
+            // 1. Áp dụng tìm kiếm (nếu có)
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var lowerTerm = searchTerm.ToLower();
+                query = query.Where(d =>
+                    d.Name.ToLower().Contains(lowerTerm) ||       // Tìm theo tên deck
+                    (d.User != null && d.User.UserName.ToLower().Contains(lowerTerm)) // Tìm theo tên tác giả
+                );
+            }
+
+            // 2. Lấy tổng số lượng (cho phân trang)
+            var totalCount = await query.CountAsync();
+
+            // 3. Áp dụng phân trang và Select DTO
+            var decks = await query
+                .OrderByDescending(d => d.CreatedAt) // Sắp xếp theo deck mới nhất
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(d => new DeckAdminDto // ✨ Chuyển đổi sang DTO
+                {
+                    Id = d.Id,
+                    Name = d.Name,
+                    Description = d.Description,
+                    IsPublic = d.IsPublic,
+                    CardCount = d.Cards.Count, // Đếm số thẻ (EF Core sẽ dịch thành subquery)
+                    AuthorId = d.UserId,
+                    AuthorName = d.User != null ? d.User.UserName : "N/A", // Lấy tên tác giả
+                    CreatedAt = d.CreatedAt
+                })
+                .ToListAsync();
+
+            // 4. Trả về kết quả
+            return new PagedResult<DeckAdminDto>
+            {
+                Items = decks,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize
+            };
+        }
         public async Task<bool> AdminDeleteDeckAsync(int deckId)
         {
             // (Hàm này OK)
@@ -318,7 +378,7 @@ namespace Dict.Service
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
-            if (await _userManager.IsInRoleAsync(user, "Admin"))
+            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
             {
                 _logger.LogError("CRITICAL: Admin {AdminId} attempted to DELETE ADMIN {TargetUserId}", GetAdminId(), userId);
                 return false;
