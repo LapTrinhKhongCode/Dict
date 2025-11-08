@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 1. SỬA LẠI DÒNG IMPORT: Thêm 'ref', 'onMounted', 'onUnmounted'
+// (TOÀN BỘ SCRIPT SETUP GIỮ NGUYÊN TỪ CODE GỐC CỦA BẠN)
 import { computed, watch, ref, onMounted, onUnmounted } from "vue";
 import { useJwt } from "@/composables/useJwt";
 import { useRouter } from "vue-router";
@@ -251,14 +251,14 @@ function handleLogout() {
           class="absolute right-0 top-full w-32 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded shadow-lg z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
         >
           <button
-            v_if="!isAuthenticated"
+            v-if="!isAuthenticated"
             @click="handleLogin"
             class="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-neutral-700"
           >
             Đăng nhập
           </button>
           <button
-            v_else
+            v-else
             @click="handleLogout"
             class="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-neutral-700"
           >
@@ -275,7 +275,6 @@ function handleLogout() {
 
 <style>
 /* (Style giữ nguyên từ code của bạn) */
-/* Hiệu ứng slide-up (giữ nguyên) */
 .notification-text {
   display: flex;
   align-items: center;
@@ -299,8 +298,6 @@ function handleLogout() {
   transform: translateY(-20px);
 }
 
-/* --- HIỆU ỨNG "LUNG LINH" (giữ nguyên) --- */
-
 @keyframes glow {
   0% {
     text-shadow: 0 0 3px rgba(16, 185, 129, 0.3);
@@ -322,10 +319,6 @@ function handleLogout() {
   }
 }
 
-/*
-  THAY ĐỔI:
-  - Chỉ áp dụng hiệu ứng glow cho dark mode
-*/
 .dark .glow {
   animation: glow 1.5s ease-in-out infinite alternate;
 }
