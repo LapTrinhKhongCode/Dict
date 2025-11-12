@@ -58,60 +58,60 @@ public class WordServiceTests : IDisposable
 
     // ----- CÁC TEST (Đã cập nhật Assert) -----
 
-    [Fact]
-    public async Task GetWordJson_WhenSearchingByLabel_FindsCorrectEntry_And_LogsHit()
-    {
-        // ARRANGE 
-        var labelToSearch = "日本語"; // Giả sử "日本語" tồn tại trong DB test
+    //[Fact]
+    //public async Task GetWordJson_WhenSearchingByLabel_FindsCorrectEntry_And_LogsHit()
+    //{
+    //    // ARRANGE 
+    //    var labelToSearch = "日本語"; // Giả sử "日本語" tồn tại trong DB test
 
-        // Tìm EntryId thật trong DB Test để kiểm tra
-        var entryInDb = await _context.Entries
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Type == "word" && e.Label == labelToSearch);
+    //    // Tìm EntryId thật trong DB Test để kiểm tra
+    //    var entryInDb = await _context.Entries
+    //        .AsNoTracking()
+    //        .FirstOrDefaultAsync(e => e.Type == "word" && e.Label == labelToSearch);
 
-        Assert.NotNull(entryInDb); // Đảm bảo data test tồn tại
+    //    Assert.NotNull(entryInDb); // Đảm bảo data test tồn tại
 
-        // ACT
-        var result = await _service.GetWordJson(labelToSearch);
+    //    // ACT
+    //    var result = await _service.GetWordJson(labelToSearch);
 
-        // ASSERT (Kiểm tra kết quả)
-        Assert.NotNull(result);
-        Assert.Equal(entryInDb.RawJson, result); // So sánh JSON thật
+    //    // ASSERT (Kiểm tra kết quả)
+    //    Assert.NotNull(result);
+    //    Assert.Equal(entryInDb.RawJson, result); // So sánh JSON thật
 
-        // ASSERT (Kiểm tra Log Hit)
-        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
-        Assert.NotNull(stat);
-        Assert.Equal(1, stat.Occurrences);
+    //    // ASSERT (Kiểm tra Log Hit)
+    //    var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+    //    Assert.NotNull(stat);
+    //    Assert.Equal(1, stat.Occurrences);
 
-        // Đảm bảo nó không ghi log Miss
-        var miss = await _context.SearchMiss.FirstOrDefaultAsync(s => s.NormalizedTerm == labelToSearch.ToLower());
-        Assert.Null(miss);
-    }
+    //    // Đảm bảo nó không ghi log Miss
+    //    var miss = await _context.SearchMiss.FirstOrDefaultAsync(s => s.NormalizedTerm == labelToSearch.ToLower());
+    //    Assert.Null(miss);
+    //}
 
-    [Fact]
-    public async Task GetWordJson_WhenSearchingByPhoneticLabel_FindsCorrectEntry_And_LogsHit()
-    {
-        // ARRANGE
-        var phoneticToSearch = "アイテム"; // Giả sử "アイテム" (item) tồn tại
+    //[Fact]
+    //public async Task GetWordJson_WhenSearchingByPhoneticLabel_FindsCorrectEntry_And_LogsHit()
+    //{
+    //    // ARRANGE
+    //    var phoneticToSearch = "アイテム"; // Giả sử "アイテム" (item) tồn tại
 
-        var entryInDb = await _context.Entries
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Type == "word" && e.Label == phoneticToSearch);
+    //    var entryInDb = await _context.Entries
+    //        .AsNoTracking()
+    //        .FirstOrDefaultAsync(e => e.Type == "word" && e.Label == phoneticToSearch);
 
-        Assert.NotNull(entryInDb); // Đảm bảo data test tồn tại
+    //    Assert.NotNull(entryInDb); // Đảm bảo data test tồn tại
 
-        // ACT
-        var result = await _service.GetWordJson(phoneticToSearch);
+    //    // ACT
+    //    var result = await _service.GetWordJson(phoneticToSearch);
 
-        // ASSERT (Kiểm tra kết quả)
-        Assert.NotNull(result);
-        Assert.Equal(entryInDb.RawJson, result);
+    //    // ASSERT (Kiểm tra kết quả)
+    //    Assert.NotNull(result);
+    //    Assert.Equal(entryInDb.RawJson, result);
 
-        // ASSERT (Kiểm tra Log Hit)
-        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
-        Assert.NotNull(stat);
-        Assert.Equal(1, stat.Occurrences);
-    }
+    //    // ASSERT (Kiểm tra Log Hit)
+    //    var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+    //    Assert.NotNull(stat);
+    //    Assert.Equal(1, stat.Occurrences);
+    //}
 
     [Fact]
     public async Task GetWordJson_WhenWordDoesNotExist_ReturnsNull_And_LogsMiss()

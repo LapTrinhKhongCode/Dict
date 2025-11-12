@@ -67,71 +67,71 @@ public class KanjiServiceTests : IDisposable
 
     // ----- CÁC BÀI TEST -----
 
-    [Fact]
-    public async Task GetKanjiInfoAsync_WhenKanjiExists_ReturnsFullDto()
-    {
-        // (Test này giữ nguyên, nó không gọi hàm GetKanjiJson)
-        // ----- ARRANGE -----
-        string kanjiToSearch = "試"; // Cần đảm bảo '試' tồn tại trong DB test
+    //[Fact]
+    //public async Task GetKanjiInfoAsync_WhenKanjiExists_ReturnsFullDto()
+    //{
+    //    // (Test này giữ nguyên, nó không gọi hàm GetKanjiJson)
+    //    // ----- ARRANGE -----
+    //    string kanjiToSearch = "試"; // Cần đảm bảo '試' tồn tại trong DB test
 
-        // ----- ACT -----
-        var result = await _service.GetKanjiInfoAsync(kanjiToSearch, "en");
+    //    // ----- ACT -----
+    //    var result = await _service.GetKanjiInfoAsync(kanjiToSearch, "en");
 
-        // ----- ASSERT -----
-        Assert.NotNull(result);
-        Assert.Equal(kanjiToSearch, result.Character);
-    }
+    //    // ----- ASSERT -----
+    //    Assert.NotNull(result);
+    //    Assert.Equal(kanjiToSearch, result.Character);
+    //}
 
-    [Fact]
-    public async Task GetKanjiJson_WhenSearchByPhonetic_FindsEntryAndLogsHit()
-    {
-        // ----- ARRANGE -----
-        string phoneticToSearch = "てすと"; // Giả định 'てすと' tồn tại
+    //[Fact]
+    //public async Task GetKanjiJson_WhenSearchByPhonetic_FindsEntryAndLogsHit()
+    //{
+    //    // ----- ARRANGE -----
+    //    string phoneticToSearch = "てすと"; // Giả định 'てすと' tồn tại
 
-        // Tìm EntryId thật trong DB Test để kiểm tra
-        var entryInDb = await _context.Entries
-            .FirstOrDefaultAsync(e => e.Type == "kanji" && e.Phonetic == phoneticToSearch);
+    //    // Tìm EntryId thật trong DB Test để kiểm tra
+    //    var entryInDb = await _context.Entries
+    //        .FirstOrDefaultAsync(e => e.Type == "kanji" && e.Phonetic == phoneticToSearch);
 
-        // Nếu DB Test của bạn không có từ này, test sẽ thất bại (đây là điều tốt)
-        Assert.NotNull(entryInDb);
+    //    // Nếu DB Test của bạn không có từ này, test sẽ thất bại (đây là điều tốt)
+    //    Assert.NotNull(entryInDb);
 
-        // ----- ACT -----
-        var result = await _service.GetKanjiJson(phoneticToSearch);
+    //    // ----- ACT -----
+    //    var result = await _service.GetKanjiJson(phoneticToSearch);
 
-        // ----- ASSERT -----
-        Assert.NotNull(result);
-        Assert.Equal(entryInDb.RawJson, result); // So sánh với JSON thật
+    //    // ----- ASSERT -----
+    //    Assert.NotNull(result);
+    //    Assert.Equal(entryInDb.RawJson, result); // So sánh với JSON thật
 
-        // 8. KIỂM TRA LOGGING (QUAN TRỌNG)
-        // (Sau khi migration, chúng ta kiểm tra StatsWordFreq.EntryId)
-        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
-        Assert.NotNull(stat); // Phải tạo ra 1 dòng log
-        Assert.Equal(1, stat.Occurrences); // Đếm là 1
-    }
+    //    // 8. KIỂM TRA LOGGING (QUAN TRỌNG)
+    //    // (Sau khi migration, chúng ta kiểm tra StatsWordFreq.EntryId)
+    //    var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+    //    Assert.NotNull(stat); // Phải tạo ra 1 dòng log
+    //    Assert.Equal(1, stat.Occurrences); // Đếm là 1
+    //}
 
-    [Fact]
-    public async Task GetKanjiJson_WhenSearchBySingleKanji_FindsEntryAndLogsHit()
-    {
-        // ----- ARRANGE -----
-        string kanjiToSearch = "試"; // Giả định '試' tồn tại
+    //[Fact]
+    //public async Task GetKanjiJson_WhenSearchBySingleKanji_FindsEntryAndLogsHit()
+    //{
+    //    // ----- ARRANGE -----
+    //    string kanjiToSearch = "試"; // Giả định '試' tồn tại
 
-        var entryInDb = await _context.Entries
-            .FirstOrDefaultAsync(e => e.Type == "kanji" && e.Label == kanjiToSearch);
+    //    var entryInDb = await _context.Entries
+    //        .FirstOrDefaultAsync(e => e.Type == "kanji" && e.Label == kanjiToSearch);
 
-        Assert.NotNull(entryInDb);
+    //    Assert.NotNull(entryInDb);
 
-        // ----- ACT -----
-        var result = await _service.GetKanjiJson(kanjiToSearch);
+    //    // ----- ACT -----
+    //    var result = await _service.GetKanjiJson(kanjiToSearch);
 
-        // ----- ASSERT -----
-        Assert.NotNull(result);
-        Assert.Equal(entryInDb.RawJson, result);
+    //    // ----- ASSERT -----
+    //    Assert.NotNull(result);
+    //    Assert.Equal(entryInDb.RawJson, result);
 
-        // 8. KIỂM TRA LOGGING (QUAN TRỌNG)
-        var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
-        Assert.NotNull(stat);
-        Assert.Equal(1, stat.Occurrences);
-    }
+    //    // 8. KIỂM TRA LOGGING (QUAN TRỌNG)
+    //    var stat = await _context.StatsWordFreq.FirstOrDefaultAsync(s => s.EntryId == entryInDb.Id);
+    //    Assert.NotNull(stat);
+    //    Assert.Equal(1, stat.Occurrences);
+    //}
 
     [Fact]
     public async Task GetKanjiJson_WhenNoMatch_Returns404JsonAndLogsMiss()

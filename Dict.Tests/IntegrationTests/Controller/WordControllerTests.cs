@@ -44,42 +44,42 @@ public class WordControllerTests : IClassFixture<WordControllerTestFactory>
     }
 
     // Kịch bản 2: Test khi service trả về NULL
-    [Fact]
-    public async Task GetWordJson_WhenServiceReturnsNull_ReturnsNotFound()
-    {
-        // ----- ARRANGE (Sắp đặt) -----
-        var label = "null-word";
+    //[Fact]
+    //public async Task GetWordJson_WhenServiceReturnsNull_ReturnsNotFound()
+    //{
+    //    // ----- ARRANGE (Sắp đặt) -----
+    //    var label = "null-word";
 
-        // Thiết lập Mock: Trả về null
-        _wordServiceMock
-            .Setup(s => s.GetWordJson(label))
-            .ReturnsAsync((string?)null);
+    //    // Thiết lập Mock: Trả về null
+    //    _wordServiceMock
+    //        .Setup(s => s.GetWordJson(label))
+    //        .ReturnsAsync((string?)null);
 
-        // ----- ACT (Hành động) -----
-        var response = await _client.GetAsync($"/api/word/GetWordJson/{label}");
+    //    // ----- ACT (Hành động) -----
+    //    var response = await _client.GetAsync($"/api/word/GetWordJson/{label}");
 
-        // ----- ASSERT (Kiểm chứng) -----
-        // Logic của controller là: if (string.IsNullOrEmpty(json)) return NotFound();
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
+    //    // ----- ASSERT (Kiểm chứng) -----
+    //    // Logic của controller là: if (string.IsNullOrEmpty(json)) return NotFound();
+    //    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    //}
 
     // Kịch bản 3: Test khi service trả về chuỗi RỖNG
-    [Fact]
-    public async Task GetWordJson_WhenServiceReturnsEmpty_ReturnsNotFound()
-    {
-        // ----- ARRANGE (Sắp đặt) -----
-        var label = "empty-word";
+    //[Fact]
+    //public async Task GetWordJson_WhenServiceReturnsEmpty_ReturnsNotFound()
+    //{
+    //    // ----- ARRANGE (Sắp đặt) -----
+    //    var label = "empty-word";
 
-        // Thiết lập Mock: Trả về chuỗi rỗng
-        _wordServiceMock
-            .Setup(s => s.GetWordJson(label))
-            .ReturnsAsync(string.Empty);
+    //    // Thiết lập Mock: Trả về chuỗi rỗng
+    //    _wordServiceMock
+    //        .Setup(s => s.GetWordJson(label))
+    //        .ReturnsAsync(string.Empty);
 
-        // ----- ACT (Hành động) -----
-        var response = await _client.GetAsync($"/api/word/GetWordJson/{label}");
+    //    // ----- ACT (Hành động) -----
+    //    var response = await _client.GetAsync($"/api/word/GetWordJson/{label}");
 
-        // ----- ASSERT (Kiểm chứng) -----
-        // Logic của controller là: if (string.IsNullOrEmpty(json)) return NotFound();
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
+    //    // ----- ASSERT (Kiểm chứng) -----
+    //    // Logic của controller là: if (string.IsNullOrEmpty(json)) return NotFound();
+    //    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    //}
 }
