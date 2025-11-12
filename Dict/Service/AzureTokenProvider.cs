@@ -24,7 +24,7 @@ namespace Dict.Service
             _credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
         }
 
-        public async Task<string> GetAccessTokenAsync()
+        public virtual async Task<string> GetAccessTokenAsync()
         {
             try
             {

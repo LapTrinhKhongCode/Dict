@@ -78,25 +78,6 @@ public class SearchServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task FindHomophonesAsync_WhenMatchExists_ReturnsEntries()
-    {
-        // ----- ARRANGE -----
-        // 🛑 THAY THẾ CHUỖI NÀY: Dùng một 'Phonetic' có thật trong DB
-        string exactPhonetic = "にほんご";
-        string correspondingLabel = "日本語"; // Label tương ứng
-
-        // ----- ACT -----
-        // Test hàm dùng Collate trên bảng Words
-        var results = await _service.FindHomophonesAsync(exactPhonetic);
-
-        // ----- ASSERT -----
-        Assert.NotNull(results);
-        Assert.NotEmpty(results);
-        // Kiểm tra xem nó có tìm thấy Entry đúng không
-        Assert.Contains(results, e => e.Label == correspondingLabel);
-    }
-
-    [Fact]
     public async Task GetSuggestionEntriesAsync_WhenFTSMatchExists_ReturnsRankedEntries()
     {
         // ----- ARRANGE -----

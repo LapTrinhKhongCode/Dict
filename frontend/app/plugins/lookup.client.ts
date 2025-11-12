@@ -82,6 +82,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     popupContainer.style.display = 'none'
     isTranslateModalVisible.value = false // Tắt Dịch
     isModalVisible.value = true      // Bật Tra cứu
+    console.log('Lookup icon clicked: ' + selectedWord.value + isModalVisible.value)
   })
 
   translateIcon.addEventListener('click', () => {
@@ -89,6 +90,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     popupContainer.style.display = 'none'
     isModalVisible.value = false      // Tắt Tra cứu
     isTranslateModalVisible.value = true // Bật Dịch
+    console.log('Translate icon clicked: ' + selectedWord.value + isTranslateModalVisible.value)
   })
 
   document.addEventListener('mouseup', (e: MouseEvent) => {

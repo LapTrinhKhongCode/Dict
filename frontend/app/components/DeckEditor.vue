@@ -293,9 +293,7 @@
         <div
           class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700"
         >
-          <h2
-            class="text-xl font-bold text-primary-600 dark:text-sky-400"
-          >
+          <h2 class="text-xl font-bold text-primary-600 dark:text-sky-400">
             Import dữ liệu thẻ
           </h2>
           <button
@@ -338,7 +336,9 @@
                   value="comma"
                   class="form-radio"
                 />
-                <span class="ml-2 text-gray-700 dark:text-gray-200">Dấu phẩy</span>
+                <span class="ml-2 text-gray-700 dark:text-gray-200"
+                  >Dấu phẩy</span
+                >
               </label>
             </div>
           </div>
@@ -376,7 +376,10 @@
                 </div>
               </div>
             </div>
-            <p v-if="parseError" class="text-red-500 dark:text-red-400 text-xs mt-1">
+            <p
+              v-if="parseError"
+              class="text-red-500 dark:text-red-400 text-xs mt-1"
+            >
               {{ parseError }}
             </p>
           </div>
@@ -404,18 +407,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
-import type { DeckDetailDto, CardDto, DeckUpdateDto, CardCreateDto, CardUpdateDto } from '~/types';
-import ConfirmationModal from './ConfirmationModal.vue';
-import { useJwt } from '~/composables/useJwt';
+import { ref, reactive, computed } from "vue";
+import type {
+  DeckDetailDto,
+  CardDto,
+  DeckUpdateDto,
+  CardCreateDto,
+  CardUpdateDto,
+} from "~/types";
+import ConfirmationModal from "./ConfirmationModal.vue";
+import { useJwt } from "~/composables/useJwt";
 // ✅ 1. Import useToast
-import { useToast } from '~/composables/useToast';
+import { useToast } from "~/composables/useToast";
 
 const { jwt } = useJwt();
 // ✅ 2. Khởi tạo showToast
 const { showToast } = useToast();
 
-interface EditableCardDto extends Omit<CardDto, 'id'> {
+interface EditableCardDto extends Omit<CardDto, "id"> {
   id?: number;
   tempId: string;
   isNew?: boolean;
@@ -424,36 +433,42 @@ interface EditableCardDto extends Omit<CardDto, 'id'> {
 }
 
 const props = defineProps<{ initialSet: DeckDetailDto }>();
-const emit = defineEmits(['go-to-list', 'deck-updated']);
+const emit = defineEmits(["go-to-list", "deck-updated"]);
 
-const config = useRuntimeConfig()
-const BASE_URL = config.public.apiBaseUrl
+const config = useRuntimeConfig();
+const BASE_URL = config.public.apiBaseUrl;
 
-const editableSet = reactive<Omit<DeckDetailDto, 'cards'> & { cards: EditableCardDto[] }>({
+const editableSet = reactive<
+  Omit<DeckDetailDto, "cards"> & { cards: EditableCardDto[] }
+>({
   ...props.initialSet,
-  cards: props.initialSet.cards.map(card => ({
+  cards: props.initialSet.cards.map((card) => ({
     ...card,
     tempId: `card-${card.id}`,
-    isNew: false
-  }))
+    isNew: false,
+  })),
 });
 
-const newCardInput = ref<CardCreateDto>({ frontText: '', backText: '', tags: '' });
+const newCardInput = ref<CardCreateDto>({
+  frontText: "",
+  backText: "",
+  tags: "",
+});
 
 const isSavingDeck = ref(false);
 const isAddingCard = ref(false);
 
 const isDeleteDeckModalOpen = ref(false);
-const deleteDeckModalMessage = ref('');
+const deleteDeckModalMessage = ref("");
 
 const isDeleteCardModalOpen = ref(false);
-const deleteCardModalMessage = ref('');
+const deleteCardModalMessage = ref("");
 const cardToDelete = ref<EditableCardDto | null>(null);
 const cardIndexToDelete = ref<number | null>(null);
 
 const showImportModal = ref(false);
-const importText = ref('');
-const importDelimiter = ref<'tab' | 'comma'>('comma');
+const importText = ref("");
+const importDelimiter = ref<"tab" | "comma">("comma");
 const parseError = ref<string | null>(null);
 
 // handleResponse
@@ -463,15 +478,23 @@ async function handleResponse<T>(response: Response): Promise<T> {
     let errorMessage = errorText;
     try {
       const errorJson = JSON.parse(errorText);
-      if (errorJson?.errors) { errorMessage = Object.values(errorJson.errors).flat().join(' '); }
-      else if (errorJson?.message) { errorMessage = errorJson.message; }
-      else if (errorJson?.title) { errorMessage = errorJson.title; }
-    } catch (e) { /* Ignore */ }
+      if (errorJson?.errors) {
+        errorMessage = Object.values(errorJson.errors).flat().join(" ");
+      } else if (errorJson?.message) {
+        errorMessage = errorJson.message;
+      } else if (errorJson?.title) {
+        errorMessage = errorJson.title;
+      }
+    } catch (e) {
+      /* Ignore */
+    }
     throw new Error(errorMessage || `Yêu cầu thất bại: ${response.status}`);
   }
   if (response.status === 204) return {} as T;
   const data = await response.json();
-  if (data.isSuccess === false) { throw new Error(data.message || 'Lỗi không xác định từ API'); }
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "Lỗi không xác định từ API");
+  }
   return (data.result === undefined ? data : data.result) as T;
 }
 
@@ -482,19 +505,22 @@ async function saveDeckInfoOnly() {
   const deckDto: DeckUpdateDto = {
     Title: editableSet.title,
     Description: editableSet.description,
-    IsPublic: editableSet.isPublic ?? false
+    IsPublic: editableSet.isPublic ?? false,
   };
   try {
     const response = await fetch(`${BASE_URL}/api/decks/${deckId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.value}` },
-      body: JSON.stringify(deckDto)
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${jwt.value}`,
+      },
+      body: JSON.stringify(deckDto),
     });
     await handleResponse(response);
     return true;
   } catch (err: any) {
     // ✅ 3. THAY THẾ ALERT
-    showToast(`Lỗi cập nhật Deck: ${err.message}`, 'error');
+    showToast(`Lỗi cập nhật Deck: ${err.message}`, "error");
     console.error("saveDeckInfoOnly Error:", err);
     return false;
   } finally {
@@ -507,7 +533,9 @@ function promptDeleteDeck() {
   isDeleteDeckModalOpen.value = true;
 }
 
-function closeDeleteDeckModal() { isDeleteDeckModalOpen.value = false; }
+function closeDeleteDeckModal() {
+  isDeleteDeckModalOpen.value = false;
+}
 
 async function handleConfirmDeleteDeck() {
   closeDeleteDeckModal();
@@ -515,16 +543,16 @@ async function handleConfirmDeleteDeck() {
   const deckId = editableSet.id;
   try {
     const response = await fetch(`${BASE_URL}/api/decks/${deckId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${jwt.value}` }
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${jwt.value}` },
     });
     await handleResponse(response);
     // ✅ 3. THAY THẾ ALERT
-    showToast('Đã xóa Deck thành công.', 'success');
-    emit('go-to-list');
+    showToast("Đã xóa Deck thành công.", "success");
+    emit("go-to-list");
   } catch (err: any) {
     // ✅ 3. THAY THẾ ALERT
-    showToast(`Lỗi xóa Deck: ${err.message}`, 'error');
+    showToast(`Lỗi xóa Deck: ${err.message}`, "error");
     console.error("handleConfirmDeleteDeck Error:", err);
   } finally {
     isSavingDeck.value = false;
@@ -536,20 +564,20 @@ function addCardToList() {
   const front = newCardInput.value.frontText?.trim();
   const back = newCardInput.value.backText?.trim();
   // ✅ 3. THAY THẾ ALERT
-  if (!front || !back) { 
-    showToast("Mặt trước và Mặt sau là bắt buộc.", 'error'); 
-    return; 
+  if (!front || !back) {
+    showToast("Mặt trước và Mặt sau là bắt buộc.", "error");
+    return;
   }
   const tempCard: EditableCardDto = {
     tempId: `new-${Date.now()}-${Math.random()}`,
     charBig: front,
     meaning: back,
-    pinyin: newCardInput.value.tags || '',
-    nextReviewAt: '',
+    pinyin: newCardInput.value.tags || "",
+    nextReviewAt: "",
     isNew: true,
   };
   editableSet.cards.push(tempCard);
-  newCardInput.value = { frontText: '', backText: '', tags: '' };
+  newCardInput.value = { frontText: "", backText: "", tags: "" };
 }
 
 async function updateCard(card: EditableCardDto) {
@@ -559,22 +587,26 @@ async function updateCard(card: EditableCardDto) {
   const cardDto: CardUpdateDto = {
     FrontText: card.charBig,
     BackText: card.meaning,
-    Tags: card.pinyin
+    Tags: card.pinyin,
   };
   try {
     const response = await fetch(`${BASE_URL}/api/cards/${cardId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.value}` },
-      body: JSON.stringify(cardDto)
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${jwt.value}`,
+      },
+      body: JSON.stringify(cardDto),
     });
     await handleResponse(response);
     // ✅ 3. THÊM TOAST (Tùy chọn)
-    showToast(`Đã cập nhật thẻ "${card.charBig}"`, 'success');
-  } catch (err: any) { 
+    showToast(`Đã cập nhật thẻ "${card.charBig}"`, "success");
+  } catch (err: any) {
     // ✅ 3. THAY THẾ ALERT
-    showToast(`Lỗi cập nhật thẻ ${cardId}: ${err.message}`, 'error'); 
+    showToast(`Lỗi cập nhật thẻ ${cardId}: ${err.message}`, "error");
+  } finally {
+    card.isSaving = false;
   }
-  finally { card.isSaving = false; }
 }
 
 function removeOrDeleteCard(card: EditableCardDto, index: number) {
@@ -586,8 +618,13 @@ function removeOrDeleteCard(card: EditableCardDto, index: number) {
 }
 
 function promptDeleteCard(card: EditableCardDto, index: number) {
-  if (!card.id) { console.error("Invalid card for deletion:", card); return; }
-  deleteCardModalMessage.value = `Bạn có chắc muốn xóa thẻ "${card.meaning || card.charBig}" không?`;
+  if (!card.id) {
+    console.error("Invalid card for deletion:", card);
+    return;
+  }
+  deleteCardModalMessage.value = `Bạn có chắc muốn xóa thẻ "${
+    card.meaning || card.charBig
+  }" không?`;
   cardToDelete.value = card;
   cardIndexToDelete.value = index;
   isDeleteCardModalOpen.value = true;
@@ -600,7 +637,12 @@ function closeDeleteCardModal() {
 }
 
 async function handleConfirmDeleteCard() {
-  if (!cardToDelete.value || cardToDelete.value.isDeleting || !cardToDelete.value.id) return;
+  if (
+    !cardToDelete.value ||
+    cardToDelete.value.isDeleting ||
+    !cardToDelete.value.id
+  )
+    return;
   const card = cardToDelete.value;
   const cardId = card.id;
   const indexToRemove = cardIndexToDelete.value;
@@ -610,18 +652,18 @@ async function handleConfirmDeleteCard() {
 
   try {
     const response = await fetch(`${BASE_URL}/api/cards/${cardId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${jwt.value}` }
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${jwt.value}` },
     });
     await handleResponse(response);
     if (indexToRemove !== null) {
       editableSet.cards.splice(indexToRemove, 1);
     }
     // ✅ 3. THÊM TOAST
-    showToast(`Đã xóa thẻ "${card.charBig}"`, 'success');
+    showToast(`Đã xóa thẻ "${card.charBig}"`, "success");
   } catch (err: any) {
     // ✅ 3. THAY THẾ ALERT
-    showToast(`Lỗi xóa thẻ ${cardId}: ${err.message}`, 'error');
+    showToast(`Lỗi xóa thẻ ${cardId}: ${err.message}`, "error");
     console.error("deleteCard Error:", err);
     if (card) card.isDeleting = false;
   }
@@ -630,59 +672,73 @@ async function handleConfirmDeleteCard() {
 // --- Import Logic ---
 const parsedCards = computed(() => {
   parseError.value = null;
-  const lines = importText.value.split('\n').filter(line => line.trim() !== '');
-  const delimiter = importDelimiter.value === 'tab' ? '\t' : ',';
+  const lines = importText.value
+    .split("\n")
+    .filter((line) => line.trim() !== "");
+  const delimiter = importDelimiter.value === "tab" ? "\t" : ",";
   const cards: CardCreateDto[] = [];
   let lineErrors = 0;
   lines.forEach((line) => {
     const parts = line.split(delimiter);
     if (parts.length >= 2) {
-      const front = parts[0]?.trim() ?? '';
-      const back = parts[1]?.trim() ?? '';
+      const front = parts[0]?.trim() ?? "";
+      const back = parts[1]?.trim() ?? "";
       const tags = parts.slice(2).join(delimiter).trim() || null;
       if (front && back) {
         cards.push({ frontText: front, backText: back, tags: tags });
-      } else { lineErrors++; }
-    } else if (line.trim()) { lineErrors++; }
+      } else {
+        lineErrors++;
+      }
+    } else if (line.trim()) {
+      lineErrors++;
+    }
   });
-  if (lineErrors > 0) { parseError.value = `Đã bỏ qua ${lineErrors} dòng không đúng định dạng.`; }
+  if (lineErrors > 0) {
+    parseError.value = `Đã bỏ qua ${lineErrors} dòng không đúng định dạng.`;
+  }
   return cards;
 });
 
 function importCardsToList() {
   const cardsToImport = parsedCards.value;
   // ✅ 3. THAY THẾ ALERT
-  if (cardsToImport.length === 0) { 
-    showToast("Không có thẻ hợp lệ nào để import.", 'error'); 
-    return; 
+  if (cardsToImport.length === 0) {
+    showToast("Không có thẻ hợp lệ nào để import.", "error");
+    return;
   }
-  cardsToImport.forEach(parsedCard => {
+  cardsToImport.forEach((parsedCard) => {
     const tempCard: EditableCardDto = {
       tempId: `new-${Date.now()}-${Math.random()}`,
       charBig: parsedCard.frontText,
       meaning: parsedCard.backText,
-      pinyin: parsedCard.tags || '',
-      nextReviewAt: '',
+      pinyin: parsedCard.tags || "",
+      nextReviewAt: "",
       isNew: true,
     };
     editableSet.cards.push(tempCard);
   });
   closeImportModal();
   // ✅ 3. THAY THẾ ALERT
-  showToast(`Đã thêm ${cardsToImport.length} thẻ vào danh sách chờ lưu.`, 'success');
+  showToast(
+    `Đã thêm ${cardsToImport.length} thẻ vào danh sách chờ lưu.`,
+    "success"
+  );
 }
 
 function openImportModal() {
-  importText.value = '';
+  importText.value = "";
   parseError.value = null;
   showImportModal.value = true;
 }
-function closeImportModal() { showImportModal.value = false; }
+function closeImportModal() {
+  showImportModal.value = false;
+}
 function handleTab(event: KeyboardEvent) {
   const target = event.target as HTMLTextAreaElement;
   const start = target.selectionStart;
   const end = target.selectionEnd;
-  target.value = target.value.substring(0, start) + "\t" + target.value.substring(end);
+  target.value =
+    target.value.substring(0, start) + "\t" + target.value.substring(end);
   target.selectionStart = target.selectionEnd = start + 1;
 }
 
@@ -690,15 +746,21 @@ function handleTab(event: KeyboardEvent) {
 async function saveAllChanges() {
   isSavingDeck.value = true;
   const deckSaveSuccess = await saveDeckInfoOnly();
-  if (!deckSaveSuccess) { isSavingDeck.value = false; return; }
+  if (!deckSaveSuccess) {
+    isSavingDeck.value = false;
+    return;
+  }
 
   const newCardsToApi = editableSet.cards
-    .filter(card => card.isNew)
-    .map(tempCard => ({
-      frontText: tempCard.charBig,
-      backText: tempCard.meaning,
-      tags: tempCard.pinyin || null
-    } as CardCreateDto));
+    .filter((card) => card.isNew)
+    .map(
+      (tempCard) =>
+        ({
+          frontText: tempCard.charBig,
+          backText: tempCard.meaning,
+          tags: tempCard.pinyin || null,
+        } as CardCreateDto)
+    );
 
   let cardAddSuccess = true;
   if (newCardsToApi.length > 0) {
@@ -706,17 +768,20 @@ async function saveAllChanges() {
     const deckId = editableSet.id;
     try {
       const response = await fetch(`${BASE_URL}/api/decks/${deckId}/cards`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt.value}` },
-        body: JSON.stringify(newCardsToApi)
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt.value}`,
+        },
+        body: JSON.stringify(newCardsToApi),
       });
-      const addedCardsData = await handleResponse<{ result?: CardDto[] }>(response);
-      if (addedCardsData.result && addedCardsData.result.length > 0) {
-        const existingCards = editableSet.cards.filter(card => !card.isNew);
-        const newApiCards = addedCardsData.result.map(newApiCard => ({
+      const addedCardsData = await handleResponse<CardDto[]>(response);
+      if (addedCardsData && addedCardsData.length > 0) {
+        const existingCards = editableSet.cards.filter((card) => !card.isNew);
+        const newApiCards = addedCardsData.map((newApiCard) => ({
           ...newApiCard,
           tempId: `card-${newApiCard.id}`,
-          isNew: false
+          isNew: false,
         }));
         editableSet.cards = [...existingCards, ...newApiCards];
       } else {
@@ -725,7 +790,7 @@ async function saveAllChanges() {
       }
     } catch (err: any) {
       // ✅ 3. THAY THẾ ALERT
-      showToast(`Lỗi khi lưu các thẻ mới: ${err.message}`, 'error');
+      showToast(`Lỗi khi lưu các thẻ mới: ${err.message}`, "error");
       cardAddSuccess = false;
     } finally {
       isAddingCard.value = false;
@@ -736,12 +801,12 @@ async function saveAllChanges() {
 
   if (deckSaveSuccess && cardAddSuccess) {
     // ✅ 3. THAY THẾ ALERT
-    showToast('Đã lưu tất cả thay đổi thành công!', 'success');
-    emit('deck-updated');
+    showToast("Đã lưu tất cả thay đổi thành công!", "success");
+    emit("deck-updated");
   } else if (deckSaveSuccess && !cardAddSuccess) {
     // ✅ 3. THAY THẾ ALERT (và bỏ comment)
-    showToast('Đã lưu thông tin deck, nhưng có lỗi khi lưu thẻ mới.', 'error');
-    emit('deck-updated');
+    showToast("Đã lưu thông tin deck, nhưng có lỗi khi lưu thẻ mới.", "error");
+    emit("deck-updated");
   }
 }
 </script>
@@ -794,7 +859,7 @@ async function saveAllChanges() {
   border-color: #2563eb; /* primary-600 */
 }
 .form-radio:checked::before {
-  content: '';
+  content: "";
   display: block;
   width: 0.5rem;
   height: 0.5rem;
