@@ -64,7 +64,7 @@
             <label
               for="deckName"
               class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1"
-              >Tên bộ thẻ</label
+              >Tên bộ thẻ <span class="text-red-400">*</span></label
             >
             <input
               type="text"
@@ -293,7 +293,9 @@
         <div
           class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700"
         >
-          <h2 class="text-xl font-bold text-primary-600 dark:text-sky-400">
+          <h2
+            class="text-xl font-bold text-primary-600 dark:text-sky-400"
+          >
             Import dữ liệu thẻ
           </h2>
           <button
@@ -336,9 +338,7 @@
                   value="comma"
                   class="form-radio"
                 />
-                <span class="ml-2 text-gray-700 dark:text-gray-200"
-                  >Dấu phẩy</span
-                >
+                <span class="ml-2 text-gray-700 dark:text-gray-200">Dấu phẩy</span>
               </label>
             </div>
           </div>
@@ -376,10 +376,7 @@
                 </div>
               </div>
             </div>
-            <p
-              v-if="parseError"
-              class="text-red-500 dark:text-red-400 text-xs mt-1"
-            >
+            <p v-if="parseError" class="text-red-500 dark:text-red-400 text-xs mt-1">
               {{ parseError }}
             </p>
           </div>
@@ -395,11 +392,9 @@
           </button>
           <button
             @click="importCardsToList"
-            :disabled="parsedCards.length === 0"
+            
             class="px-5 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed"
-          >
-            Thêm {{ parsedCards.length }} thẻ vào danh sách
-          </button>
+          >Thêm thẻ</button>
         </div>
       </div>
     </div>
@@ -500,6 +495,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 // --- Deck Operations ---
 async function saveDeckInfoOnly() {
+  // ✅ 3. THÊM VALIDATION (THEO YÊU CẦU MỚI)
+  if (!editableSet.title.trim()) {
+    showToast("Tên bộ thẻ không được để trống.", "error");
+    return false; // Trả về false để saveAllChanges dừng lại
+  }
+
   isSavingDeck.value = true;
   const deckId = editableSet.id;
   const deckDto: DeckUpdateDto = {
@@ -519,7 +520,7 @@ async function saveDeckInfoOnly() {
     await handleResponse(response);
     return true;
   } catch (err: any) {
-    // ✅ 3. THAY THẾ ALERT
+    // ✅ (Đã sửa từ lần trước)
     showToast(`Lỗi cập nhật Deck: ${err.message}`, "error");
     console.error("saveDeckInfoOnly Error:", err);
     return false;
@@ -547,11 +548,11 @@ async function handleConfirmDeleteDeck() {
       headers: { Authorization: `Bearer ${jwt.value}` },
     });
     await handleResponse(response);
-    // ✅ 3. THAY THẾ ALERT
+    // ✅ (Đã sửa từ lần trước)
     showToast("Đã xóa Deck thành công.", "success");
     emit("go-to-list");
   } catch (err: any) {
-    // ✅ 3. THAY THẾ ALERT
+    // ✅ (Đã sửa từ lần trước)
     showToast(`Lỗi xóa Deck: ${err.message}`, "error");
     console.error("handleConfirmDeleteDeck Error:", err);
   } finally {
@@ -563,7 +564,7 @@ async function handleConfirmDeleteDeck() {
 function addCardToList() {
   const front = newCardInput.value.frontText?.trim();
   const back = newCardInput.value.backText?.trim();
-  // ✅ 3. THAY THẾ ALERT
+  // ✅ (Đã sửa từ lần trước)
   if (!front || !back) {
     showToast("Mặt trước và Mặt sau là bắt buộc.", "error");
     return;
@@ -599,10 +600,10 @@ async function updateCard(card: EditableCardDto) {
       body: JSON.stringify(cardDto),
     });
     await handleResponse(response);
-    // ✅ 3. THÊM TOAST (Tùy chọn)
+    // ✅ (Đã sửa từ lần trước)
     showToast(`Đã cập nhật thẻ "${card.charBig}"`, "success");
   } catch (err: any) {
-    // ✅ 3. THAY THẾ ALERT
+    // ✅ (Đã sửa từ lần trước)
     showToast(`Lỗi cập nhật thẻ ${cardId}: ${err.message}`, "error");
   } finally {
     card.isSaving = false;
@@ -659,10 +660,10 @@ async function handleConfirmDeleteCard() {
     if (indexToRemove !== null) {
       editableSet.cards.splice(indexToRemove, 1);
     }
-    // ✅ 3. THÊM TOAST
+    // ✅ (Đã sửa từ lần trước)
     showToast(`Đã xóa thẻ "${card.charBig}"`, "success");
   } catch (err: any) {
-    // ✅ 3. THAY THẾ ALERT
+    // ✅ (Đã sửa từ lần trước)
     showToast(`Lỗi xóa thẻ ${cardId}: ${err.message}`, "error");
     console.error("deleteCard Error:", err);
     if (card) card.isDeleting = false;
@@ -701,7 +702,7 @@ const parsedCards = computed(() => {
 
 function importCardsToList() {
   const cardsToImport = parsedCards.value;
-  // ✅ 3. THAY THẾ ALERT
+  // ✅ (Đã sửa từ lần trước)
   if (cardsToImport.length === 0) {
     showToast("Không có thẻ hợp lệ nào để import.", "error");
     return;
@@ -718,7 +719,7 @@ function importCardsToList() {
     editableSet.cards.push(tempCard);
   });
   closeImportModal();
-  // ✅ 3. THAY THẾ ALERT
+  // ✅ (Đã sửa từ lần trước)
   showToast(
     `Đã thêm ${cardsToImport.length} thẻ vào danh sách chờ lưu.`,
     "success"
@@ -775,10 +776,14 @@ async function saveAllChanges() {
         },
         body: JSON.stringify(newCardsToApi),
       });
-      const addedCardsData = await handleResponse<CardDto[]>(response);
+      // ✅ SỬA LỖI: handleResponse<CardDto[]> -> handleResponse<any>
+      // API của bạn trả về { result: CardDto[] }, nên handleResponse sẽ tự bóc tách
+      const addedCardsData = await handleResponse<any>(response);
+      
+      // ✅ SỬA LỖI: Kiểm tra addedCardsData (trước là addedCardsData.result)
       if (addedCardsData && addedCardsData.length > 0) {
         const existingCards = editableSet.cards.filter((card) => !card.isNew);
-        const newApiCards = addedCardsData.map((newApiCard) => ({
+        const newApiCards = addedCardsData.map((newApiCard: CardDto) => ({
           ...newApiCard,
           tempId: `card-${newApiCard.id}`,
           isNew: false,
@@ -789,7 +794,7 @@ async function saveAllChanges() {
         cardAddSuccess = false;
       }
     } catch (err: any) {
-      // ✅ 3. THAY THẾ ALERT
+      // ✅ (Đã sửa từ lần trước)
       showToast(`Lỗi khi lưu các thẻ mới: ${err.message}`, "error");
       cardAddSuccess = false;
     } finally {
@@ -800,11 +805,11 @@ async function saveAllChanges() {
   isSavingDeck.value = false;
 
   if (deckSaveSuccess && cardAddSuccess) {
-    // ✅ 3. THAY THẾ ALERT
+    // ✅ (Đã sửa từ lần trước)
     showToast("Đã lưu tất cả thay đổi thành công!", "success");
     emit("deck-updated");
   } else if (deckSaveSuccess && !cardAddSuccess) {
-    // ✅ 3. THAY THẾ ALERT (và bỏ comment)
+    // ✅ (Đã sửa từ lần trước)
     showToast("Đã lưu thông tin deck, nhưng có lỗi khi lưu thẻ mới.", "error");
     emit("deck-updated");
   }

@@ -147,7 +147,7 @@
       <div class="text-right">
         <button
           @click="createDeck"
-          :disabled="isSaving || !newDeck.title"
+          :disabled="isSaving"
           class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed"
         >
           <span v-if="isSaving">Đang tạo...</span>
