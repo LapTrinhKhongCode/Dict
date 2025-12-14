@@ -10,16 +10,16 @@ namespace Dict.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_entries_EntSeq",
-                table: "entries");
+            //migrationBuilder.DropIndex(
+            //    name: "IX_entries_EntSeq",
+            //    table: "entries");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_entries_EntSeq_Type",
-                table: "entries",
-                columns: new[] { "EntSeq", "Type" },
-                unique: true,
-                filter: "[EntSeq] IS NOT NULL");
+            //migrationBuilder.CreateIndex(
+            //    name: "IX_entries_EntSeq_Type",
+            //    table: "entries",
+            //    columns: new[] { "EntSeq", "Type" },
+            //    unique: true,
+            //    filter: "[EntSeq] IS NOT NULL");
         }
 
         /// <inheritdoc />

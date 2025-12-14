@@ -1,7 +1,9 @@
 ﻿using Dict.DTO;
 using Dict.DTO.Deck; // Namespace chứa các DTO trên
+using Dict.Models;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims; // Cần cho ClaimTypes
 
@@ -15,12 +17,14 @@ namespace Dict.Controllers
         private readonly IDeckService _deckService;
         private readonly ResponseDTO _response;
         private readonly ILogger<DecksController> _logger; // Thêm Logger
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public DecksController(IDeckService deckService, ILogger<DecksController> logger) // Inject Logger
+        public DecksController(IDeckService deckService, ILogger<DecksController> logger, UserManager<ApplicationUser> userManager) // Inject Logger
         {
             _deckService = deckService;
             _response = new ResponseDTO();
             _logger = logger; // Lưu Logger
+            _userManager = userManager;
         }
 
         // SỬA LẠI: Lấy UserId động từ JWT token bằng ClaimTypes.NameIdentifier
@@ -156,28 +160,78 @@ namespace Dict.Controllers
         #endregion
 
         #region Deck Write Endpoints
-
-            [HttpPost]
-            public async Task<IActionResult> CreateDeck([FromBody] DeckCreateDto deckDto)
+        [HttpPost]
+        public async Task<IActionResult> CreateDeck([FromBody] DeckCreateDto deckDto)
+        {
+            var userId = GetUserId();
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (!ModelState.IsValid)
             {
-                if (!ModelState.IsValid) { return BadRequest(new ResponseDTO { IsSuccess = false, Message = "Invalid data", Result = ModelState }); }
-                try
+                var errorResponse = new ResponseDTO
                 {
-                    var userId = GetUserId();
-                    _response.Result = await _deckService.CreateDeckAsync(deckDto, userId);
-                    _response.Message = "Deck created successfully.";
-                    // Trả về 201 Created sẽ tốt hơn, nhưng Ok() cũng được chấp nhận
-                    return Ok(_response);
-                }
-                catch (UnauthorizedAccessException ex) { return Unauthorized(new ResponseDTO { IsSuccess = false, Message = ex.Message }); }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error creating deck for user {UserId}", GetUserId());
-                    _response.IsSuccess = false;
-                    _response.Message = ex.Message;
-                    return StatusCode(500, _response);
-                }
+                    IsSuccess = false,
+                    Message = "Invalid data",
+                    Result = ModelState
+                };
+                return BadRequest(errorResponse);
             }
+
+            if (!user.IsActive)
+            {
+                return Unauthorized(new ResponseDTO
+                {
+                    IsSuccess = false,
+                    Message = "Tài khoản bị khóa."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(deckDto.Title))
+            {
+                var errorResponse = new ResponseDTO
+                {
+                    IsSuccess = false,
+                    Message = "Tên bộ thẻ (deck) không được để trống",
+                    Result = null
+                };
+                return BadRequest(errorResponse);
+            }
+
+            try
+            {
+        
+
+                // 2. Tạo deck
+                var deck = await _deckService.CreateDeckAsync(deckDto, userId);
+
+                // 3. Trả response thành công, tạo mới ResponseDTO cục bộ
+                var successResponse = new ResponseDTO
+                {
+                    IsSuccess = true,
+                    Message = "Deck created successfully.",
+                    Result = deck
+                };
+                return Ok(successResponse);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new ResponseDTO { IsSuccess = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new ResponseDTO { IsSuccess = false, Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ResponseDTO { IsSuccess = false, Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating deck for user {UserId}", GetUserId());
+                return StatusCode(500, new ResponseDTO { IsSuccess = false, Message = "Internal server error." });
+            }
+        }
+
+
 
         // ✨ ENDPOINT MỚI: Cập nhật Deck
         [HttpPut("{deckId}")]

@@ -10,12 +10,12 @@ namespace Dict.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "ShortMean",
-                table: "entries",
-                type: "nvarchar(255)",
-                maxLength: 255,
-                nullable: true);
+            //migrationBuilder.AddColumn<string>(
+            //    name: "ShortMean",
+            //    table: "entries",
+            //    type: "nvarchar(255)",
+            //    maxLength: 255,
+            //    nullable: true);
         }
 
         /// <inheritdoc />

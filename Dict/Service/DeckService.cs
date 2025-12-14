@@ -91,17 +91,36 @@ namespace Dict.Service
 
         public async Task<DeckSummaryDto> CreateDeckAsync(DeckCreateDto deckDto, int userId)
         {
-            // 3. SỬA LẠI CÁCH TÌM USER
+            // 1️⃣ KIỂM TRA NGƯỜI DÙNG CHƯA ĐĂNG NHẬP
+            if (userId <= 0)
+            {
+                throw new UnauthorizedAccessException("Vui lòng đăng nhập để tạo bộ thẻ (deck).");
+            }
+
+            // 2️⃣ KIỂM TRA TÊN DECK
+            if (string.IsNullOrWhiteSpace(deckDto.Title))
+            {
+                throw new ArgumentException("Tên bộ thẻ (deck) không được để trống.");
+            }
+
+            // 3️⃣ LẤY THÔNG TIN USER
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null)
             {
-                throw new Exception("Người dùng không tồn tại.");
+                throw new InvalidOperationException("Người dùng không tồn tại.");
             }
 
+            // 4️⃣ KIỂM TRA USER BỊ KHÓA
+            if (!user.IsActive)
+            {
+                throw new InvalidOperationException("Tài khoản của bạn đã bị khóa, không thể tạo bộ thẻ.");
+            }
+
+            // 5️⃣ TẠO DECK MỚI
             var newDeck = new Deck
             {
-                Name = deckDto.Title,
-                Description = deckDto.Description,
+                Name = deckDto.Title.Trim(),
+                Description = deckDto.Description ?? "",
                 IsPublic = deckDto.IsPublic,
                 UserId = userId,
                 CreatedAt = DateTime.UtcNow,
@@ -131,12 +150,13 @@ namespace Dict.Service
             {
                 Id = newDeck.Id,
                 Name = newDeck.Name,
-                Description = newDeck.Description ?? "",
+                Description = newDeck.Description,
                 IsPublic = newDeck.IsPublic,
                 CardCount = newDeck.Cards.Count,
                 AuthorName = user.UserName ?? "N/A"
             };
         }
+
 
 
         public async Task<bool> UpdateDeckAsync(int deckId, DeckUpdateDto deckDto, int userId)
@@ -339,6 +359,7 @@ namespace Dict.Service
             };
 
             // 6. Sao chép (OK)
+            if (originalDeck.Cards != null && originalDeck.Cards.Any())
             if (originalDeck.Cards != null && originalDeck.Cards.Any())
             {
                 foreach (var originalCard in originalDeck.Cards)

@@ -10,18 +10,18 @@ namespace Dict.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "EntryCategory",
-                table: "entries",
-                type: "nvarchar(50)",
-                maxLength: 50,
-                nullable: true);
+            //migrationBuilder.AddColumn<string>(
+            //    name: "EntryCategory",
+            //    table: "entries",
+            //    type: "nvarchar(50)",
+            //    maxLength: 50,
+            //    nullable: true);
 
-            migrationBuilder.AddColumn<int>(
-                name: "Weight",
-                table: "entries",
-                type: "int",
-                nullable: true);
+            //migrationBuilder.AddColumn<int>(
+            //    name: "Weight",
+            //    table: "entries",
+            //    type: "int",
+            //    nullable: true);
         }
 
         /// <inheritdoc />

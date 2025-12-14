@@ -3,6 +3,10 @@ using Dict.DTO;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
+using Dict.Data;
+using Dict.Models;
 
 namespace Dict.Controllers
 {
@@ -13,11 +17,14 @@ namespace Dict.Controllers
     {
         private readonly IReviewService _reviewService;
         private ResponseDTO _response;
-
-        public ReviewController(IReviewService reviewService)
+        private readonly ApplicationDbContext _db;
+        private readonly UserManager<ApplicationUser> _userManager;
+        public ReviewController(IReviewService reviewService, ApplicationDbContext db, UserManager<ApplicationUser> userManager)
         {
             _reviewService = reviewService;
             _response = new ResponseDTO();
+            _db = db;
+            _userManager = userManager;
         }
         private int GetUserId()
         {
@@ -37,19 +44,70 @@ namespace Dict.Controllers
         {
             try
             {
-                // Tạm thời hardcode UserId. Trong thực tế, bạn sẽ lấy từ JWT token
-                // var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-                var userId = GetUserId();
+             
 
-                _response.Result = await _reviewService.GetReviewQueueAsync(deckId, userId);
+                var userId = GetUserId();
+                var user = await _userManager.FindByIdAsync(userId.ToString());
+                if (user == null)
+                {
+                    return Unauthorized(new ResponseDTO
+                    {
+                        IsSuccess = false,
+                        Message = "Người dùng không tồn tại."
+                    });
+                }
+
+                if (!user.IsActive)
+                {
+                    return Unauthorized(new ResponseDTO
+                    {
+                        IsSuccess = false,
+                        Message = "Tài khoản bị khóa."
+                    });
+                }
+
+
+                // Kiểm tra deck tồn tại
+                var deck = await _db.Decks.FindAsync(deckId);
+                if (deck == null)
+                {
+                    return StatusCode(404, new ResponseDTO
+                    {
+                        IsSuccess = false,
+                        Message = "Deck không tồn tại"
+                    });
+                }
+
+                // Kiểm tra quyền sở hữu deck
+                if (deck.UserId != userId)
+                {
+                    return StatusCode(403, new ResponseDTO
+                    {
+                        IsSuccess = false,
+                        Message = "Không có quyền truy cập deck này"
+                    });
+                }
+
+
+                var queue = await _reviewService.GetReviewQueueAsync(deckId, userId);
+
+                return Ok(new ResponseDTO
+                {
+                    IsSuccess = true,
+                    Result = queue,
+                    Message = "Lấy queue thành công"
+                });
             }
             catch (Exception ex)
             {
-                _response.IsSuccess = false;
-                _response.Message = ex.Message;
+                return StatusCode(500, new ResponseDTO
+                {
+                    IsSuccess = false,
+                    Message = "Lỗi hệ thống: " + ex.Message
+                });
             }
-            return Ok(_response);
         }
+
 
         [HttpPost]
         [Route("PostAnswer")]

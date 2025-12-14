@@ -11,18 +11,18 @@ namespace Dict.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "CommentRawJson",
-                table: "entries",
-                type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "");
+            //migrationBuilder.AddColumn<string>(
+            //    name: "CommentRawJson",
+            //    table: "entries",
+            //    type: "nvarchar(max)",
+            //    nullable: false,
+            //    defaultValue: "");
 
-            migrationBuilder.AddColumn<int>(
-                name: "MobileId",
-                table: "entries",
-                type: "int",
-                nullable: true);
+            //migrationBuilder.AddColumn<int>(
+            //    name: "MobileId",
+            //    table: "entries",
+            //    type: "int",
+            //    nullable: true);
         }
 
         /// <inheritdoc />

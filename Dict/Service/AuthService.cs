@@ -178,42 +178,55 @@ namespace Dict.Service
 
         public async Task<LoginResponseDto> LoginAsync(LoginRequestDto request)
         {
-            // 13. DÙNG USERNMANAGER ĐỂ TÌM USER
+            // 1️⃣ KIỂM TRA THIẾU TRƯỜNG
+            if (string.IsNullOrWhiteSpace(request.Username))
+            {
+                throw new ArgumentException("Thiếu trường tên đăng nhập.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                throw new ArgumentException("Thiếu trường mật khẩu.");
+            }
+
+            // 2️⃣ TÌM USER
             var user = await _userManager.FindByNameAsync(request.Username);
 
             if (user == null)
             {
-                throw new Exception("Tên đăng nhập hoặc mật khẩu không chính xác.");
+                throw new InvalidOperationException("Tên đăng nhập không tồn tại.");
             }
 
-            // 14. DÙNG SIGNINMANAGER ĐỂ KIỂM TRA MẬT KHẨU
-            // (Nó sẽ tự động so sánh hash)
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false); // false = không khóa tài khoản nếu sai
+            // 3️⃣ KIỂM TRA TÀI KHOẢN CÓ BỊ KHÓA KHÔNG
+            if (!user.IsActive)
+            {
+                throw new InvalidOperationException("Tài khoản này đã bị khóa.");
+            }
+
+            // 4️⃣ KIỂM TRA MẬT KHẨU
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
 
             if (!result.Succeeded)
             {
-                throw new Exception("Tên đăng nhập hoặc mật khẩu không chính xác.");
+                throw new InvalidOperationException("Mật khẩu không chính xác.");
             }
 
-            if (!user.IsActive)
-            {
-                throw new Exception("Tài khoản này đã bị khóa.");
-            }
-
-            // 15. LẤY ROLE VÀ TẠO TOKEN
+            // 5️⃣ LẤY ROLE & TẠO TOKEN
             var roles = await _userManager.GetRolesAsync(user);
             var token = _jwtService.GenerateToken(user, roles);
 
+            // 6️⃣ TRẢ VỀ KẾT QUẢ THÀNH CÔNG
             return new LoginResponseDto
             {
                 Token = token,
                 Username = user.UserName,
                 Email = user.Email,
-                Role = roles.FirstOrDefault(), // Trả về vai trò
+                Role = roles.FirstOrDefault(),
                 AvatarUrl = user.AvatarUrl,
                 UserId = user.Id
             };
         }
+
         public async Task LogoutAsync(int userId)
         {
             _logger.LogInformation("User {UserId} logged out at {Timestamp}", userId, DateTime.UtcNow);
