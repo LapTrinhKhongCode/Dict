@@ -392,11 +392,9 @@
           </button>
           <button
             @click="importCardsToList"
-            :disabled="parsedCards.length === 0"
+            
             class="px-5 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed"
-          >
-            Thêm {{ parsedCards.length }} thẻ vào danh sách
-          </button>
+          >Thêm thẻ</button>
         </div>
       </div>
     </div>

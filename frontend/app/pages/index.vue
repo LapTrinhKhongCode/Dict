@@ -1,5 +1,6 @@
 <template>
   <div class="p-6 space-y-6 bg-gray-50 dark:bg-neutral-900 transition-colors">
+   
     <div
       class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-4 space-y-4"
     >
@@ -37,8 +38,27 @@
         </button>
       </div>
     </div>
+       <!-- Banner - visible only before search -->
+    <div v-if="!hasSearched" class="rounded-xl overflow-hidden">
+      <img 
+        src="/banner.png" 
+        alt="Miyo Dictionary Banner" 
+        class="w-full h-auto object-cover"
+      />
+    </div>
 
+    <!-- Show TranslationBlock when no search has been performed -->
+    <div v-if="!hasSearched" class="mt-2">
+      <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+        <span>✨</span>
+        <span>Dịch bằng AI</span>
+      </h2>
+      <TranslationBlock />
+    </div>
+
+    <!-- Show SearchResult after a search is made -->
     <SearchResult
+      v-else
       :loading="loading"
       :error="error"
       :result="currentResult"
@@ -57,6 +77,7 @@ import { toKana } from "wanakana";
 
 import SearchBar from "~/components/SearchBar.vue";
 import SearchResult from "~/components/SearchResult.vue";
+import TranslationBlock from "~/components/translate/TranslationBlock.vue";
 
 const route = useRoute();
 const router = useRouter();

@@ -230,7 +230,7 @@ async function handleAuth() {
       </div>
       <button
         @click="handleAuth"
-        :disabled="loading || !isFormValid()"
+        :disabled="loading"
         class="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded disabled:opacity-60"
       >
         {{

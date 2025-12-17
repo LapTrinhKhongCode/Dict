@@ -40,7 +40,12 @@
       </div>
     </div>
     <div id="search-results-area" ref="searchResultRef">
+      <!-- Show recent searches when no search has been performed -->
+      <RecentSearches v-if="!hasSearched" />
+
+      <!-- Show search results after a search is made -->
       <SearchResult
+        v-else
         :loading="loading"
         :error="error"
         :result="currentResult"
@@ -61,6 +66,8 @@ import { toKana } from "wanakana";
 
 import SearchBar from "~/components/SearchBar.vue";
 import SearchResult from "~/components/SearchResult.vue";
+import RecentSearches from "~/components/RecentSearches.vue";
+import { useRecentSearches } from '~/composables/useRecentSearches';
 
 const route = useRoute();
 const router = useRouter();
@@ -80,6 +87,7 @@ const error = ref("");
 const searchedTerm = ref(searchWord.value);
 const hasSearched = ref(false);
 const config = useRuntimeConfig();
+const { addRecentSearch } = useRecentSearches();
 
 // --- Computed properties to drive the UI ---
 const viewMode = computed(() => {
@@ -236,6 +244,16 @@ const fetchAll = async (word: string) => {
   await fetchKanjiDataOnly(kanjiSearchTerm);
 
   loading.value = false;
+
+  // Save to recent searches if word result found
+  if (wordResult.value?.words?.[0]) {
+    const firstWord = wordResult.value.words[0];
+    addRecentSearch({
+      word: firstWord.word,
+      phonetic: firstWord.phonetic || '',
+      short_mean: firstWord.short_mean || '',
+    });
+  }
 
   if (!wordResult.value && !kanjiResult.value) {
     error.value = "No results found for word or kanji.";
