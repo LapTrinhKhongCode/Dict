@@ -63,7 +63,7 @@ namespace Dict.Service
                 throw new InvalidOperationException(passwordError);
             }
 
-            if (!Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
+            if (string.IsNullOrEmpty(request.Username) || !Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
                 throw new InvalidOperationException("Username chỉ được chứa chữ cái, số hoặc dấu gạch dưới, không có khoảng trắng hoặc dấu.");
 
             // << --- CÁC DÒNG CODE CŨ (DÙNG _context) ĐÃ ĐƯỢC XÓA Ở ĐÂY --- >>
@@ -150,8 +150,14 @@ namespace Dict.Service
 
             // 11. GÁN VAI TRÒ (ROLE) CHO USER
             // (Đảm bảo bạn đã có Role "User" trong DB)
-            await _userManager.AddToRoleAsync(user, "User"); // Giả định vai trò "User"
+            var roleResult = await _userManager.AddToRoleAsync(user, "USER"); // Gán vào biến mới
 
+            if (!roleResult.Succeeded) // Kiểm tra kết quả
+            {
+                // Nếu thất bại, ném lỗi
+                var errors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Failed to assign role: {errors}");
+            }
             _cache.Remove(token);
 
             // 12. TẠO TOKEN ĐĂNG NHẬP (LẤY CẢ ROLE)

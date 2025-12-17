@@ -1,0 +1,66 @@
+[
+  {
+    "TestCaseName": "User không tồn tại",
+    "FindByIdReturnsUser": false,
+    "TargetIsAdmin": false,
+    "RoleExistsSetup": {},
+    "NewRoles": [ "USER" ],
+    "RemoveRolesResult": "Success",
+    "AddRolesResult": "Success",
+    "ExpectedResultType": "ReturnsFalse",
+    "ExpectedExceptionMessage": null
+  },
+  {
+    "TestCaseName": "Cố gắng đổi role của ADMIN",
+    "FindByIdReturnsUser": true,
+    "TargetIsAdmin": true,
+    "RoleExistsSetup": {},
+    "NewRoles": [ "USER" ],
+    "RemoveRolesResult": "Success",
+    "AddRolesResult": "Success",
+    "ExpectedResultType": "ReturnsFalse",
+    "ExpectedExceptionMessage": null
+  },
+  {
+    "TestCaseName": "Tên Role mới không hợp lệ",
+    "FindByIdReturnsUser": true,
+    "TargetIsAdmin": false,
+    "RoleExistsSetup": {
+      "USER": true,
+      "INVALID_ROLE": false
+    },
+    "NewRoles": [ "USER", "INVALID_ROLE" ],
+    "RemoveRolesResult": "Success",
+    "AddRolesResult": "Success",
+    "ExpectedResultType": "ThrowsArgumentException",
+    "ExpectedExceptionMessage": "Invalid role specified: INVALID_ROLE"
+  },
+  {
+    "TestCaseName": "Lỗi khi xóa Role cũ",
+    "FindByIdReturnsUser": true,
+    "TargetIsAdmin": false,
+    "RoleExistsSetup": {
+      "USER": true,
+      "MODERATOR": true
+    },
+    "NewRoles": [ "USER", "MODERATOR" ],
+    "RemoveRolesResult": "Failed",
+    "AddRolesResult": "Success",
+    "ExpectedResultType": "ThrowsException",
+    "ExpectedExceptionMessage": "Failed to remove old roles."
+  },
+  {
+    "TestCaseName": "Lỗi khi thêm Role mới",
+    "FindByIdReturnsUser": true,
+    "TargetIsAdmin": false,
+    "RoleExistsSetup": {
+      "USER": true,
+      "MODERATOR": true
+    },
+    "NewRoles": [ "USER", "MODERATOR" ],
+    "RemoveRolesResult": "Success",
+    "AddRolesResult": "Failed",
+    "ExpectedResultType": "ThrowsException",
+    "ExpectedExceptionMessage": "Failed to add new roles."
+  }
+]
