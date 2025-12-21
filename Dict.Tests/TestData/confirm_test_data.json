@@ -1,0 +1,50 @@
+[
+  {
+    "TestCaseName": "Token không hợp lệ / hết hạn",
+    "CacheFindsToken": false,
+    "FindByNameReturnsUser": false,
+    "FindByEmailReturnsUser": false,
+    "CreateAsyncResult": "Success",
+    "CreateAsyncError": null,
+    "AddToRoleResult": "Success",
+    "AddToRoleError": null,
+    "ExpectedExceptionType": "InvalidOperationException",
+    "ExpectedMessage": "Link xác thực không hợp lệ, đã hết hạn hoặc không tồn tại."
+  },
+  {
+    "TestCaseName": "Race Condition - Trùng Email",
+    "CacheFindsToken": true,
+    "FindByNameReturnsUser": false,
+    "FindByEmailReturnsUser": true,
+    "CreateAsyncResult": "Success",
+    "CreateAsyncError": null,
+    "AddToRoleResult": "Success",
+    "AddToRoleError": null,
+    "ExpectedExceptionType": "InvalidOperationException",
+    "ExpectedMessage": "Username or Email already exists."
+  },
+  {
+    "TestCaseName": "Lỗi tạo user (Password yếu)",
+    "CacheFindsToken": true,
+    "FindByNameReturnsUser": false,
+    "FindByEmailReturnsUser": false,
+    "CreateAsyncResult": "Failed",
+    "CreateAsyncError": "Password too weak",
+    "AddToRoleResult": "Success",
+    "AddToRoleError": null,
+    "ExpectedExceptionType": "InvalidOperationException",
+    "ExpectedMessage": "Failed to create user: Password too weak"
+  },
+  {
+    "TestCaseName": "Lỗi gán Role (Role không tồn tại)",
+    "CacheFindsToken": true,
+    "FindByNameReturnsUser": false,
+    "FindByEmailReturnsUser": false,
+    "CreateAsyncResult": "Success",
+    "CreateAsyncError": null,
+    "AddToRoleResult": "Failed",
+    "AddToRoleError": "Role USER does not exist",
+    "ExpectedExceptionType": "InvalidOperationException",
+    "ExpectedMessage": "Failed to assign role: Role USER does not exist"
+  }
+]

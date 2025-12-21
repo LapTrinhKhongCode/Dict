@@ -1,0 +1,67 @@
+[
+  {
+    "TestCaseName": "Trùng Email",
+    "InputUser": "new_user",
+    "InputEmail": "existing@email.com",
+    "InputPass": "ValidPass123",
+    "FindByEmailReturnsUser": true,
+    "FindByNameReturnsUser": false,
+    "FrontendUrlValue": "http://ok.com",
+    "EmailServiceThrowsError": false,
+    "CacheServiceThrowsError": false,
+    "ExpectedExceptionType": "InvalidOperationException",
+    "ExpectedMessage": "Email already exists."
+  },
+  {
+    "TestCaseName": "Trùng Username",
+    "InputUser": "existing_user",
+    "InputEmail": "new@email.com",
+    "InputPass": "ValidPass123",
+    "FindByEmailReturnsUser": false,
+    "FindByNameReturnsUser": true,
+    "FrontendUrlValue": "http://ok.com",
+    "EmailServiceThrowsError": false,
+    "CacheServiceThrowsError": false,
+    "ExpectedExceptionType": "InvalidOperationException",
+    "ExpectedMessage": "Username already exists."
+  },
+  {
+    "TestCaseName": "Lỗi Config - Thiếu FrontendUrl",
+    "InputUser": "new_user",
+    "InputEmail": "new@email.com",
+    "InputPass": "ValidPass123",
+    "FindByEmailReturnsUser": false,
+    "FindByNameReturnsUser": false,
+    "FrontendUrlValue": null,
+    "EmailServiceThrowsError": false,
+    "CacheServiceThrowsError": false,
+    "ExpectedExceptionType": "Exception",
+    "ExpectedMessage": "FrontendUrl is not configured"
+  },
+  {
+    "TestCaseName": "Lỗi Dịch vụ Email Sập",
+    "InputUser": "new_user",
+    "InputEmail": "new@email.com",
+    "InputPass": "ValidPass123",
+    "FindByEmailReturnsUser": false,
+    "FindByNameReturnsUser": false,
+    "FrontendUrlValue": "http://ok.com",
+    "EmailServiceThrowsError": true,
+    "CacheServiceThrowsError": false,
+    "ExpectedExceptionType": "Exception",
+    "ExpectedMessage": "Giả lập lỗi hệ thống email"
+  },
+  {
+    "TestCaseName": "Lỗi Dịch vụ Cache Sập",
+    "InputUser": "new_user",
+    "InputEmail": "new@email.com",
+    "InputPass": "ValidPass123",
+    "FindByEmailReturnsUser": false,
+    "FindByNameReturnsUser": false,
+    "FrontendUrlValue": "http://ok.com",
+    "EmailServiceThrowsError": false,
+    "CacheServiceThrowsError": true,
+    "ExpectedExceptionType": "Exception",
+    "ExpectedMessage": "Giả lập lỗi cache sập"
+  }
+]

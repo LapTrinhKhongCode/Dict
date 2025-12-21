@@ -284,6 +284,11 @@ namespace Dict.Service
         // 10. SỬA LẠI HOÀN TOÀN HÀM UPDATE ROLE
         public async Task<bool> UpdateUserRolesAsync(int userId, List<string> newRoleNames)
         {
+            if (newRoleNames == null)
+            {
+                // Chủ động ném ra lỗi đúng loại mà test đang mong đợi
+                throw new ArgumentNullException(nameof(newRoleNames));
+            }
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
