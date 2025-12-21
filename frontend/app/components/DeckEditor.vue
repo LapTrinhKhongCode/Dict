@@ -392,9 +392,11 @@
           </button>
           <button
             @click="importCardsToList"
-            
+            :disabled="parsedCards.length === 0"
             class="px-5 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed"
-          >Thêm thẻ</button>
+          >
+            Thêm {{ parsedCards.length }} thẻ vào danh sách
+          </button>
         </div>
       </div>
     </div>
@@ -638,17 +640,30 @@ function closeDeleteCardModal() {
 }
 
 async function handleConfirmDeleteCard() {
-  if (
-    !cardToDelete.value ||
-    cardToDelete.value.isDeleting ||
-    !cardToDelete.value.id
-  )
-    return;
+  if (!cardToDelete.value || cardToDelete.value.isDeleting) return;
   const card = cardToDelete.value;
   const cardId = card.id;
-  const indexToRemove = cardIndexToDelete.value;
+  let indexToRemove =
+    Number.isInteger(cardIndexToDelete.value) && cardIndexToDelete.value !== null
+      ? cardIndexToDelete.value
+      : editableSet.cards.findIndex(
+          (c) => c.id === cardId || (c as any).tempId === (card as any).tempId
+        );
 
   closeDeleteCardModal();
+
+  if (card.isNew) {
+    if (indexToRemove !== -1 && indexToRemove !== null) {
+      editableSet.cards.splice(indexToRemove, 1);
+    } else {
+      const idx = editableSet.cards.findIndex((c) => c === card);
+      if (idx !== -1) editableSet.cards.splice(idx, 1);
+    }
+    showToast(`Đã xóa thẻ "${card.charBig}"`, "success");
+    emit("deck-updated");
+    return;
+  }
+
   card.isDeleting = true;
 
   try {
@@ -656,19 +671,33 @@ async function handleConfirmDeleteCard() {
       method: "DELETE",
       headers: { Authorization: `Bearer ${jwt.value}` },
     });
-    await handleResponse(response);
-    if (indexToRemove !== null) {
-      editableSet.cards.splice(indexToRemove, 1);
+
+    try {
+      await handleResponse<any>(response);
+    } catch (err: any) {
+      if (response && response.status === 404) {
+        // treat as deleted
+      } else {
+        throw err;
+      }
     }
-    // ✅ (Đã sửa từ lần trước)
+
+    if (indexToRemove !== -1 && indexToRemove !== null) {
+      editableSet.cards.splice(indexToRemove, 1);
+    } else {
+      const idx = editableSet.cards.findIndex((c) => c.id === cardId);
+      if (idx !== -1) editableSet.cards.splice(idx, 1);
+    }
+
     showToast(`Đã xóa thẻ "${card.charBig}"`, "success");
+    emit("deck-updated");
   } catch (err: any) {
-    // ✅ (Đã sửa từ lần trước)
-    showToast(`Lỗi xóa thẻ ${cardId}: ${err.message}`, "error");
+    showToast(`Lỗi xóa thẻ ${cardId}: ${err?.message ?? err}`, "error");
     console.error("deleteCard Error:", err);
     if (card) card.isDeleting = false;
   }
 }
+
 
 // --- Import Logic ---
 const parsedCards = computed(() => {

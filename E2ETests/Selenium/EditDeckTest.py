@@ -5,6 +5,12 @@ from selenium.webdriver.support import expected_conditions as EC
 import unittest
 import time
 
+# Import test data
+from test_data import (
+    BASE_URL, HYDRATION_WAIT_TIME, SHORT_WAIT_TIME, MEDIUM_WAIT_TIME, LONG_WAIT_TIME,
+    LoginData, Locators, DeckData, CardData
+)
+
 class EditDeckTest(unittest.TestCase):
     
     def setUp(self):

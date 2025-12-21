@@ -188,24 +188,33 @@ async function fetchDeckDetail(id: number): Promise<DeckDetailDto | null> {
   isLoading.value = true;
   try {
     const response = await fetch(`${BASE_URL}/api/decks/${id}`, {
-      cache: 'no-store',
+      cache: "no-store",
       headers: isAuthenticated.value
         ? { Authorization: `Bearer ${jwt.value}` }
         : {},
     });
+
+    if (response.status === 404) {
+      // ✅ Deck không tồn tại → trạng thái hợp lệ
+      console.warn(`Deck ${id} not found (probably deleted)`);
+      return null;
+    }
+
     return await handleResponse<DeckDetailDto>(response);
   } catch (error) {
-    console.error('Không thể tải chi tiết bộ thẻ:', error);
-    alert(
+    console.error("Không thể tải chi tiết bộ thẻ:", error);
+    showToast(
       `Không thể tải chi tiết bộ thẻ: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
+      "error"
     );
     return null;
   } finally {
     isLoading.value = false;
   }
 }
+
 async function refreshSelectedSet() {
   if (selectedSet.value) {
     const updatedSet = await fetchDeckDetail(selectedSet.value.id);
