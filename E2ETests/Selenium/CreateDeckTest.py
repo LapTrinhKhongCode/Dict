@@ -5,44 +5,46 @@ from selenium.webdriver.support import expected_conditions as EC
 import unittest
 import time
 
+# Import test data
+from test_data import (
+    BASE_URL, HYDRATION_WAIT_TIME, SHORT_WAIT_TIME, LONG_WAIT_TIME,
+    LoginData, Locators, DeckData, CardData
+)
+
 class CreateDeckTest(unittest.TestCase):
     
     def setUp(self):
-        # 1. Khởi tạo WebDriver
         self.driver = webdriver.Chrome() 
         self.driver.maximize_window()
-        self.base_url = "http://localhost:3000"
+        self.base_url = BASE_URL
 
     def _login_as_admin(self, driver, wait):
         """Hàm trợ giúp để đăng nhập vào tài khoản admin."""
         print("\nBắt đầu đăng nhập...")
         driver.get(self.base_url + "/login")
 
-        heading_locator = (By.XPATH, "//h2[contains(text(), 'ĐĂNG NHẬP')]")
+        heading_locator = (By.XPATH, Locators.LOGIN_HEADING)
         wait.until(EC.visibility_of_element_located(heading_locator))
         
-        # Chờ 1 giây CỐ ĐỊNH để Nuxt/Vue "hydrate"
-        time.sleep(7)
+        time.sleep(HYDRATION_WAIT_TIME)
         
-        username_locator = (By.ID, "username") 
-        password_locator = (By.ID, "password")
+        username_locator = (By.ID, Locators.USERNAME_INPUT) 
+        password_locator = (By.ID, Locators.PASSWORD_INPUT)
         
         username_field = wait.until(EC.element_to_be_clickable(username_locator))
         password_field = driver.find_element(*password_locator)
 
-        username_field.send_keys('admin')
-        password_field.send_keys('SuperPassword123!')
+        username_field.send_keys(LoginData.ADMIN_USERNAME)
+        password_field.send_keys(LoginData.ADMIN_PASSWORD)
         
-        # Click ra ngoài để trigger v-model
         driver.find_element(*heading_locator).click()
-        time.sleep(0.2) # Chờ Vue cập nhật
+        time.sleep(SHORT_WAIT_TIME)
         
-        login_button_locator = (By.XPATH, "//button[normalize-space()='Login']")
+        login_button_locator = (By.XPATH, Locators.LOGIN_BUTTON)
         login_button = wait.until(EC.element_to_be_clickable(login_button_locator))
         login_button.click()
         
-        # Chờ cho đến khi chuyển trang và thấy text của admin
-        success_text_locator = (By.XPATH, "//*[contains(text(), 'admin !')]")
+        success_text_locator = (By.XPATH, f"//*[contains(text(), '{LoginData.LOGIN_SUCCESS_TEXT}')]")
         wait.until(EC.visibility_of_element_located(success_text_locator))
         print("Đăng nhập thành công, đang ở trang chủ.")
 
@@ -54,89 +56,74 @@ class CreateDeckTest(unittest.TestCase):
         # 1. Đăng nhập
         self._login_as_admin(driver, wait)
         
-        # ⚠️ BƯỚC MỚI: Chuyển hướng đến trang Explore
+        # Chuyển hướng đến trang Explore
         print("Đang chuyển hướng đến trang /explore...")
         driver.get(self.base_url + "/explore")
         
-        # 2. Điều hướng đến trang Tạo bộ thẻ
-        # (Nút này nằm trên trang /explore - là nút "+")
-        # (Chúng ta giả định trang /explore cũng có nút "+" tương tự)
-        create_deck_button_locator = (By.XPATH, "//button[normalize-space()='+']")
+        # Điều hướng đến trang Tạo bộ thẻ
+        create_deck_button_locator = (By.XPATH, Locators.CREATE_DECK_BUTTON)
         
         print("Đang tìm nút '+' để tạo bộ thẻ trên trang /explore...")
         
-        # Thêm chờ cho trang explore tải (ví dụ: chờ heading "Khám phá")
-        explore_heading_locator = (By.XPATH, "//h2[contains(text(), 'Khám phá')]")
+        explore_heading_locator = (By.XPATH, Locators.EXPLORE_HEADING)
         wait.until(EC.visibility_of_element_located(explore_heading_locator))
         
         create_button = wait.until(EC.element_to_be_clickable(create_deck_button_locator))
         create_button.click()
         
-        # 3. Chờ trang DeckCreator tải xong
-        # (Đây là heading <h1> trên DeckCreator.vue)
-        create_page_heading_locator = (By.XPATH, "//h1[normalize-space()='Tạo sổ tay mới']")
+        # Chờ trang DeckCreator tải xong
+        create_page_heading_locator = (By.XPATH, Locators.DECK_CREATOR_HEADING)
         wait.until(EC.visibility_of_element_located(create_page_heading_locator))
         print("Đã chuyển sang trang 'Tạo sổ tay mới'.")
 
-        # Chờ hydration (nếu cần)
-        time.sleep(1) 
+        time.sleep(LONG_WAIT_TIME)
 
-        # 4. Điền form tạo bộ thẻ
-        # (Đây là các trường input trên DeckCreator.vue)
-        name_locator = (By.ID, "deckName")
-        desc_locator = (By.ID, "deckDesc")
+        # Điền form tạo bộ thẻ
+        name_locator = (By.ID, Locators.DECK_NAME_INPUT)
+        desc_locator = (By.ID, Locators.DECK_DESC_INPUT)
 
-        # Tạo tên bộ thẻ duy nhất
-        deck_name = f"Bộ thẻ Test {int(time.time())}"
+        deck_name = f"{DeckData.DECK_NAME_PREFIX} {int(time.time())}"
         
         name_field = wait.until(EC.element_to_be_clickable(name_locator))
         desc_field = driver.find_element(*desc_locator)
 
         name_field.send_keys(deck_name)
-        desc_field.send_keys("Đây là mô tả được tạo tự động bởi Selenium.")
+        desc_field.send_keys(DeckData.DECK_DESCRIPTION)
         print(f"Đã điền tên bộ thẻ: {deck_name}")
 
-        # ⚠️ BƯỚC 4.5: Thêm ít nhất một thẻ (theo yêu cầu)
-        # (Để tránh hộp thoại confirm() mà Selenium không xử lý được)
+        # Thêm ít nhất một thẻ
         print("Đang thêm một thẻ mới...")
-        front_text_locator = (By.CSS_SELECTOR, "input[placeholder='Ký tự *']")
-        back_text_locator = (By.CSS_SELECTOR, "input[placeholder='Nghĩa *']")
-        add_card_button_locator = (By.XPATH, "//button[normalize-space()='Thêm vào danh sách']")
+        front_text_locator = (By.CSS_SELECTOR, Locators.CARD_FRONT_INPUT)
+        back_text_locator = (By.CSS_SELECTOR, Locators.CARD_BACK_INPUT)
+        add_card_button_locator = (By.XPATH, Locators.ADD_CARD_BUTTON)
 
         front_field = driver.find_element(*front_text_locator)
         back_field = driver.find_element(*back_text_locator)
         add_card_button = driver.find_element(*add_card_button_locator)
 
-        front_field.send_keys("Thẻ Mặt Trước 1")
-        back_field.send_keys("Thẻ Mặt Sau 1")
+        front_field.send_keys(CardData.CARD_FRONT_1)
+        back_field.send_keys(CardData.CARD_BACK_1)
         
-        # Click nút "Thêm vào danh sách"
         add_card_button.click()
         
-        # Chờ 0.2 giây để Vue thêm thẻ vào DOM
-        time.sleep(0.2) 
+        time.sleep(SHORT_WAIT_TIME)
         
         # Xác minh thẻ đã xuất hiện trong danh sách
-        card_in_list_locator = (By.XPATH, "//*[contains(@class, 'truncate') and contains(text(), 'Thẻ Mặt Trước 1')]")
+        card_in_list_locator = (By.XPATH, f"//*[contains(@class, 'truncate') and contains(text(), '{CardData.CARD_FRONT_1}')]")
         wait.until(EC.visibility_of_element_located(card_in_list_locator))
         print("Đã thêm thẻ vào danh sách thành công.")
 
 
-        # 5. Gửi form
-        # (Đây là nút submit trên DeckCreator.vue)
-        submit_button_locator = (By.XPATH, "//button[normalize-space()='Tạo bộ thẻ']")
+        # Gửi form
+        submit_button_locator = (By.XPATH, Locators.CREATE_DECK_SUBMIT)
         
-        # Click ra ngoài để Vue kịp update :disabled state
         driver.find_element(*create_page_heading_locator).click()
-        time.sleep(0.2)
+        time.sleep(SHORT_WAIT_TIME)
 
         submit_button = wait.until(EC.element_to_be_clickable(submit_button_locator))
         submit_button.click()
 
-        # 6. Xác minh thành công
-        # (Sau khi tạo, app.vue sẽ chuyển sang 'list' (CardListPage))
-        # Chúng ta xác minh bằng cách tìm tên bộ thẻ mới (dưới dạng <h1>)
-        # ⚠️ LƯU Ý: Bước này giả định CardListPage.vue hiển thị tên bộ thẻ trong <h1>
+        # Xác minh thành công
         print("Đang chờ chuyển sang trang danh sách thẻ...")
         deck_title_locator = (By.XPATH, f"//h1[normalize-space()='{deck_name}']")
         

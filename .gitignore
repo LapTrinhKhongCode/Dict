@@ -7,3 +7,4 @@ Dict/venv
 Dict/TempOcr
 Dict/requirements.txt
 .env
+*.pyc
