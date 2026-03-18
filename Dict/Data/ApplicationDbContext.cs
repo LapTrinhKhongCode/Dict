@@ -219,30 +219,54 @@ namespace Dict.Data
             // entries and related
             modelBuilder.Entity<Entry>(b =>
             {
-                b.ToTable("entries");
-                b.HasKey(x => x.Id);
-                b.Property(x => x.EntSeq);
-                b.HasIndex(x => new { x.EntSeq, x.Type }).IsUnique();
+                // --- BƯỚC 1: Cấu hình "Cơ bắp" (Bảng Gầy - entries) ---
                 b.Property(x => x.Type).HasMaxLength(32);
-                b.Property(x => x.Label);
-                b.Property(x => x.RawJson);
-                b.Property(x => x.MobileId);
-                b.Property(x => x.CommentRawJson);
-                b.Property(x => x.CreatedAt);
-                b.Property(x => x.UpdatedAt);
-                b.Property(x => x.JsonProcessingStatus).HasMaxLength(50);
-                b.Property(x => x.CommentRawJson);
-                b.Property(x => x.MobileId);
-                b.Property(x => x.JsonErrorMessage);
+                b.Property(x => x.Label).HasMaxLength(450); // Đã hạ xuống 450 để khớp Index
                 b.Property(x => x.Phonetic).HasMaxLength(255);
                 b.Property(x => x.Romaji).HasMaxLength(255);
-                b.Property(x => x.ShortMean);
-                b.Property(x => x.Weight);
-                b.Property(x => x.EntryCategory).HasMaxLength(50).IsRequired(false);
+                b.Property(x => x.EntryCategory).HasMaxLength(50);
 
-                b.HasIndex(x => new { x.Type, x.Label }, "IX_entries_Type_Label");
-                b.HasIndex(x => new { x.Type, x.Phonetic }, "IX_entries_Type_Phonetic");
+                // ShortMean: ĐÃ ĐƯA VỀ BẢNG GẦY
+                // Dùng nvarchar để hỗ trợ tiếng Nhật/Việt và giới hạn độ dài để giữ bảng nhẹ
+                b.Property(x => x.ShortMean)
+                 .HasMaxLength(450)
+                 .IsUnicode(true);
 
+                // RawJson & CommentRawJson: Vẫn dùng tuyệt chiêu UTF-8 vì nó ở bảng Béo
+                b.Property(x => x.RawJson)
+                 .IsUnicode(false)
+                 .HasColumnType("varchar(max)")
+                 .UseCollation("Latin1_General_100_CI_AS_SC_UTF8");
+
+                b.Property(x => x.CommentRawJson)
+                 .IsUnicode(false)
+                 .HasColumnType("varchar(max)")
+                 .UseCollation("Latin1_General_100_CI_AS_SC_UTF8");
+
+                // --- BƯỚC 2: Cấu hình "Phân nhà" (Entity Splitting) ---
+                b.ToTable("entries");
+
+                b.SplitToTable("entry_details", t =>
+                {
+                    // ShortMean ĐÃ BỊ LOẠI KHỎI ĐÂY để nó nằm ở bảng chính
+                    t.Property(x => x.RawJson);
+                    t.Property(x => x.CommentRawJson);
+                    t.Property(x => x.JsonErrorMessage);
+                    t.Property(x => x.JsonProcessingStatus);
+                    t.Property(x => x.SynsetProcessingStatus);
+                });
+
+                // --- BƯỚC 3: Index & Relationships ---
+                b.HasKey(x => x.Id);
+
+                // Index tối ưu cho Autocomplete (Sử dụng Covering Index nếu EF Core hỗ trợ Include)
+                // Lưu ý: EF Core 6.0+ hỗ trợ .IncludeProperties()
+                b.HasIndex(x => x.Label, "IX_entries_SmartSearch")
+                 .IncludeProperties(x => new { x.Phonetic, x.Type, x.Weight, x.ShortMean });
+
+                b.HasIndex(x => new { x.EntSeq, x.Type }).IsUnique();
+
+                // Các quan hệ giữ nguyên
                 b.HasMany(x => x.KanjiElements).WithOne(k => k.Entry).HasForeignKey(k => k.EntryId).OnDelete(DeleteBehavior.Cascade);
                 b.HasMany(x => x.ReadingElements).WithOne(r => r.Entry).HasForeignKey(r => r.EntryId).OnDelete(DeleteBehavior.Cascade);
                 b.HasMany(x => x.Senses).WithOne(s => s.Entry).HasForeignKey(s => s.EntryId).OnDelete(DeleteBehavior.Cascade);

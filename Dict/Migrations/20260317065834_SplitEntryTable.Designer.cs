@@ -4,6 +4,7 @@ using Dict.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dict.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260317065834_SplitEntryTable")]
+    partial class SplitEntryTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -325,12 +328,13 @@ namespace Dict.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("JsonProcessingStatus")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Label")
                         .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasMaxLength(900)
+                        .HasColumnType("nvarchar(900)");
 
                     b.Property<int?>("MobileId")
                         .HasColumnType("int");
@@ -350,12 +354,9 @@ namespace Dict.Migrations
                         .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("ShortMean")
-                        .HasMaxLength(450)
-                        .IsUnicode(true)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("SynsetProcessingStatus")
-                        .HasColumnType("nvarchar(max)");
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .UseCollation("Latin1_General_100_CI_AS_SC_UTF8");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -374,9 +375,9 @@ namespace Dict.Migrations
                         .IsUnique()
                         .HasFilter("[EntSeq] IS NOT NULL");
 
-                    b.HasIndex(new[] { "Label" }, "IX_entries_SmartSearch");
+                    b.HasIndex(new[] { "Type", "Label" }, "IX_entries_Type_Label");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex(new[] { "Label" }, "IX_entries_SmartSearch"), new[] { "Phonetic", "Type", "Weight", "ShortMean" });
+                    b.HasIndex(new[] { "Type", "Phonetic" }, "IX_entries_Type_Phonetic");
 
                     b.ToTable("entries", (string)null);
 
@@ -390,7 +391,7 @@ namespace Dict.Migrations
 
                             t.Property("RawJson");
 
-                            t.Property("SynsetProcessingStatus");
+                            t.Property("ShortMean");
                         });
                 });
 
