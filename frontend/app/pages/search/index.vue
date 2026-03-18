@@ -57,7 +57,6 @@
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -67,7 +66,7 @@ import { toKana } from "wanakana";
 import SearchBar from "~/components/SearchBar.vue";
 import SearchResult from "~/components/SearchResult.vue";
 import RecentSearches from "~/components/RecentSearches.vue";
-import { useRecentSearches } from '~/composables/useRecentSearches';
+import { useRecentSearches } from "~/composables/useRecentSearches";
 
 const route = useRoute();
 const router = useRouter();
@@ -143,54 +142,126 @@ const checkConjugation = (word: string): any | null => {
   return null;
 };
 
-// --- Function to change the view in the URL (Giữ nguyên) ---
-const setView = (mode: "word" | "kanji") => {
-  router.push({ query: { ...route.query, view: mode } });
+// --- NEW: Hàm Lazy Load Kanji thông minh ---
+const loadKanjiIfNeeded = async () => {
+  // Nếu đã có kết quả Kanji rồi thì không gọi lại API nữa
+  if (kanjiResult.value) return;
+
+  // Xác định từ khóa (Ưu tiên từ đang chọn > từ kết quả word > từ search gốc)
+  const termToSearch =
+    selectedWordItem.value?.word ||
+    wordResult.value?.words?.[0]?.word ||
+    searchedTerm.value;
+
+  // Chỉ gọi API nếu trong chuỗi có chứa ký tự Hán Tự (Kanji)
+  const hasKanji = /[\u4e00-\u9faf]/.test(termToSearch);
+
+  if (hasKanji) {
+    loading.value = true;
+    await fetchKanjiDataOnly(termToSearch);
+    loading.value = false;
+  }
 };
 
-// --- NEW: Kanji Fetch Logic (Hàm độc lập) ---
+// --- Function to change the view in the URL (ĐÃ SỬA THÊM LAZY LOAD) ---
+const setView = async (mode: "word" | "kanji") => {
+  router.push({ query: { ...route.query, view: mode } });
+
+  // NẾU bấm sang tab Kanji, kích hoạt hàm kiểm tra và load Kanji
+  if (mode === "kanji") {
+    await loadKanjiIfNeeded();
+  }
+};
+
+// --- NEW: Kanji Fetch Logic (Hàm độc lập - GIỮ NGUYÊN CÁCH BÓC TÁCH CỦA ÔNG) ---
+// Trả về 1 chuỗi dính liền các chữ Hán duy nhất (VD: "大学")
+const extractKanjiString = (text: string): string => {
+  const kanjiRegex = /[\u4e00-\u9faf\u3400-\u4dbf]/g;
+  const matches = text.match(kanjiRegex);
+  return matches ? [...new Set(matches)].join("") : "";
+};
+
+// Hàm gọi API nay đã sạch sẽ và tối ưu tuyệt đối
+// --- HÀM TRONG INDEX.VUE ---
 const fetchKanjiDataOnly = async (kanjiSearchTerm: string) => {
-  // Không cần clear lỗi chính ở đây, chỉ cần clear kết quả cũ
   kanjiResult.value = null;
 
   try {
+    const kanjiString = extractKanjiString(kanjiSearchTerm);
+    if (!kanjiString) return;
+
     const apiUrl = `${
       config.public.apiBaseUrl
-    }/api/Kanji/GetKanjiJson/${encodeURIComponent(
-      kanjiSearchTerm // <-- Sử dụng từ khóa/từ có hán tự được chọn
-    )}`;
+    }/api/Kanji/GetKanjiJson/${encodeURIComponent(kanjiString)}`;
     const res = await fetch(apiUrl);
+
     if (!res.ok) throw new Error("Kanji data not found");
     const response = await res.json();
+
+    console.log("1. Data từ API:", response);
 
     if (
       response.status === 200 &&
       response.results &&
       response.results.length > 0
     ) {
-      kanjiResult.value = {
-        type: "kanji",
-        kanjiList: response.results,
-      };
+      // CHUẨN HÓA MẢNG DỮ LIỆU ĐẦU RA
+      const validKanjiList = [];
+
+      response.results.forEach((item: any) => {
+        // Trường hợp 1: Dữ liệu chuẩn bị bọc trong results (như chữ 大)
+        if (item && item.results && item.results.length > 0) {
+          validKanjiList.push(item.results[0]);
+        }
+        // Trường hợp 2: Dữ liệu đã là object Kanji chuẩn, có key "kanji"
+        else if (item && item.kanji) {
+          validKanjiList.push(item);
+        }
+        // Trường hợp 3: Có thể nằm trong key "data"
+        else if (item && item.data && item.data.length > 0) {
+          validKanjiList.push(item.data[0]);
+        }
+      });
+
+      console.log("2. Đã gọt vỏ xong:", validKanjiList);
+
+      // Nếu gọt xong mà vẫn có mảng hợp lệ thì mới gán
+      if (validKanjiList.length > 0) {
+        kanjiResult.value = {
+          type: "kanji",
+          kanjiList: validKanjiList,
+        };
+      } else {
+        console.warn("Lỗi: Dữ liệu Kanji lấy về không có cấu trúc hợp lệ.");
+      }
     }
   } catch (e: any) {
     console.error("Kanji fetch failed:", e.message);
   }
 };
-// ---
 
-// --- NEW: Function to handle selection change from child ---
-const handleSelectionChange = (item: any) => {
+// --- NEW: Function to handle selection change from child (ĐÃ SỬA THÊM LAZY LOAD) ---
+// --- SỬA LẠI HÀM NÀY TRONG INDEX.VUE ---
+const handleSelectionChange = async (item: any) => {
   // 1. Lưu selected item vào state
   selectedWordItem.value = item;
 
-  // 2. Tự động chạy lại tìm kiếm Kanji nếu item mới có word
-  if (item && item.word) {
-    fetchKanjiDataOnly(item.word);
+  // >>> CHỐT CHẶN SINH TỬ <<<
+  // Nếu item được chọn là một chữ Kanji (có thuộc tính .kanji)
+  // thì DỪNG LẠI, KHÔNG LÀM GÌ CẢ! Giữ nguyên giao diện!
+  if (item && item.kanji) {
+    return;
+  }
+
+  // 2. Chỉ khi chọn Từ Vựng (có thuộc tính .word) thì mới reset Kanji cũ để load mới
+  kanjiResult.value = null;
+
+  if (viewMode.value === "kanji" && item && item.word) {
+    await loadKanjiIfNeeded();
   }
 };
 
-// --- Main API Fetch Logic (ĐÃ SỬA) ---
+// --- Main API Fetch Logic (ĐÃ SỬA ÁP DỤNG LAZY LOAD) ---
 const fetchAll = async (word: string) => {
   if (!word) return;
 
@@ -236,12 +307,10 @@ const fetchAll = async (word: string) => {
 
   await fetchWordData();
 
-  // 2. Xác định từ khóa tra Kanji
-  // Ưu tiên 1: Từ khóa từ kết quả Word đầu tiên (nếu có)
-  const kanjiSearchTerm = wordResult.value?.words?.[0]?.word || word;
-
-  // 3. Gọi Kanji Fetch với từ khóa đã ưu tiên (Hàm đã tách)
-  await fetchKanjiDataOnly(kanjiSearchTerm);
+  // 2. GỌI KANJI THEO KIỂU LAZY LOAD (Chỉ gọi nếu đang ở sẵn Tab Kanji)
+  if (viewMode.value === "kanji") {
+    await loadKanjiIfNeeded();
+  }
 
   loading.value = false;
 
@@ -250,13 +319,14 @@ const fetchAll = async (word: string) => {
     const firstWord = wordResult.value.words[0];
     addRecentSearch({
       word: firstWord.word,
-      phonetic: firstWord.phonetic || '',
-      short_mean: firstWord.short_mean || '',
+      phonetic: firstWord.phonetic || "",
+      short_mean: firstWord.short_mean || "",
     });
   }
 
-  if (!wordResult.value && !kanjiResult.value) {
-    error.value = "No results found for word or kanji.";
+  // Báo lỗi nếu tab Word không có dữ liệu (và không phải đang xem tab Kanji)
+  if (!wordResult.value && viewMode.value !== "kanji") {
+    error.value = "Không tìm thấy dữ liệu từ vựng.";
   }
 };
 
@@ -290,6 +360,6 @@ watch(
       conjugationResult.value = null;
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>

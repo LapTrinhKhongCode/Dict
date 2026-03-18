@@ -1,9 +1,7 @@
 <template>
   <div class="space-y-6">
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <div
-        class="text-gray-500 dark:text-gray-400 flex items-center space-x-2"
-      >
+      <div class="text-gray-500 dark:text-gray-400 flex items-center space-x-2">
         <div
           class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500 dark:border-blue-500"
         ></div>
@@ -27,11 +25,11 @@
     >
       <div class="md:col-span-4 lg:col-span-3 space-y-6">
         <div
-          v-if="result.type === 'word' && result.words && result.words.length > 0"
+          v-if="
+            result.type === 'word' && result.words && result.words.length > 0
+          "
         >
-          <h3
-            class="text-lg font-semibold mb-2 text-gray-900 dark:text-white"
-          >
+          <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
             Kết quả tra cứu
           </h3>
           <ul class="space-y-2">
@@ -52,9 +50,7 @@
               <p class="text-sm text-blue-600 dark:text-blue-400">
                 {{ word.phonetic }}
               </p>
-              <p
-                class="text-sm text-gray-600 dark:text-gray-400 truncate"
-              >
+              <p class="text-sm text-gray-600 dark:text-gray-400 truncate">
                 {{ word.short_mean }}
               </p>
             </li>
@@ -68,9 +64,7 @@
             result.kanjiList.length > 0
           "
         >
-          <h3
-            class="text-lg font-semibold mb-2 text-gray-900 dark:text-white"
-          >
+          <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
             Kết quả tra cứu
           </h3>
           <ul class="space-y-2">
@@ -103,9 +97,7 @@
           "
           class="space-y-4"
         >
-          <h3
-            class="text-lg font-semibold mb-2 text-gray-900 dark:text-white"
-          >
+          <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
             Các từ liên quan
           </h3>
           <div class="space-y-2">
@@ -125,7 +117,8 @@
           </div>
           <button
             v-if="
-              result.suggestWords && result.suggestWords.length > suggestionLimit
+              result.suggestWords &&
+              result.suggestWords.length > suggestionLimit
             "
             @click="showAllSuggestions = !showAllSuggestions"
             class="w-full text-sm font-medium text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-gray-700 transition-colors"
@@ -376,9 +369,7 @@
             ref="decksPanelRef"
             class="absolute top-16 right-4 z-20 w-64 rounded-lg shadow-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
           >
-            <h4
-              class="font-medium text-gray-900 dark:text-white mb-2"
-            >
+            <h4 class="font-medium text-gray-900 dark:text-white mb-2">
               Lưu vào Deck...
             </h4>
 
@@ -434,7 +425,8 @@
           </div>
           <div
             v-if="
-              selectedItem.pronunciation && selectedItem.pronunciation.length > 0
+              selectedItem.pronunciation &&
+              selectedItem.pronunciation.length > 0
             "
             class="flex flex-wrap gap-3 pt-3 border-t border-gray-100 dark:border-gray-700"
           >
@@ -465,8 +457,7 @@
                   class="text-lg text-blue-600 dark:text-blue-400 font-medium"
                   >{{ pron.transcriptions[0].kana }}</span
                 >
-                <span
-                  class="text-gray-600 dark:text-gray-400 text-base ml-1"
+                <span class="text-gray-600 dark:text-gray-400 text-base ml-1"
                   >[{{ pron.transcriptions[0].romaji }}]</span
                 >
               </div>
@@ -517,9 +508,7 @@
                     <p class="text-gray-800 dark:text-gray-200 mb-1">
                       {{ example.content }}
                     </p>
-                    <p
-                      class="text-gray-600 dark:text-gray-400 text-sm italic"
-                    >
+                    <p class="text-gray-600 dark:text-gray-400 text-sm italic">
                       {{ example.mean }}
                     </p>
                     <p
@@ -674,13 +663,13 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
-import { useJwt } from '~/composables/useJwt';
+import { useJwt } from "~/composables/useJwt";
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import WordResultModal from "~/components/WordResultModal.vue";
 import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
 import ImageModal from "~/components/ImageModal.vue";
 // ✅ SỬA LỖI: Import đúng composable
-import { useToast } from '@/composables/useToast';
+import { useToast } from "@/composables/useToast";
 // ✅ SỬA LỖI: Lấy đúng hàm 'showToast'
 const { showToast } = useToast();
 
@@ -715,10 +704,14 @@ const props = defineProps({
 const selectedItem = ref<any | null>(null);
 const showAllSuggestions = ref(false);
 const suggestionLimit = 6;
-const emit = defineEmits(['itemSelected']);
-watch(selectedItem, (newItem) => {
-  emit('itemSelected', newItem);
-}, { deep: true });
+const emit = defineEmits(["itemSelected"]);
+watch(
+  selectedItem,
+  (newItem) => {
+    emit("itemSelected", newItem);
+  },
+  { deep: true },
+);
 // --- NEW: State for images toggle ---
 const showAllImages = ref(false);
 const imageLimit = 6;
@@ -743,17 +736,30 @@ const visibleImages = computed(() => {
 watch(
   () => props.result,
   (newResult) => {
+    console.log("3. SearchResult nhận được props:", newResult);
     showAllSuggestions.value = false;
     showAllImages.value = false;
-    if (newResult && newResult.type === 'word' && newResult.words && newResult.words.length > 0) {
+    if (
+      newResult &&
+      newResult.type === "word" &&
+      newResult.words &&
+      newResult.words.length > 0
+    ) {
       selectedItem.value = newResult.words[0];
-    } else if (newResult && newResult.type === 'kanji' && newResult.kanjiList && newResult.kanjiList.length > 0) {
+    } else if (
+      newResult &&
+      newResult.type === "kanji" &&
+      newResult.kanjiList &&
+      newResult.kanjiList.length > 0
+    ) {
+      console.log("4. Đã set selectedItem cho Kanji:", selectedItem.value);
       selectedItem.value = newResult.kanjiList[0];
     } else {
       selectedItem.value = null;
+      console.log("5. Chết dở, nó nhảy vào else rồi!");
     }
   },
-  { immediate: true, deep: true }
+  { immediate: true, deep: true },
 );
 
 const showSuggestedWordModal = ref(false);
@@ -782,30 +788,33 @@ const toggleDecksPanel = () => {
     fetchDecks();
     // Thêm listener để đóng khi click ra ngoài
     setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
+      document.addEventListener("click", handleClickOutside);
     }, 0); // 0 mili-giây là đủ
-
   } else {
     // Gỡ listener khi đóng
-    document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener("click", handleClickOutside);
   }
 };
 
 // 4. Hàm mới để xử lý click ra ngoài
 const handleClickOutside = (event: MouseEvent) => {
-  const isClickInsideButton = decksButtonRef.value?.contains(event.target as Node);
-  const isClickInsidePanel = decksPanelRef.value?.contains(event.target as Node);
+  const isClickInsideButton = decksButtonRef.value?.contains(
+    event.target as Node,
+  );
+  const isClickInsidePanel = decksPanelRef.value?.contains(
+    event.target as Node,
+  );
 
   // Nếu click ra ngoài cả nút VÀ panel
   if (!isClickInsideButton && !isClickInsidePanel) {
     showDecksPanel.value = false;
-    document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener("click", handleClickOutside);
   }
 };
 
 // 5. Gỡ listener khi component bị hủy (quan trọng)
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener("click", handleClickOutside);
 });
 /**
  * Hàm gọi API để lấy danh sách decks.
@@ -816,13 +825,13 @@ const fetchDecks = async () => {
 
   // ✅ SỬA LỖI: Dùng showToast
   if (!isAuthenticated.value) {
-    showToast('Bạn cần đăng nhập để tải decks', 'error');
+    showToast("Bạn cần đăng nhập để tải decks", "error");
     return;
   }
 
   const headers = {
-    'Authorization': `Bearer ${jwt.value}`,
-    'accept': '*/*'
+    Authorization: `Bearer ${jwt.value}`,
+    accept: "*/*",
   };
 
   decksLoading.value = true;
@@ -830,19 +839,18 @@ const fetchDecks = async () => {
     const response = await $fetch<any>(
       `${config.public.apiBaseUrl}/api/Decks/my-decks`,
       {
-        method: 'GET',
-        headers: headers
-      }
+        method: "GET",
+        headers: headers,
+      },
     );
     decks.value = response.result;
 
     if (!decks.value) {
       decks.value = [];
     }
-
   } catch (e) {
     // ✅ SỬA LỖI: Dùng showToast
-    showToast('Không thể tải danh sách decks', 'error');
+    showToast("Không thể tải danh sách decks", "error");
     decks.value = []; // Gán mảng rỗng nếu lỗi
   } finally {
     decksLoading.value = false;
@@ -856,7 +864,7 @@ const saveToDeck = async (deckId: string) => {
 
   // ✅ SỬA LỖI: Dùng showToast
   if (!isAuthenticated.value) {
-    showToast('Bạn cần đăng nhập để lưu thẻ', 'error');
+    showToast("Bạn cần đăng nhập để lưu thẻ", "error");
     return;
   }
 
@@ -865,46 +873,47 @@ const saveToDeck = async (deckId: string) => {
   const payload = [
     {
       frontText: selectedItem.value.word,
-      backText: selectedItem.value.means?.[0]?.mean || selectedItem.value.short_mean || '',
-      tags: selectedItem.value.phonetic || ''
-    }
+      backText:
+        selectedItem.value.means?.[0]?.mean ||
+        selectedItem.value.short_mean ||
+        "",
+      tags: selectedItem.value.phonetic || "",
+    },
   ];
 
   const headers = {
-    'Authorization': `Bearer ${jwt.value}`,
-    'Content-Type': 'application/json'
+    Authorization: `Bearer ${jwt.value}`,
+    "Content-Type": "application/json",
   };
 
   try {
     await $fetch(`${config.public.apiBaseUrl}/api/Decks/${deckId}/cards`, {
-      method: 'POST',
+      method: "POST",
       body: payload,
-      headers: headers
+      headers: headers,
     });
 
     // ✅ SỬA LỖI: Dùng showToast
-    showToast(
-      `Đã lưu từ "${selectedItem.value.word}" vào deck.`,
-      'success'
-    );
-
+    showToast(`Đã lưu từ "${selectedItem.value.word}" vào deck.`, "success");
   } catch (e) {
     // ✅ SỬA LỖI: Dùng showToast
-    showToast('Không thể lưu thẻ, vui lòng thử lại', 'error');
+    showToast("Không thể lưu thẻ, vui lòng thử lại", "error");
   } finally {
     // (Logic finally giữ nguyên)
     saveLoading.value = false; // <-- TẮT ĐI
-    
+
     // Đóng panel
     showDecksPanel.value = false;
-    document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener("click", handleClickOutside);
   }
 };
 function speak(textToSpeak) {
   // Quan trọng: Phải check 'process.client' vì window.speechSynthesis chỉ tồn tại ở trình duyệt
   if (process.client) {
     if (!window.speechSynthesis) {
-      console.error('Rất tiếc, trình duyệt của bạn không hỗ trợ chức năng phát âm.');
+      console.error(
+        "Rất tiếc, trình duyệt của bạn không hỗ trợ chức năng phát âm.",
+      );
       return;
     }
 
@@ -912,7 +921,7 @@ function speak(textToSpeak) {
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
 
     // *** Đặt ngôn ngữ là tiếng Nhật ***
-    utterance.lang = 'ja-JP';
+    utterance.lang = "ja-JP";
 
     // (Nên có) Hủy bỏ bất kỳ lần phát âm nào trước đó nếu người dùng click nhanh
     window.speechSynthesis.cancel();

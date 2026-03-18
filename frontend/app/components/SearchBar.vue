@@ -69,7 +69,10 @@
       class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-1000"
     >
       <div class="min-h-[48px] mb-3 flex items-center justify-center">
-        <div v-if="isPredicting" class="flex items-center justify-center h-full">
+        <div
+          v-if="isPredicting"
+          class="flex items-center justify-center h-full"
+        >
           <div
             class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 dark:border-blue-400"
           ></div>
@@ -89,7 +92,10 @@
           </button>
         </div>
 
-        <p v-else class="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+        <p
+          v-else
+          class="text-sm text-gray-500 dark:text-gray-400 text-center py-2"
+        >
           Vẽ chữ Kanji hoặc Kana vào khung bên dưới và chọn từ gợi ý để thêm vào
           ô tìm kiếm.
         </p>
@@ -179,7 +185,10 @@
                 ocrStatus
               }}</span>
             </div>
-            <p v-else-if="ocrStatus" class="text-sm text-gray-500 dark:text-gray-400">
+            <p
+              v-else-if="ocrStatus"
+              class="text-sm text-gray-500 dark:text-gray-400"
+            >
               {{ ocrStatus }}
             </p>
           </div>
@@ -210,8 +219,7 @@
               class="size-10 text-gray-400 dark:text-gray-500 mb-3"
             />
             <p class="text-sm text-gray-500 dark:text-gray-400">
-              <span
-                class="font-semibold text-blue-500 dark:text-blue-400"
+              <span class="font-semibold text-blue-500 dark:text-blue-400"
                 >Click vào để upload</span
               >
               hoặc kéo thả ảnh vào đây
@@ -225,7 +233,9 @@
             v-else
             class="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg"
           >
-            <p class="text-sm text-gray-500 dark:text-gray-400">Processing...</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Processing...
+            </p>
           </div>
         </div>
       </div>
@@ -251,10 +261,10 @@
 }
 /* (Logic MÀU BÚT VẼ nằm trong <script setup>) */
 
-
 /* --- Scrollbar Styling (Chung cho cả 2 list) --- */
 .suggestions-list::-webkit-scrollbar,
-.ocr-results-ref::-webkit-scrollbar { /* Sửa tên class cho đúng */
+.ocr-results-ref::-webkit-scrollbar {
+  /* Sửa tên class cho đúng */
   width: 8px;
 }
 /* Light Mode */
@@ -308,7 +318,7 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["update:modelValue", "search"]);
-
+const autocompleteCache = new Map<string, any[]>();
 const config = useRuntimeConfig();
 const colorMode = useColorMode(); // <-- THÊM DÒNG NÀY
 
@@ -355,20 +365,18 @@ watch(
       isProgrammaticUpdate.value = true;
       internalSearchWord.value = newValue;
     }
-  }
+  },
 );
 
 // --- Watcher for Autocomplete ---
 watch(internalSearchWord, (newValue) => {
   emit("update:modelValue", newValue);
 
-  // If update came from code (e.g., prediction click), stop.
   if (isProgrammaticUpdate.value) {
     isProgrammaticUpdate.value = false;
     return;
   }
-  
-  // (Logic debounce giữ nguyên)
+
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
@@ -381,6 +389,19 @@ watch(internalSearchWord, (newValue) => {
     return;
   }
 
+  // Tiền xử lý từ khóa bằng wanakana
+  const convertedWord = toKana(trimmed);
+
+  // --- BƯỚC 2: CHECK CACHE TRƯỚC KHI DEBOUNCE VÀ FETCH ---
+  if (autocompleteCache.has(convertedWord)) {
+    suggestions.value = autocompleteCache.get(convertedWord) || [];
+    if (!showDrawingPad.value) {
+      showSuggestions.value = suggestions.value.length > 0;
+    }
+    return; // Có rồi thì nghỉ, KHÔNG CẦN FETCH, KHÔNG CẦN CHỜ DEBOUNCE!
+  }
+
+  // --- NẾU CHƯA CÓ, MỚI BẮT ĐẦU CHỜ DEBOUNCE ĐỂ GỌI API ---
   debounceTimer = setTimeout(async () => {
     if (abortController.value) {
       abortController.value.abort();
@@ -389,25 +410,26 @@ watch(internalSearchWord, (newValue) => {
     const signal = abortController.value.signal;
 
     try {
-      const convertedWord = toKana(trimmed);
       const res = await fetch(
         `${
           config.public.apiBaseUrl
         }/api/Search/autocomplete/${encodeURIComponent(convertedWord)}`,
-        { signal }
+        { signal },
       );
       if (!res.ok) throw new Error("Autocomplete fetch failed");
 
       const data = await res.json();
+
+      // --- BƯỚC 3: LƯU KẾT QUẢ VÀO CACHE CHO LẦN SAU ---
+      autocompleteCache.set(convertedWord, data || []);
+
       suggestions.value = data || [];
 
-      // Check that drawing pad isn't open *before* showing suggestions
       if (!showDrawingPad.value) {
         showSuggestions.value = suggestions.value.length > 0;
       }
     } catch (e: any) {
       if (e.name === "AbortError") {
-        console.log("Autocomplete fetch aborted.");
         return;
       }
       console.error("Autocomplete error:", e);
@@ -486,7 +508,10 @@ const handleClickOutside = (event: MouseEvent) => {
 
   // ✅ SỬA LỖI: (props.searchResultRef as any)
   // Kiểm tra 2: Click có bên trong SearchResult (dùng prop) không?
-  if (props.searchResultRef && (props.searchResultRef as any).contains(target)) {
+  if (
+    props.searchResultRef &&
+    (props.searchResultRef as any).contains(target)
+  ) {
     return; // Nếu có, không làm gì cả
   }
 
@@ -555,7 +580,7 @@ const autoScrollOcrResults = () => {
 const initializeCanvas = () => {
   if (!canvasRef.value) return;
   // Thêm { willReadFrequently: true } để tối ưu getImageData
-  ctx.value = canvasRef.value.getContext("2d", { willReadFrequently: true }); 
+  ctx.value = canvasRef.value.getContext("2d", { willReadFrequently: true });
   if (!ctx.value) return;
 
   // Đặt style bút vẽ dựa trên theme
@@ -565,7 +590,7 @@ const initializeCanvas = () => {
   ctx.value.lineJoin = "round";
 
   clearCanvas(); // Đặt nền ban đầu
-  
+
   // Add listeners
   canvasRef.value.addEventListener("mousedown", startDrawing);
   canvasRef.value.addEventListener("mousemove", draw);
@@ -645,7 +670,7 @@ const stopDrawing = () => {
 // ✅ SỬA LỖI Ở ĐÂY: Cập nhật hàm này
 const clearCanvas = () => {
   if (!ctx.value || !canvasRef.value) return;
-  
+
   // 1. Đặt MÀU NỀN (Fill) dựa trên theme
   // (CSS trong <style> cũng đặt màu nền, nhưng hàm fillRect này
   // đảm bảo hình ảnh export ra (getMatrix) có nền đúng)
@@ -670,7 +695,7 @@ const saveHistory = () => {
     0,
     0,
     canvasRef.value.width,
-    canvasRef.value.height
+    canvasRef.value.height,
   );
   history.value.push(data);
   historyIndex.value = history.value.length - 1;
@@ -723,12 +748,12 @@ const getMatrixFromCanvas = () => {
   const pCtx = processingCanvas.getContext("2d", { willReadFrequently: true }); // Thêm willReadFrequently
   if (!pCtx) return [];
 
-  const isDark = colorMode.value === 'dark';
+  const isDark = colorMode.value === "dark";
 
   // 1. Vẽ nền (giống hệt clearCanvas)
   pCtx.fillStyle = isDark ? "#1f2937" : "#ffffff"; // Match background
   pCtx.fillRect(0, 0, 64, 64);
-  
+
   // 2. Vẽ hình ảnh đã thu nhỏ
   if (canvasRef.value) {
     pCtx.drawImage(canvasRef.value, 0, 0, 256, 256, 0, 0, 64, 64);
@@ -748,11 +773,17 @@ const getMatrixFromCanvas = () => {
     const g = data[i + 1];
     const b = data[i + 2];
     const grayscale = (r + g + b) / 3;
-    
+
     // 4. Kiểm tra pixel "nét vẽ"
     // Dark mode: nét vẽ là MÀU TRẮNG (grayscale > 50)
     // Light mode: nét vẽ là MÀU ĐEN (grayscale < 200)
-    const binaryValue = isDark ? (grayscale > threshold ? 1 : 0) : (grayscale < threshold ? 1 : 0);
+    const binaryValue = isDark
+      ? grayscale > threshold
+        ? 1
+        : 0
+      : grayscale < threshold
+      ? 1
+      : 0;
 
     if (binaryValue === 1) {
       const pixelIndex = i / 4;
@@ -801,7 +832,7 @@ const runPrediction = async () => {
         },
         body: JSON.stringify({ matrix: matrixData }),
         signal: signal,
-      }
+      },
     );
 
     if (!response.ok) {
@@ -884,7 +915,7 @@ const processFile = async (file: File) => {
         method: "POST",
         body: formData,
         headers: { Authorization: `Bearer ${token}` },
-      }
+      },
     );
 
     if (!response.ok) {
