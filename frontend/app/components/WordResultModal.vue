@@ -29,7 +29,7 @@
             Từ vựng
           </button>
           <button
-            @click="activeTab = 'kanji'"
+            @click="setTab('kanji')"
             :class="[
               'px-4 py-2 rounded-lg font-medium transition-all',
               activeTab === 'kanji'
@@ -168,8 +168,7 @@
                     class="text-lg text-blue-600 dark:text-blue-400 font-medium"
                     >{{ pron.transcriptions[0].kana }}</span
                   >
-                  <span
-                    class="text-gray-600 dark:text-gray-400 text-base ml-1"
+                  <span class="text-gray-600 dark:text-gray-400 text-base ml-1"
                     >[{{ pron.transcriptions[0].romaji }}]</span
                   >
                 </div>
@@ -192,9 +191,7 @@
                   class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
                 >
                   <div class="flex items-start justify-between mb-2">
-                    <p
-                      class="text-gray-800 dark:text-gray-200 font-medium"
-                    >
+                    <p class="text-gray-800 dark:text-gray-200 font-medium">
                       {{ meaning.mean }}
                     </p>
                     <span
@@ -461,7 +458,7 @@
                 <div v-if="selectedKanji.detail" class="space-y-3">
                   <div
                     v-for="(paragraph, index) in selectedKanji.detail.split(
-                      '##'
+                      '##',
                     )"
                     :key="index"
                     class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 border-l-4 border-blue-200 dark:border-blue-700"
@@ -495,7 +492,8 @@
               </div>
               <div
                 v-if="
-                  selectedKanji.compDetail && selectedKanji.compDetail.length > 0
+                  selectedKanji.compDetail &&
+                  selectedKanji.compDetail.length > 0
                 "
                 class="space-y-3"
               >
@@ -656,9 +654,8 @@ import conjugationsData from "~/data/conjugations_normalized.json";
 import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
 import { useJwt } from "~/composables/useJwt";
 import ImageModal from "~/components/ImageModal.vue";
-// ✅ SỬA LỖI: Import đúng composable
 import { useToast } from "@/composables/useToast";
-// ✅ SỬA LỖI: Lấy đúng hàm 'showToast'
+
 const { showToast } = useToast();
 
 // --- Props and Emits ---
@@ -720,11 +717,9 @@ watch(selectedWord, (newWord) => {
   }
 });
 
-// --- ============================================= ---
-// --- START: LOGIC MỚI CHO SUGGEST WORDS ---
-// --- ============================================= ---
+// --- Logic Suggest Words ---
 const showAllSuggestions = ref(false);
-const suggestionLimit = 6; // Giới hạn hiển thị ban đầu
+const suggestionLimit = 6;
 
 const visibleSuggestions = computed(() => {
   if (!result.value || !result.value.suggestWords) return [];
@@ -733,9 +728,6 @@ const visibleSuggestions = computed(() => {
   }
   return result.value.suggestWords.slice(0, suggestionLimit);
 });
-// --- ============================================= ---
-// --- END: LOGIC MỚI CHO SUGGEST WORDS ---
-// --- ============================================= ---
 
 // --- Logic "Lưu vào Deck" ---
 const { isAuthenticated, jwt } = useJwt();
@@ -759,10 +751,10 @@ const toggleDecksPanel = () => {
 };
 const handleClickOutside = (event: MouseEvent) => {
   const isClickInsideButton = decksButtonRef.value?.contains(
-    event.target as Node
+    event.target as Node,
   );
   const isClickInsidePanel = decksPanelRef.value?.contains(
-    event.target as Node
+    event.target as Node,
   );
   if (!isClickInsideButton && !isClickInsidePanel) {
     showDecksPanel.value = false;
@@ -772,36 +764,32 @@ const handleClickOutside = (event: MouseEvent) => {
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
 });
+
 const fetchDecks = async () => {
   if (decks.value.length > 0) return;
   if (!isAuthenticated.value) {
-    // ✅ SỬA LỖI: Dùng showToast
     showToast("Bạn cần đăng nhập để tải decks", "error");
     return;
   }
-  const headers = {
-    Authorization: `Bearer ${jwt.value}`,
-    accept: "*/*",
-  };
+  const headers = { Authorization: `Bearer ${jwt.value}`, accept: "*/*" };
   decksLoading.value = true;
   try {
     const response = await $fetch<any>(
       `${config.public.apiBaseUrl}/api/Decks/my-decks`,
-      { method: "GET", headers: headers }
+      { method: "GET", headers },
     );
     decks.value = response.result || [];
   } catch (e) {
-    // ✅ SỬA LỖI: Dùng showToast
     showToast("Không thể tải danh sách decks", "error");
     decks.value = [];
   } finally {
     decksLoading.value = false;
   }
 };
+
 const saveToDeck = async (deckId: string) => {
   if (!selectedWord.value || saveLoading.value) return;
   if (!isAuthenticated.value) {
-    // ✅ SỬA LỖI: Dùng showToast
     showToast("Bạn cần đăng nhập để lưu thẻ", "error");
     return;
   }
@@ -824,15 +812,10 @@ const saveToDeck = async (deckId: string) => {
     await $fetch(`${config.public.apiBaseUrl}/api/Decks/${deckId}/cards`, {
       method: "POST",
       body: payload,
-      headers: headers,
+      headers,
     });
-    // ✅ SỬA LỖI: Dùng showToast
-    showToast(
-      `Đã lưu từ "${selectedWord.value.word}" vào deck.`,
-      "success"
-    );
+    showToast(`Đã lưu từ "${selectedWord.value.word}" vào deck.`, "success");
   } catch (e) {
-    // ✅ SỬA LỖI: Dùng showToast
     showToast("Không thể lưu thẻ, vui lòng thử lại", "error");
   } finally {
     saveLoading.value = false;
@@ -840,30 +823,23 @@ const saveToDeck = async (deckId: string) => {
     document.removeEventListener("click", handleClickOutside);
   }
 };
-function speak(textToSpeak) {
-  // Quan trọng: Phải check 'process.client' vì window.speechSynthesis chỉ tồn tại ở trình duyệt
+
+function speak(textToSpeak: string) {
   if (process.client) {
     if (!window.speechSynthesis) {
       console.error(
-        "Rất tiếc, trình duyệt của bạn không hỗ trợ chức năng phát âm."
+        "Rất tiếc, trình duyệt của bạn không hỗ trợ chức năng phát âm.",
       );
       return;
     }
-
-    // Tạo một yêu cầu phát âm mới
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
-
-    // *** Đặt ngôn ngữ là tiếng Nhật ***
     utterance.lang = "ja-JP";
-
-    // (Nên có) Hủy bỏ bất kỳ lần phát âm nào trước đó nếu người dùng click nhanh
     window.speechSynthesis.cancel();
-
-    // Phát âm
     window.speechSynthesis.speak(utterance);
   }
 }
-// --- Helper Functions (Giữ nguyên) ---
+
+// --- Helper Functions ---
 const extractWordLeftOfSlash = (word: string): string => {
   const slashIndex = word.indexOf("/");
   return slashIndex !== -1 ? word.substring(0, slashIndex) : word;
@@ -871,8 +847,8 @@ const extractWordLeftOfSlash = (word: string): string => {
 const getDictionaryForm = (word: string): string => {
   const trimmed = word.trim();
   if (!trimmed) return trimmed;
-  if (conjugationsData.byForm && conjugationsData.byForm[trimmed]) {
-    const dictionaryFormWithSlash = conjugationsData.byForm[trimmed];
+  if (conjugationsData.byForm && (conjugationsData.byForm as any)[trimmed]) {
+    const dictionaryFormWithSlash = (conjugationsData.byForm as any)[trimmed];
     return extractWordLeftOfSlash(dictionaryFormWithSlash);
   }
   return extractWordLeftOfSlash(trimmed);
@@ -895,17 +871,66 @@ const checkConjugation = (word: string): any | null => {
   }
   return null;
 };
-const extractKanji = (text: string): string[] => {
+
+// Lọc lấy các ký tự Kanji
+const extractKanjiString = (text: string): string => {
   const kanjiRegex = /[\u4e00-\u9faf\u3400-\u4dbf]/g;
   const matches = text.match(kanjiRegex);
-  return matches ? [...new Set(matches)] : [];
+  return matches ? [...new Set(matches)].join("") : "";
 };
 
-// --- Logic Fetch Data ---
+// --- GỌI API KANJI THEO KIỂU GOM NHÓM (BATCHING) ---
+const fetchKanjiData = async (word: string) => {
+  kanjiResults.value = null; // Ở Modal, biến này là mảng
+  try {
+    const kanjiString = extractKanjiString(word);
+    if (!kanjiString) {
+      kanjiResults.value = [];
+      return;
+    }
+
+    const apiUrl = `${
+      config.public.apiBaseUrl
+    }/api/Kanji/GetKanjiJson/${encodeURIComponent(kanjiString)}`;
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error("Failed to fetch kanji");
+    const response = await res.json();
+
+    if (
+      response.status === 200 &&
+      response.results &&
+      response.results.length > 0
+    ) {
+      // Dùng kỹ thuật "gọt vỏ" để lọc đúng object Kanji
+      const validKanjiList: any[] = [];
+
+      response.results.forEach((item: any) => {
+        if (item && item.results && item.results.length > 0) {
+          validKanjiList.push(item.results[0]);
+        } else if (item && item.kanji) {
+          validKanjiList.push(item);
+        } else if (item && item.data && item.data.length > 0) {
+          validKanjiList.push(item.data[0]);
+        }
+      });
+
+      kanjiResults.value = validKanjiList;
+      if (validKanjiList.length > 0) {
+        activeKanjiIndex.value = 0;
+      }
+    } else {
+      kanjiResults.value = [];
+    }
+  } catch (e: any) {
+    console.error("Kanji fetch error:", e.message);
+    kanjiResults.value = [];
+  }
+};
+
 const fetchWordData = async (word: string) => {
   try {
     const conjugation = checkConjugation(word);
-    conjugationResult.value = conjugation; // Gán luôn, kể cả là null
+    conjugationResult.value = conjugation;
 
     const dictionaryForm = getDictionaryForm(word);
     const apiUrl = `${
@@ -930,71 +955,38 @@ const fetchWordData = async (word: string) => {
   }
 };
 
-const fetchKanjiData = async (word: string) => {
-  try {
-    const kanjiChars = extractKanji(word);
-    if (kanjiChars.length === 0) {
-      kanjiResults.value = [];
-      return;
-    }
-    const fetchPromises = kanjiChars.map(async (char) => {
-      const apiUrl = `${
-        config.public.apiBaseUrl
-      }/api/Kanji/GetKanjiJson/${encodeURIComponent(char)}`;
-      const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error(`Failed to fetch kanji: ${char}`);
-      const response = await res.json();
-      if (
-        response.status === 200 &&
-        response.results &&
-        response.results.length > 0
-      ) {
-        return response.results[0];
-      } else {
-        throw new Error(`Invalid kanji response for: ${char}`);
-      }
-    });
+// --- HÀM LAZY LOAD KHI BẤM TAB ---
+const setTab = async (tab: "word" | "kanji") => {
+  activeTab.value = tab;
 
-    const results = await Promise.allSettled(fetchPromises);
-    const successfulResults = results
-      .filter((r) => r.status === "fulfilled")
-      .map((r) => (r as PromiseFulfilledResult<any>).value);
-
-    kanjiResults.value = successfulResults;
-    if (successfulResults.length > 0) {
-      activeKanjiIndex.value = 0;
-    }
-  } catch (e: any) {
-    console.error("Kanji fetch error:", e.message);
-    kanjiResults.value = [];
+  // Nếu bấm sang Kanji mà data chưa có, thì mới gọi API
+  if (tab === "kanji" && !kanjiResults.value) {
+    loading.value = true;
+    await fetchKanjiData(currentSearchWord.value);
+    loading.value = false;
   }
 };
 
-/**
- * Hàm fetchData tổng, gọi cả word và kanji.
- */
+// --- HÀM FETCH TỔNG CHO LẦN ĐẦU MỞ MODAL ---
 const fetchData = async (word: string) => {
   if (!word) return;
 
   loading.value = true;
   error.value = "";
-  // Reset tất cả state
   result.value = null;
-  kanjiResults.value = null;
+  kanjiResults.value = null; // Quan trọng: Clear để Lazy Load hoạt động
   conjugationResult.value = null;
   activeKanjiIndex.value = 0;
-  activeTab.value = "word";
+  activeTab.value = "word"; // Luôn mở ở tab Word trước
   showDecksPanel.value = false;
-  showAllSuggestions.value = false; // <-- THÊM RESET NÀY
+  showAllSuggestions.value = false;
 
-  await Promise.allSettled([fetchWordData(word), fetchKanjiData(word)]);
+  // CHỈ FETCH TỪ VỰNG TRƯỚC, KANJI ĐỂ DÀNH
+  await fetchWordData(word);
 
   loading.value = false;
 
-  if (
-    !result.value &&
-    (!kanjiResults.value || kanjiResults.value.length === 0)
-  ) {
+  if (!result.value) {
     error.value = `Không tìm thấy kết quả cho "${word}".`;
   }
 };
@@ -1005,7 +997,7 @@ const searchNewWord = (word: string) => {
     currentSearchWord.value = word;
   }
 };
-// --- onMounted và watch ---
+
 onMounted(() => {
   fetchData(currentSearchWord.value);
 });
@@ -1022,7 +1014,7 @@ watch(
     if (newWord && newWord !== currentSearchWord.value) {
       currentSearchWord.value = newWord;
     }
-  }
+  },
 );
 </script>
 

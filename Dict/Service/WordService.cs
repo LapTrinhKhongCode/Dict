@@ -1,8 +1,8 @@
 ﻿using Dict.Data;
 using Dict.Models;
 using Dict.Service.IService;
-using MailKit.Search;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection; // CẦN THIẾT CHO IServiceScopeFactory
 using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
@@ -15,11 +15,13 @@ namespace Dict.Service
         private readonly ApplicationDbContext _db;
         private readonly string _sensitiveCollation = "Japanese_CS_AS_KS_WS";
         private readonly ILogger<WordService> _logger;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public WordService(ApplicationDbContext db, ILogger<WordService> logger)
+        public WordService(ApplicationDbContext db, ILogger<WordService> logger, IServiceScopeFactory scopeFactory)
         {
             _db = db;
             _logger = logger;
+            _scopeFactory = scopeFactory;
         }
 
         public async Task<string?> GetWordJson(string label)
@@ -34,22 +36,20 @@ namespace Dict.Service
 
             if (entry != null)
             {
-                // 2. TÌM THẤY: Ghi log Hit (dùng entry.Id)
-                // Logic này giờ đã AN TOÀN (sau khi bạn chạy migration)
-                await LogSearchHitAsync(entry.Id);
+                // 2. TÌM THẤY: Ghi log Hit (Gọi thẳng, KHÔNG DÙNG AWAIT)
+                LogSearchHitAsync(entry.Id);
                 return entry.RawJson;
             }
             else
             {
-                // 3. KHÔNG TÌM THẤY: Ghi log Miss
-                await LogSearchMissAsync(label);
+                // 3. KHÔNG TÌM THẤY: Ghi log Miss (Gọi thẳng, KHÔNG DÙNG AWAIT)
+                LogSearchMissAsync(label);
                 return null;
             }
         }
 
         public async Task UpsertCacheForLabelAsync(string label, string newJson, string category)
         {
-            // (Hàm này giữ nguyên)
             var existingEntry = await _db.Entries
                 .Where(k => k.Type == "word" &&
                             EF.Functions.Collate(k.Label, _sensitiveCollation) == label)
@@ -82,71 +82,85 @@ namespace Dict.Service
             await _db.SaveChangesAsync();
         }
 
-        // --- CÁC HÀM GHI LOG (ĐÃ CẬP NHẬT) ---
+        // --- CÁC HÀM GHI LOG (Hàm Void, Fire and Forget) ---
 
-        private async Task LogSearchHitAsync(int entryId) // <-- Giờ đây là EntryId
+        private void LogSearchHitAsync(int entryId) // Đổi thành void
         {
-            try
+            _ = Task.Run(async () =>
             {
-                // Truy vấn bằng EntryId
-                var stat = await _db.StatsWordFreq
-                    .FirstOrDefaultAsync(s => s.EntryId == entryId); // <-- SỬA
+                try
+                {
+                    // TẠO SCOPE MỚI TẠI ĐÂY LÀ CHUẨN XÁC
+                    using var scope = _scopeFactory.CreateScope();
+                    var backgroundDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                if (stat != null)
-                {
-                    stat.Occurrences = (stat.Occurrences ?? 0) + 1;
-                    stat.LastSeenAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    stat = new StatsWordFreq
+                    var stat = await backgroundDb.StatsWordFreq
+                        .FirstOrDefaultAsync(s => s.EntryId == entryId);
+
+                    if (stat != null)
                     {
-                        EntryId = entryId, // <-- SỬA
-                        Occurrences = 1,
-                        LastSeenAt = DateTime.UtcNow
-                    };
-                    _db.StatsWordFreq.Add(stat);
+                        stat.Occurrences = (stat.Occurrences ?? 0) + 1;
+                        stat.LastSeenAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        stat = new StatsWordFreq
+                        {
+                            EntryId = entryId,
+                            Occurrences = 1,
+                            LastSeenAt = DateTime.UtcNow
+                        };
+                        backgroundDb.StatsWordFreq.Add(stat);
+                    }
+                    await backgroundDb.SaveChangesAsync();
                 }
-                await _db.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi ghi log StatsWordFreq cho EntryId {EntryId}", entryId);
-            }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi khi ghi log StatsWordFreq cho EntryId {EntryId}", entryId);
+                }
+            });
         }
 
-        private async Task LogSearchMissAsync(string term)
+        private void LogSearchMissAsync(string term) // Đổi thành void
         {
             if (string.IsNullOrWhiteSpace(term)) return;
             var normalizedTerm = term.Trim().ToLower();
 
-            try
+            _ = Task.Run(async () =>
             {
-                var miss = await _db.SearchMiss
-                    .FirstOrDefaultAsync(sm => sm.NormalizedTerm == normalizedTerm);
+                try
+                {
+                    // LỖI Ở BẢN TRƯỚC LÀ QUÊN ĐOẠN NÀY!
+                    // Phải tạo DbContext mới cho luồng Miss này
+                    using var scope = _scopeFactory.CreateScope();
+                    var backgroundDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                if (miss != null)
-                {
-                    miss.SearchCount++;
-                    miss.LastSearchedAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    miss = new SearchMiss
+                    var miss = await backgroundDb.SearchMiss
+                        .FirstOrDefaultAsync(sm => sm.NormalizedTerm == normalizedTerm);
+
+                    if (miss != null)
                     {
-                        SearchTerm = term.Length > 255 ? term.Substring(0, 255) : term,
-                        NormalizedTerm = normalizedTerm,
-                        SearchCount = 1,
-                        LastSearchedAt = DateTime.UtcNow
-                    };
-                    _db.SearchMiss.Add(miss);
+                        miss.SearchCount++;
+                        miss.LastSearchedAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        miss = new SearchMiss
+                        {
+                            SearchTerm = term.Length > 255 ? term.Substring(0, 255) : term,
+                            NormalizedTerm = normalizedTerm,
+                            SearchCount = 1,
+                            LastSearchedAt = DateTime.UtcNow
+                        };
+                        backgroundDb.SearchMiss.Add(miss); // Dùng backgroundDb
+                    }
+                    await backgroundDb.SaveChangesAsync(); // Dùng backgroundDb
                 }
-                await _db.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi ghi log SearchMiss cho Term {Term}", term);
-            }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi khi ghi log SearchMiss cho Term {Term}", term);
+                }
+            });
         }
     }
 }

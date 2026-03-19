@@ -32,6 +32,7 @@ namespace Dict.Models
         public string? Phonetic { get; set; }
 
         public string? Romaji { get; set; }
+        public string? SynsetProcessingStatus { get; set; }
 
         public string? ShortMean { get; set; }
 

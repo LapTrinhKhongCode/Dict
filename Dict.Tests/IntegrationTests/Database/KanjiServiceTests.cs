@@ -51,11 +51,11 @@ public class KanjiServiceTests : IDisposable
         _mockLogger = new Mock<ILogger<KanjiService>>();
 
         // 7. CẬP NHẬT CONSTRUCTOR (Thêm _mockLogger.Object)
-        _service = new KanjiService(
-            _context,
-            _mockJsonBuilder.Object,
-            _mockLogger.Object // <-- ĐÃ THÊM
-        );
+        //_service = new KanjiService(
+        //    _context,
+        //    _mockJsonBuilder.Object,
+        //    _mockLogger.Object // <-- ĐÃ THÊM
+        //);
     }
 
     public void Dispose()
