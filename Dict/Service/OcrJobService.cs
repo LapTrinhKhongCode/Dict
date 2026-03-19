@@ -25,6 +25,7 @@ namespace Dict.Service
             {
                 UserId = createDto.UserId,
                 MediaId = createDto.MediaId,
+                ProjectId = createDto.ProjectId,
                 Status = createDto.Status,
                 DetectedText = createDto.DetectedText,
                 CreatedAt = DateTime.UtcNow,

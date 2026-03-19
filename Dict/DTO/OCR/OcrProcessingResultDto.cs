@@ -9,5 +9,6 @@
         public string ImageUrl { get; set; }
         public int? AnnotatedMediaId { get; set; }
         public string? AnnotatedImageUrl { get; set; }
+        public List<CreateOcrResultDto> Results { get; set; } = new List<CreateOcrResultDto>();
     }   
 }
