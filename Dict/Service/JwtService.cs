@@ -4,38 +4,76 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Collections.Generic; // Thêm
-using System.Linq; // Thêm
+using System.Collections.Generic;
+using System.Linq;
+using Dict.Data; // ✅ BỔ SUNG USING NÀY ĐỂ GỌI DATABASE
 
 namespace Dict.Service
 {
     public class JwtService : IJwtService
     {
         private readonly IConfiguration _config;
+        private readonly ApplicationDbContext _db; // ✅ KHAI BÁO DATABASE CONTEXT
 
-        public JwtService(IConfiguration config)
+        // ✅ TIÊM THÊM ApplicationDbContext VÀO CONSTRUCTOR
+        public JwtService(IConfiguration config, ApplicationDbContext db)
         {
             _config = config;
+            _db = db;
         }
 
-        // 1. CẬP NHẬT CHỮ KÝ: (Đã đúng)
         public string GenerateToken(ApplicationUser user, IList<string> roles)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            // 2. DÙNG List<Claim>
+            // ✅ TÌM WORKSPACE MẶC ĐỊNH CỦA USER NÀY
+            // Lấy ID công ty đầu tiên mà user này đang tham gia. Nếu không có trả về 0.
+            int defaultWorkspaceId = _db.WorkspaceMembers
+                                        .Where(wm => wm.UserId == user.Id)
+                                        .Select(wm => wm.WorkspaceId)
+                                        .FirstOrDefault();
+
+            // 🌟 2. HYBRID B2B + B2C: NẾU CHƯA CÓ, TỰ ĐỘNG TẠO WORKSPACE CÁ NHÂN
+            if (defaultWorkspaceId == 0)
+            {
+                // Tạo một Workspace riêng cho khách hàng cá nhân này
+                var personalWorkspace = new Workspace
+                {
+                    Name = $"Personal - {user.UserName}",
+                    Description = "Không gian làm việc cá nhân",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _db.Workspaces.Add(personalWorkspace);
+                _db.SaveChanges(); // Lưu để lấy ID mới
+
+                // Cho user này làm Admin của chính cái Workspace cá nhân đó
+                var member = new WorkspaceMember
+                {
+                    WorkspaceId = personalWorkspace.Id,
+                    UserId = user.Id,
+                    Role = "Admin"
+                };
+
+                _db.WorkspaceMembers.Add(member);
+                _db.SaveChanges();
+
+                // Gán lại ID vừa tạo để nhét vào Token
+                defaultWorkspaceId = personalWorkspace.Id;
+            }
+
             var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("userId", user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserName ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+                new Claim("userId", user.Id.ToString()), // Đã chốt dùng chuẩn này
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 
-                // << --- ĐÃ XÓA KHỐI CODE "user.Role" BỊ LỖI Ở ĐÂY --- >>
+                // Bây giờ Token luôn luôn có WorkspaceId (Dù là B2B hay B2C)
+                new Claim("WorkspaceId", defaultWorkspaceId.ToString())
             };
 
-            // 3. THÊM TẤT CẢ CÁC ROLE CỦA USER VÀO CLAIMS (Đây là code đúng)
             foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
@@ -44,8 +82,8 @@ namespace Dict.Service
             var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
-                claims: claims, // Sử dụng danh sách claims đã cập nhật
-                expires: DateTime.Now.AddHours(2400), // Token hết hạn sau 100 ngày
+                claims: claims,
+                expires: DateTime.Now.AddHours(2400),
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

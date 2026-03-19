@@ -25,6 +25,7 @@ using System.Threading.Tasks;
 using ImageMagick;
 using System.Text.Json;
 using Dict.DTO.OCR;
+using Google.Cloud.Vision.V1;
 [ApiController]
 [Route("api/[controller]")]
 public class InferController : ControllerBase
@@ -36,11 +37,15 @@ public class InferController : ControllerBase
     private readonly ResponseDTO _response;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _pythonApiBaseUrl;
+    private readonly ICurrentUserService _currentUserService;
     // Định nghĩa form nhận file
     public class UploadForm
     {
         [FromForm(Name = "image")]
         public IFormFile image { get; set; }
+
+        [FromForm(Name = "projectId")] // ✅ Lấy thêm ProjectId từ giao diện Vue
+        public int? ProjectId { get; set; }
     }
     public class PredictionRequestDto
     {
@@ -105,13 +110,14 @@ public class InferController : ControllerBase
     public InferController(
         ILogger<InferController> logger,
         IOcrProcessingService ocrProcessingService,
-        IHttpClientFactory httpClientFactory, IConfiguration configuration, IOcrJobService ocrJobService)
+        IHttpClientFactory httpClientFactory, IConfiguration configuration, IOcrJobService ocrJobService, ICurrentUserService currentUserService)
         
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _ocrProcessingService = ocrProcessingService;
         _ocrJobService = ocrJobService;
+        _currentUserService = currentUserService;
         _response = new ResponseDTO();
         _pythonApiBaseUrl = configuration["ServiceUrls:PythonApiBaseUrl"]
                             ?? "http://127.0.0.1:8000";
@@ -540,38 +546,131 @@ public class InferController : ControllerBase
     [AllowAnonymous] // Cho phép kiểm tra health mà không cần đăng nhập
     public IActionResult Health() => Ok(new { status = "ok", now = DateTimeOffset.UtcNow });
 
+    // 1. API UPLOAD (CỰC NHANH - LAZY LOAD PART 1)
     [HttpPost("upload-and-infer")]
     [Consumes("multipart/form-data")]
+    [Authorize]
     public async Task<IActionResult> UploadAndInfer([FromForm] UploadForm form, [FromQuery] bool saveAnnotated = false)
     {
         try
         {
             var image = form?.image;
-            if (image == null || image.Length == 0)
-            {
-                return BadRequest(new { error = "No image uploaded. Use form-field 'image'." });
-            }
+            if (image == null || image.Length == 0) return BadRequest("No image uploaded.");
 
-            // 1. Lấy UserId
-            var userId = GetUserId();
+            int userId = _currentUserService.UserId;
+            int workspaceId = _currentUserService.WorkspaceId;
+            int? projectId = form?.ProjectId > 0 ? form.ProjectId : null;
 
-            // 2. Ủy quyền toàn bộ công việc cho service
-            OcrProcessingResultDto result = await _ocrProcessingService.ProcessImageAsync(image, userId, saveAnnotated);
+            if (userId == 0 || workspaceId == 0)
+                return Unauthorized(new { error = "Token không hợp lệ." });
 
-            // 3. Trả về kết quả thành công
+            // GỌI HÀM MỚI CHỈ UPLOAD LÊN AZURE
+            OcrProcessingResultDto result = await _ocrProcessingService.UploadImageOnlyAsync(image, userId, workspaceId, projectId);
+
             return Ok(result);
         }
         catch (Exception e)
         {
-            // Bắt tất cả các lỗi được ném ra từ service (Timeout, HttpRequest, DB, ...)
             _logger.LogError(e, "Unhandled exception in UploadAndInfer");
-
-            // Trả về lỗi 500 chung
-            // Bạn cũng có thể bắt các Exception cụ thể (TimeoutException, JsonException) 
-            // để trả về mã lỗi 504, 502, v.v.
             return Problem(detail: e.Message, statusCode: 500);
         }
     }
+
+    // 2. API GET CHI TIẾT VÀ XỬ LÝ OCR (LAZY LOAD PART 2)
+    [HttpGet("job/{jobId}")]
+    [Authorize]
+    public async Task<IActionResult> GetJobDetails(int jobId)
+    {
+        try
+        {
+            // Gọi hàm xử lý OCR ngầm nếu chưa làm
+            var result = await _ocrProcessingService.ProcessOcrLazyAsync(jobId);
+            if (result == null) return NotFound("Không tìm thấy Job này.");
+
+            return Ok(result);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Lỗi khi lấy chi tiết Job");
+            return Problem(detail: e.Message, statusCode: 500);
+        }
+    }
+
+    [HttpPost("scan-page-ocr")]
+    [Consumes("multipart/form-data")]
+    [Authorize]
+    public async Task<IActionResult> ScanPageOcr([FromForm] ScanPageForm form)
+    {
+        try
+        {
+            // 1. Lấy ảnh từ form ra
+            var image = form?.image;
+            if (image == null || image.Length == 0) return BadRequest("Không có ảnh.");
+
+            // 2. Biến ảnh nhận được từ VueJS thành mảng Byte
+            using var ms = new MemoryStream();
+            await image.CopyToAsync(ms);
+            byte[] imageBytes = ms.ToArray();
+
+            // 3. Gọi Google Cloud Vision
+            var client = await ImageAnnotatorClient.CreateAsync();
+            var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(imageBytes);
+
+            var response = await client.DetectDocumentTextAsync(googleImage);
+
+            var createResults = new List<CreateOcrResultDto>();
+            string finalDetectedText = string.Empty;
+
+            // Phân tích JSON của Google
+            if (response != null && response.Text != null)
+            {
+                var fullTextBuilder = new StringBuilder();
+                foreach (var page in response.Pages)
+                {
+                    foreach (var block in page.Blocks)
+                    {
+                        foreach (var paragraph in block.Paragraphs)
+                        {
+                            foreach (var word in paragraph.Words)
+                            {
+                                string wordText = string.Join("", word.Symbols.Select(s => s.Text));
+                                fullTextBuilder.Append(wordText).Append(" ");
+
+                                var bboxList = word.BoundingBox.Vertices.Select(v => new[] { v.X, v.Y }).ToList();
+                                string bboxJson = JsonSerializer.Serialize(bboxList);
+
+                                createResults.Add(new CreateOcrResultDto
+                                {
+                                    PageNumber = 1,
+                                    WordText = wordText,
+                                    BoundingBox = bboxJson
+                                });
+                            }
+                            fullTextBuilder.AppendLine();
+                        }
+                    }
+                }
+                finalDetectedText = fullTextBuilder.ToString().Trim();
+            }
+
+            return Ok(new
+            {
+                message = "Quét thành công",
+                detectedText = finalDetectedText,
+                results = createResults
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Lỗi quét OCR: " + ex.Message });
+        }
+    }
+
+    public class ScanPageForm
+    {
+        public IFormFile image { get; set; }
+    }
+
     [HttpGet("me/recent")]
     public async Task<IActionResult> GetMyRecentOcrJobs()
     {

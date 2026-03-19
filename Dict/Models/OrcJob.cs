@@ -19,7 +19,10 @@ namespace Dict.Models
 
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+        public int PageNumber { get; set; } = 1;
 
+        public int? ProjectId { get; set; }
+        public virtual Project Project { get; set; }
         public virtual ICollection<OcrResult> Results { get; set; }
     }
 }

@@ -92,6 +92,10 @@ namespace Dict.Data
         public DbSet<StatsWordFreq> StatsWordFreq { get; set; }
         public DbSet<SynonymsCache> SynonymsCache { get; set; }
 
+        public DbSet<Project> Projects { get; set; }
+        public DbSet<ProjectVocabulary> ProjectVocabularies { get; set; }
+        public DbSet<Workspace> Workspaces { get; set; }
+        public DbSet<WorkspaceMember> WorkspaceMembers { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -582,7 +586,9 @@ namespace Dict.Data
                 b.Property(x => x.Sha256).HasMaxLength(128);
                 b.Property(x => x.CreatedAt);
 
+                // ✅ SỬA LẠI KHÓA NGOẠI CHO CHUẨN:
                 b.HasOne(x => x.Owner).WithMany(u => u.MediaStore).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.Workspace).WithMany(w => w.MediaFiles).HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<OcrJob>(entity =>
@@ -600,6 +606,13 @@ namespace Dict.Data
                 entity.Property(j => j.CreatedAt);
                 entity.Property(j => j.UpdatedAt);
 
+                entity.Property(x => x.PageNumber).HasDefaultValue(1); // Mặc định là trang 1
+                entity.Property(x => x.ProjectId); // Nullable
+
+                entity.HasOne(x => x.Project)
+                      .WithMany(p => p.OcrJobs)
+                      .HasForeignKey(x => x.ProjectId)
+                      .OnDelete(DeleteBehavior.SetNull);
                 // Relation: OcrJob - User (NO CASCADE to avoid multiple cascade paths)
                 entity.HasOne(j => j.User)
                       .WithMany(u => u.OcrJobs)
@@ -624,6 +637,68 @@ namespace Dict.Data
                 b.HasOne(x => x.LinkWord).WithMany(w => w.OcrResults).HasForeignKey(x => x.LinkWordId).OnDelete(DeleteBehavior.SetNull);
             });
 
+            modelBuilder.Entity<Project>(b =>
+            {
+                b.ToTable("projects");
+                b.HasKey(x => x.Id);
+
+                b.Property(x => x.Name).IsRequired().HasMaxLength(255);
+                b.Property(x => x.Description);
+                b.Property(x => x.WorkspaceId).IsRequired();
+                b.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()"); // Lưu giờ chuẩn quốc tế
+
+                // Quan hệ 1-N: 1 User (Owner) có nhiều Projects
+                b.HasOne(x => x.Workspace)
+                 .WithMany(w => w.Projects) // Để trống nếu class User của bạn không có ICollection<Project>
+                 .HasForeignKey(x => x.WorkspaceId)
+                 .OnDelete(DeleteBehavior.Cascade); // Xóa user thì xóa luôn project của họ
+
+                b.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // 2. Cấu hình bảng project_vocabularies
+            modelBuilder.Entity<ProjectVocabulary>(b =>
+            {
+                b.ToTable("project_vocabularies");
+                b.HasKey(x => x.Id);
+
+                b.Property(x => x.WordText).IsRequired().HasMaxLength(255);
+                b.Property(x => x.ContextMeaning).IsRequired();
+                b.Property(x => x.AddedBy).IsRequired();
+                b.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+                // Quan hệ 1-N: 1 Project có nhiều Vocabularies
+                b.HasOne(x => x.Project)
+                 .WithMany(p => p.ProjectVocabularies)
+                 .HasForeignKey(x => x.ProjectId)
+                 .OnDelete(DeleteBehavior.Cascade); // Xóa Project thì bay luôn từ vựng dự án đó
+
+                // Quan hệ 1-N: User thêm từ vựng nào
+                // LƯU Ý CHÍ PHẢI: Dùng Restrict chỗ này để tránh lỗi "Multiple Cascade Paths" kinh điển của SQL Server
+                b.HasOne(x => x.UserAdded)
+                 .WithMany()
+                 .HasForeignKey(x => x.AddedBy)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Workspace>(b =>
+            {
+                b.ToTable("workspaces");
+                b.HasKey(x => x.Id);
+                b.Property(x => x.Name).IsRequired().HasMaxLength(255);
+                b.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            });
+
+            // 2. Cấu hình WorkspaceMember (Khóa chính kép)
+            modelBuilder.Entity<WorkspaceMember>(b =>
+            {
+                b.ToTable("workspace_members");
+                b.HasKey(x => new { x.WorkspaceId, x.UserId }); // 1 User chỉ join 1 Workspace 1 lần
+                b.Property(x => x.Role).IsRequired().HasMaxLength(50);
+
+                b.HasOne(x => x.Workspace).WithMany(w => w.Members).HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+                b.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
             modelBuilder.Entity<StatsWordFreq>(b =>
             {
                 b.ToTable("stats_word_freq");

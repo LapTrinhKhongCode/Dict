@@ -777,7 +777,7 @@ namespace Dict.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.Property<int?>("OwnerId")
+                    b.Property<int>("OwnerId")
                         .HasColumnType("int");
 
                     b.Property<string>("Sha256")
@@ -793,9 +793,14 @@ namespace Dict.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<int>("WorkspaceId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId");
+
+                    b.HasIndex("WorkspaceId");
 
                     b.ToTable("media_store", (string)null);
                 });
@@ -818,6 +823,14 @@ namespace Dict.Migrations
                     b.Property<int?>("MediaId")
                         .HasColumnType("int");
 
+                    b.Property<int>("PageNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<int?>("ProjectId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -832,6 +845,8 @@ namespace Dict.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("MediaId");
+
+                    b.HasIndex("ProjectId");
 
                     b.HasIndex("UserId");
 
@@ -874,6 +889,80 @@ namespace Dict.Migrations
                     b.HasIndex("OcrJobId");
 
                     b.ToTable("ocr_results", (string)null);
+                });
+
+            modelBuilder.Entity("Dict.Models.Project", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("WorkspaceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("projects", (string)null);
+                });
+
+            modelBuilder.Entity("Dict.Models.ProjectVocabulary", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AddedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContextMeaning")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("WordText")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("project_vocabularies", (string)null);
                 });
 
             modelBuilder.Entity("Dict.Models.ReadingElement", b =>
@@ -1389,6 +1478,53 @@ namespace Dict.Migrations
                     b.ToTable("WordToEntries");
                 });
 
+            modelBuilder.Entity("Dict.Models.Workspace", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("workspaces", (string)null);
+                });
+
+            modelBuilder.Entity("Dict.Models.WorkspaceMember", b =>
+                {
+                    b.Property<int>("WorkspaceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("WorkspaceId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("workspace_members", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
                 {
                     b.Property<int>("Id")
@@ -1635,9 +1771,18 @@ namespace Dict.Migrations
                     b.HasOne("Dict.Models.ApplicationUser", "Owner")
                         .WithMany("MediaStore")
                         .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Dict.Models.Workspace", "Workspace")
+                        .WithMany("MediaFiles")
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Owner");
+
+                    b.Navigation("Workspace");
                 });
 
             modelBuilder.Entity("Dict.Models.OcrJob", b =>
@@ -1647,12 +1792,19 @@ namespace Dict.Migrations
                         .HasForeignKey("MediaId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Dict.Models.Project", "Project")
+                        .WithMany("OcrJobs")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Dict.Models.ApplicationUser", "User")
                         .WithMany("OcrJobs")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Media");
+
+                    b.Navigation("Project");
 
                     b.Navigation("User");
                 });
@@ -1671,6 +1823,44 @@ namespace Dict.Migrations
                     b.Navigation("LinkWord");
 
                     b.Navigation("OcrJob");
+                });
+
+            modelBuilder.Entity("Dict.Models.Project", b =>
+                {
+                    b.HasOne("Dict.Models.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Dict.Models.Workspace", "Workspace")
+                        .WithMany("Projects")
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Workspace");
+                });
+
+            modelBuilder.Entity("Dict.Models.ProjectVocabulary", b =>
+                {
+                    b.HasOne("Dict.Models.ApplicationUser", "UserAdded")
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Dict.Models.Project", "Project")
+                        .WithMany("ProjectVocabularies")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+
+                    b.Navigation("UserAdded");
                 });
 
             modelBuilder.Entity("Dict.Models.ReadingElement", b =>
@@ -1864,6 +2054,25 @@ namespace Dict.Migrations
                     b.Navigation("Word");
                 });
 
+            modelBuilder.Entity("Dict.Models.WorkspaceMember", b =>
+                {
+                    b.HasOne("Dict.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Dict.Models.Workspace", "Workspace")
+                        .WithMany("Members")
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+
+                    b.Navigation("Workspace");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
                 {
                     b.HasOne("Dict.Models.ApplicationRole", null)
@@ -1993,6 +2202,13 @@ namespace Dict.Migrations
                     b.Navigation("Results");
                 });
 
+            modelBuilder.Entity("Dict.Models.Project", b =>
+                {
+                    b.Navigation("OcrJobs");
+
+                    b.Navigation("ProjectVocabularies");
+                });
+
             modelBuilder.Entity("Dict.Models.Sense", b =>
                 {
                     b.Navigation("Examples");
@@ -2035,6 +2251,15 @@ namespace Dict.Migrations
                     b.Navigation("WordTags");
 
                     b.Navigation("WordToEntries");
+                });
+
+            modelBuilder.Entity("Dict.Models.Workspace", b =>
+                {
+                    b.Navigation("MediaFiles");
+
+                    b.Navigation("Members");
+
+                    b.Navigation("Projects");
                 });
 #pragma warning restore 612, 618
         }

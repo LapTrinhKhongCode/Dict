@@ -1,171 +1,117 @@
 <template>
   <div
-    class="p-6 space-y-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg text-gray-900 dark:text-gray-300 transition-colors"
+    class="p-4 space-y-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg h-full flex flex-col transition-colors"
   >
-    <h2
-      class="text-xl font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 text-gray-900 dark:text-white"
+    <div
+      class="flex items-center gap-4 border-b border-gray-200 dark:border-gray-700 pb-4"
     >
-      OCR (Tải lên Ảnh hoặc PDF)
-    </h2>
+      <h2
+        class="text-xl font-bold text-gray-900 dark:text-white whitespace-nowrap"
+      >
+        OCR Workspace
+      </h2>
+      <input
+        type="file"
+        @change="handleFileChange"
+        accept="image/*"
+        :disabled="isLoading"
+        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300"
+      />
+      <select
+        v-model="selectedProjectId"
+        class="p-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
+      >
+        <option :value="null">Không thuộc dự án</option>
+        <option :value="1">Dự án Alpha</option>
+      </select>
 
-    <div class="flex items-center gap-4">
-      <label class="flex-grow">
-        <input
-          type="file"
-          @change="handleFileChange"
-          accept="image/*,application/pdf"
-          :disabled="isLoading"
-          class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600"
-        />
-      </label>
       <button
         @click="startOCR"
         :disabled="isLoading || !file"
-        class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed"
+        class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
       >
-        {{ isLoading ? "Đang xử lý..." : "Bắt đầu OCR" }}
+        {{ isLoading ? "Đang quét..." : "Bắt đầu quét AI" }}
       </button>
     </div>
 
-    <hr class="border-t border-gray-200 dark:border-gray-700" />
-
     <div
       v-if="statusMessage"
-      class="p-4 bg-blue-50 border border-blue-200 text-blue-700 dark:bg-gray-900 dark:border-blue-800 dark:text-blue-300 rounded-lg"
+      class="text-sm text-blue-600 dark:text-blue-400 font-medium"
     >
-      <strong>Trạng thái OCR:</strong> {{ statusMessage }}
+      Trạng thái: {{ statusMessage }}
     </div>
 
-    <div v-if="!isPdf" class="result-container single-image-layout">
-      <div class="image-wrapper" ref="imageWrapperRef">
-        <div v-if="!originalImageUrl" class="image-placeholder">
-          Vui lòng tải ảnh lên để xem preview...
+    <div class="flex-1 flex gap-6 overflow-hidden min-h-[70vh]">
+      <div
+        class="w-1/2 bg-gray-100 dark:bg-gray-900 rounded-lg p-2 flex items-center justify-center relative border border-gray-200 dark:border-gray-700"
+      >
+        <div
+          v-if="!originalImageUrl"
+          class="text-gray-400 dark:text-gray-500 flex flex-col items-center"
+        >
+          <svg
+            class="w-16 h-16 mb-2 opacity-50"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            ></path>
+          </svg>
+          <p>Khu vực xem trước tài liệu</p>
         </div>
 
-        <div v-else class="image-overlay-container">
+        <div
+          v-else
+          class="image-overlay-container w-full h-full relative flex items-center justify-center overflow-hidden"
+        >
           <img
             :src="originalImageUrl"
-            alt="Ảnh gốc"
+            alt="Bản gốc"
             ref="originalImageRef"
             @load="updateImageDimensions"
+            class="max-w-full max-h-full object-contain shadow-sm rounded"
           />
+
           <div
-            v-for="(item, index) in results.filter((r) => r.bbox)"
+            v-for="(item, index) in parsedResults"
             :key="index"
             class="ocr-bbox"
-            :class="{ 'is-hovered': item.line_number === hoveredLine }"
-            :style="calculateBoxStyle(item.bbox)"
-            @mouseover="hoveredLine = item.line_number"
-            @mouseleave="hoveredLine = -1"
-            :title="item.text"
+            :class="{ 'is-hovered': hoveredIndex === index }"
+            :style="calculateBoxStyle(item.parsedBbox)"
+            @mouseover="hoveredIndex = index"
+            @mouseleave="hoveredIndex = -1"
+            :title="item.wordText"
           ></div>
         </div>
       </div>
 
-      <div class="text-list-wrapper">
-        <h3
-          class="text-lg font-semibold text-gray-900 dark:text-white mb-2"
-        >
-          Kết quả OCR:
+      <div class="w-1/2 flex flex-col gap-3">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+          Văn bản trích xuất
         </h3>
-        <ul class="ocr-results">
-          <li
-            v-if="isLoading && results.length === 0"
-            class="p-4 text-gray-400 dark:text-gray-500"
+
+        <textarea
+          v-model="detectedText"
+          class="flex-1 w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none font-mono leading-relaxed"
+          placeholder="Kết quả OCR sẽ hiển thị tại đây để bạn chỉnh sửa..."
+        ></textarea>
+
+        <div class="flex gap-3 justify-end mt-2">
+          <button
+            class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition"
           >
-            Đang xử lý...
-          </li>
-          <li
-            v-if="!isLoading && results.length === 0"
-            class="p-4 text-gray-400 dark:text-gray-500"
+            Sao chép
+          </button>
+          <button
+            class="px-4 py-2 bg-green-600 text-white font-medium rounded hover:bg-green-700 transition"
           >
-            Chưa có kết quả...
-          </li>
-          <li
-            v-for="item in results"
-            :key="item.line_number"
-            class="ocr-item"
-            :class="{ 'is-hovered': item.line_number === hoveredLine }"
-            @mouseover="hoveredLine = item.line_number"
-            @mouseleave="hoveredLine = -1"
-          >
-            <strong class="text-green-600 dark:text-green-400">
-              <span v-if="item.page_number">P{{ item.page_number }} - </span>
-              L{{ item.line_number }}:
-            </strong>
-            {{ item.text }}
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div v-else-if="isPdf" class="pdf-results-list">
-      <div
-        v-if="pdfPagePreviews.length === 0"
-        class="image-placeholder"
-        style="width: 100%; text-align: center; padding: 40px 0"
-      >
-        {{ statusMessage }}
-      </div>
-
-      <div
-        v-for="page in pdfPagePreviews"
-        :key="page.id"
-        class="result-container pdf-page-row"
-      >
-        <div class="image-wrapper">
-          <div class="pdf-page-item">
-            <h4 class="page-number-title">Trang {{ page.id }}</h4>
-            <div class="image-overlay-container pdf-page-image-container">
-              <img :src="page.imageUrl" :alt="'Trang ' + page.id" />
-
-              <div
-                v-for="item in results.filter(
-                  (r) => r.page_number === page.id && r.bbox
-                )"
-                :key="item.line_number"
-                class="ocr-bbox"
-                :class="{ 'is-hovered': item.line_number === hoveredLine }"
-                :style="calculateBoxStyleForPdf(item.bbox, page)"
-                @mouseover="hoveredLine = item.line_number"
-                @mouseleave="hoveredLine = -1"
-                :title="item.text"
-              ></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="text-list-wrapper">
-          <h3
-            class="text-lg font-semibold text-gray-900 dark:text-white mb-2"
-          >
-            Kết quả Trang {{ page.id }}:
-          </h3>
-          <ul class="ocr-results">
-            <li
-              v-for="item in results.filter((r) => r.page_number === page.id)"
-              :key="item.line_number"
-              class="ocr-item"
-              :class="{ 'is-hovered': item.line_number === hoveredLine }"
-              @mouseover="hoveredLine = item.line_number"
-              @mouseleave="hoveredLine = -1"
-            >
-              <strong class="text-green-600 dark:text-green-400">
-                L{{ item.line_number }}:
-              </strong>
-              {{ item.text }}
-            </li>
-
-            <li
-              v-if="
-                !isLoading &&
-                results.filter((r) => r.page_number === page.id).length === 0
-              "
-              class="p-4 text-gray-400 dark:text-gray-500"
-            >
-              (Không có kết quả cho trang này)
-            </li>
-          </ul>
+            Lưu vào Dự án
+          </button>
         </div>
       </div>
     </div>
@@ -173,106 +119,37 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-const file = ref(null);
-const results = ref([]);
-const statusMessage = ref("Chưa chọn file");
-const isLoading = ref(false);
-const config = useRuntimeConfig();
+import { ref, computed } from "vue";
 
+// --- STATES ---
+const file = ref(null);
 const originalImageUrl = ref(null);
 const originalImageRef = ref(null);
-const hoveredLine = ref(-1);
-const isPdf = ref(false);
-const pdfPagePreviews = ref([]); // [{id, imageUrl, originalWidth, originalHeight, scaledWidth, scaledHeight}]
 const imageDimensions = ref({ nativeWidth: 0, nativeHeight: 0 });
 
+const isLoading = ref(false);
+const statusMessage = ref("Chưa chọn file");
+const selectedProjectId = ref(null);
+
+// Data từ API
+const detectedText = ref("");
+const rawResults = ref([]); // Mảng chứa wordText và boundingBox JSON string
+
+const hoveredIndex = ref(-1);
+const config = useRuntimeConfig();
+
+// --- LOGIC GIAO DIỆN ---
 function handleFileChange(event) {
   file.value = event.target.files[0];
   if (!file.value) return;
 
-  statusMessage.value = "Đã chọn file. Sẵn sàng bắt đầu.";
-  results.value = [];
+  statusMessage.value = "Sẵn sàng quét.";
+  detectedText.value = "";
+  rawResults.value = [];
   imageDimensions.value = { nativeWidth: 0, nativeHeight: 0 };
-  pdfPagePreviews.value = [];
-  originalImageUrl.value = null;
 
-  if (file.value.type.startsWith("image/")) {
-    isPdf.value = false;
-    originalImageUrl.value = URL.createObjectURL(file.value);
-  } else if (file.value.type === "application/pdf") {
-    isPdf.value = true;
-    originalImageUrl.value = null;
-    generatePdfPreviews(file.value);
-  }
-}
-
-/**
- * Nuxt 4 + Vite friendly:
- * - dynamic import pdfjs only on client
- * - import worker as URL using '?url' so Vite emits asset and returns URL
- * - set GlobalWorkerOptions.workerSrc BEFORE getDocument()
- */
-async function generatePdfPreviews(pdfFile) {
-  if (typeof window === "undefined") {
-    statusMessage.value = "Không thể render PDF trên server.";
-    return;
-  }
-
-  try {
-    statusMessage.value = "Đang tải thư viện pdf.js...";
-    // dynamic import module (legacy build recommended for browser)
-    const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf"); // returns module
-    // import worker file as URL (Vite will return an URL string under default)
-    const workerModule = await import(
-      "pdfjs-dist/build/pdf.worker.min.mjs?url"
-    );
-    const workerSrc = workerModule?.default ?? workerModule;
-    // set workerSrc BEFORE any pdfjsModule.getDocument call
-    pdfjsModule.GlobalWorkerOptions.workerSrc = workerSrc;
-
-    // read file as arrayBuffer
-    const arrayBuffer = await pdfFile.arrayBuffer();
-    const loadingTask = pdfjsModule.getDocument({
-      data: new Uint8Array(arrayBuffer),
-    });
-    const pdfDoc = await loadingTask.promise;
-    const numPages = pdfDoc.numPages;
-    statusMessage.value = `Đang render PDF... (Tổng ${numPages} trang)`;
-
-    const previews = [];
-    const scale = 1.5;
-    for (let i = 1; i <= numPages; i++) {
-      const page = await pdfDoc.getPage(i);
-      const originalViewport = page.getViewport({ scale: 1.0 });
-      const scaledViewport = page.getViewport({ scale });
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = Math.round(scaledViewport.width);
-      canvas.height = Math.round(scaledViewport.height);
-
-      await page.render({ canvasContext: ctx, viewport: scaledViewport })
-        .promise;
-      previews.push({
-        id: i,
-        imageUrl: canvas.toDataURL("image/jpeg"),
-        originalWidth: originalViewport.width,
-        originalHeight: originalViewport.height,
-        scaledWidth: scaledViewport.width,
-        scaledHeight: scaledViewport.height,
-      });
-      // update progressively
-      pdfPagePreviews.value = [...previews];
-      // tiny yield for UI
-      await new Promise((r) => setTimeout(r, 5));
-    }
-    statusMessage.value = `Đã tạo preview cho ${numPages} trang.`;
-  } catch (err) {
-    console.error("Lỗi khi render PDF:", err);
-    // nếu worker fetch fail, log gốc có thông tin
-    statusMessage.value = `Lỗi render PDF: ${err?.message || err}`;
-  }
+  if (originalImageUrl.value) URL.revokeObjectURL(originalImageUrl.value);
+  originalImageUrl.value = URL.createObjectURL(file.value);
 }
 
 function updateImageDimensions() {
@@ -284,15 +161,37 @@ function updateImageDimensions() {
   }
 }
 
+// --- LOGIC PARSE BOUNDING BOX TỪ GOOGLE VISION ---
+// Google trả về string: "[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]"
+const parsedResults = computed(() => {
+  return rawResults.value
+    .map((item) => {
+      let parsedBbox = null;
+      try {
+        const arr = JSON.parse(item.boundingBox); // Parse chuỗi JSON
+        if (arr && arr.length > 0) {
+          // Tìm x nhỏ nhất, lớn nhất, y nhỏ nhất, lớn nhất
+          const xs = arr.map((pt) => pt[0]);
+          const ys = arr.map((pt) => pt[1]);
+          parsedBbox = [
+            Math.min(...xs), // x_min
+            Math.min(...ys), // y_min
+            Math.max(...xs), // x_max
+            Math.max(...ys), // y_max
+          ];
+        }
+      } catch (e) {
+        console.error("Lỗi parse Bbox:", e);
+      }
+      return { ...item, parsedBbox };
+    })
+    .filter((item) => item.parsedBbox !== null);
+});
+
+// --- LOGIC VẼ BOX ĐÈ LÊN ẢNH (TỶ LỆ CHUẨN) ---
 function calculateBoxStyle(bbox) {
   const { nativeWidth, nativeHeight } = imageDimensions.value;
-  if (
-    !bbox ||
-    bbox.length < 4 ||
-    !originalImageRef.value ||
-    nativeWidth === 0 ||
-    nativeHeight === 0
-  )
+  if (!bbox || !originalImageRef.value || nativeWidth === 0)
     return { display: "none" };
 
   const container = originalImageRef.value.parentElement;
@@ -300,347 +199,118 @@ function calculateBoxStyle(bbox) {
 
   const containerWidth = container.clientWidth;
   const containerHeight = container.clientHeight;
+
+  // Tính tỷ lệ thu nhỏ của ảnh khi dùng object-fit: contain
   const ratioX = containerWidth / nativeWidth;
   const ratioY = containerHeight / nativeHeight;
   const ratio = Math.min(ratioX, ratioY);
+
+  // Kích thước thực tế của ảnh đang hiển thị trên màn hình
   const displayedWidth = nativeWidth * ratio;
   const displayedHeight = nativeHeight * ratio;
+
+  // Canh lề (Khoảng trống bị dư ra do object-fit)
   const offsetX = (containerWidth - displayedWidth) / 2;
   const offsetY = (containerHeight - displayedHeight) / 2;
 
   const [x_min, y_min, x_max, y_max] = bbox;
+
   return {
-    top: y_min * ratio + offsetY + "px",
-    left: x_min * ratio + offsetX + "px",
-    width: (x_max - x_min) * ratio + "px",
-    height: (y_max - y_min) * ratio + "px",
+    top: `${y_min * ratio + offsetY}px`,
+    left: `${x_min * ratio + offsetX}px`,
+    width: `${(x_max - x_min) * ratio}px`,
+    height: `${(y_max - y_min) * ratio}px`,
   };
 }
 
-function calculateBoxStyleForPdf(bbox, page) {
-  if (
-    !bbox ||
-    bbox.length < 4 ||
-    !page ||
-    !page.originalWidth ||
-    !page.originalHeight
-  )
-    return { display: "none" };
-  // We use percent positioning relative to originalWidth/originalHeight (scale=1)
-  const [x_min, y_min, x_max, y_max] = bbox;
-  return {
-    top: (y_min / page.originalHeight) * 100 + "%",
-    left: (x_min / page.originalWidth) * 100 + "%",
-    width: ((x_max - x_min) / page.originalWidth) * 100 + "%",
-    height: ((y_max - y_min) / page.originalHeight) * 100 + "%",
-  };
-}
-
+// --- LOGIC GỌI API (C# BACKEND MỚI) ---
 async function startOCR() {
-  if (!file.value) {
-    alert("Vui lòng chọn 1 file!");
+  if (!file.value) return;
+
+  const token = localStorage.getItem("jwt_token"); // Thay bằng useJwt() của bạn nếu cần
+  if (!token) {
+    statusMessage.value = "Lỗi: Chưa đăng nhập (Không tìm thấy Token).";
     return;
   }
+
   isLoading.value = true;
-  results.value = [];
-  statusMessage.value = "Đang tải file lên...";
+  statusMessage.value = "Đang gửi ảnh cho Google Cloud Vision xử lý...";
+
   const formData = new FormData();
-  formData.append("file", file.value);
-  const token = localStorage.getItem("jwt_token");
-  if (!token) {
-    statusMessage.value = "Lỗi: Bạn chưa đăng nhập!";
-    isLoading.value = false;
-    return;
+  formData.append("image", file.value);
+  if (selectedProjectId.value) {
+    formData.append("projectId", selectedProjectId.value);
   }
 
   try {
-    let apiUrl = "";
-    if (file.value.type === "application/pdf") {
-      apiUrl = `${config.public.apiBaseUrl}/api/Infer/pdf-stream`;
-      statusMessage.value = "Đang xử lý PDF (có thể mất vài phút)...";
-    } else {
-      apiUrl = `${config.public.apiBaseUrl}/api/Infer/stream`;
-    }
+    // Gọi thẳng endpoint trả về JSON của C#
+    const apiUrl = `${
+      config.public.apiBaseUrl || "https://localhost:7084"
+    }/api/Infer/upload-and-infer`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
       body: formData,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
-    if (!response.ok) throw new Error(`Lỗi server: ${response.statusText}`);
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n\n");
-      buffer = lines.pop();
-      for (const line of lines) {
-        if (line.startsWith("data:")) {
-          try {
-            const jsonString = line.substring(5).trim();
-            const data = JSON.parse(jsonString);
-            if (data.status === "result") {
-              results.value.push(data);
-            } else {
-              statusMessage.value = data.message || data.status;
-            }
-          } catch (e) {
-            console.error("Lỗi parse JSON từ stream:", line, e);
-          }
-        }
-      }
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || response.statusText);
     }
+
+    // Backend Google C# trả về 1 cục JSON duy nhất
+    const data = await response.json();
+
+    // Gán dữ liệu vào UI
+    detectedText.value = data.detectedText || "";
+    if (data.results && Array.isArray(data.results)) {
+      rawResults.value = data.results;
+    }
+
+    statusMessage.value = `Hoàn tất! Bóc tách thành công văn bản.`;
   } catch (error) {
-    console.error("Lỗi khi gọi OCR:", error);
-    statusMessage.value = `Lỗi nghiêm trọng: ${error.message}`;
+    console.error("Lỗi OCR:", error);
+    statusMessage.value = `Lỗi: ${error.message}`;
   } finally {
     isLoading.value = false;
-    if (statusMessage.value.startsWith("Đang"))
-      statusMessage.value = `Xử lý xong. Tìm thấy ${results.value.length} dòng.`;
   }
 }
 </script>
 
 <style scoped>
-/* THAY ĐỔI:
-  - Tái cấu trúc lại toàn bộ khối style
-  - Thêm style cho light mode (mặc định)
-  - Bọc style cho dark mode (cũ) trong class .dark
-*/
-
-/* === CẤU TRÚC CHUNG === */
-.result-container {
-  display: flex;
-  flex-direction: row;
-  gap: 20px;
-  align-items: stretch;
-}
-
-/* === 1️⃣ ẢNH ĐƠN === */
-.single-image-layout {
-  display: flex;
-  flex-direction: row;
-  gap: 20px;
-  height: 70vh; /* 🔥 cố định chiều cao */
-  overflow: hidden;
-  align-items: stretch; /* hai cột cùng chiều cao */
-}
-
-/* --- CỘT TRÁI (ẢNH + BOX ĐỎ) --- */
-.image-wrapper {
-  flex: 3;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  padding: 12px;
-  box-sizing: border-box;
-  height: 100%; /* cao bằng layout */
-  /* Light Mode */
-  background: #f3f4f6; /* bg-gray-100 */
-  border: 1px solid #e5e7eb; /* border-gray-200 */
-  color: #6b7280; /* text-gray-500 */
-}
-.dark .image-wrapper {
-  /* Dark Mode */
-  background: #111;
-  border: 1px solid #4b5563;
-  color: #9ca3af; /* text-gray-400 */
-}
-
-.image-overlay-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.image-overlay-container img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-/* Box đỏ OCR (Giữ nguyên, hoạt động tốt trên cả 2 nền) */
+/* Box viền đỏ cho chữ */
 .ocr-bbox {
   position: absolute;
-  border: 2px solid rgba(239, 68, 68, 0.7);
-  background-color: rgba(239, 68, 68, 0.2);
-  transition: background-color 0.1s, border-color 0.1s;
+  border: 1.5px solid rgba(59, 130, 246, 0.4); /* Màu xanh nhạt */
+  background-color: transparent;
+  transition: all 0.15s ease-in-out;
+  cursor: crosshair;
+  border-radius: 2px;
 }
+
+/* Khi rê chuột vào chữ trên ảnh */
 .ocr-bbox.is-hovered {
-  background-color: rgba(59, 130, 246, 0.5);
-  border-color: rgba(59, 130, 246, 1);
-  z-index: 10;
+  background-color: rgba(250, 204, 21, 0.4); /* Highlight vàng */
+  border-color: rgba(234, 179, 8, 0.8);
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.8);
+  z-index: 20;
 }
 
-/* --- CỘT PHẢI (KẾT QUẢ TEXT) --- */
-.text-list-wrapper {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  height: 100%; /* cao bằng khung trái */
-  min-height: 0; /* fix flex + overflow */
-  overflow: hidden;
-  background: transparent;
-}
-.ocr-results {
-  flex: 1;
-  overflow-y: auto; /* 🔥 cuộn riêng trong cột phải */
-  min-height: 0;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid #e5e7eb; /* border-gray-200 */
-  border-radius: 5px;
-  background: #ffffff; /* bg-white */
-}
-.dark .ocr-results {
-  border: 1px solid #4b5563;
-  background: #1f2937;
-}
-
-.ocr-item {
-  padding: 10px 12px;
-  border-bottom: 1px solid #f3f4f6; /* border-gray-100 */
-  transition: background-color 0.1s;
-  cursor: default;
-}
-.dark .ocr-item {
-  border-bottom: 1px solid #374151;
-}
-
-.ocr-item.is-hovered {
-  background-color: #dbeafe; /* blue-100 */
-  color: #1f2937; /* text-gray-800 */
-}
-.ocr-item.is-hovered strong {
-  color: #1d4ed8; /* blue-700 */
-}
-.dark .ocr-item.is-hovered {
-  background-color: #3b82f6; /* blue-500 */
-  color: white;
-}
-.dark .ocr-item.is-hovered strong {
-  color: #c7d2fe; /* blue-200 */
-}
-
-/* === 2️⃣ PDF (DANH SÁCH NHIỀU TRANG) === */
-.pdf-results-list {
-  display: flex;
-  flex-direction: column;
-  gap: 30px;
-}
-.pdf-page-row {
-  display: flex;
-  flex-direction: row;
-  gap: 20px;
-  border: 1px solid #e5e7eb; /* border-gray-200 */
-  border-radius: 8px;
-  padding: 16px;
-  background: #ffffff; /* bg-white */
-}
-.dark .pdf-page-row {
-  border: 1px solid #374151;
-  background: #1f2937;
-}
-
-.pdf-page-row .image-wrapper {
-  flex: 3;
-  padding: 0;
-  align-items: flex-start;
-  border: none;
-  background: none;
-}
-.pdf-page-row .text-list-wrapper {
-  flex: 2;
-  height: auto; /* Reset chiều cao cố định */
-}
-.pdf-page-row .ocr-results {
-  height: 400px; /* Thêm chiều cao + cuộn cho list text PDF */
-}
-
-/* === ẢNH TRONG PDF === */
-.pdf-preview-container {
-  width: 100%;
-  height: 100%;
-  overflow-y: visible;
-  padding: 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.pdf-page-item {
-  margin-bottom: 0;
-  border: 1px solid #e5e7eb; /* border-gray-200 */
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f9fafb; /* bg-gray-50 */
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-.dark .pdf-page-item {
-  border: 1px solid #4b5563;
-  background: #1f2937;
-}
-
-.page-number-title {
-  text-align: center;
-  padding: 8px;
-  background: #f3f4f6; /* bg-gray-100 */
-  color: #111827; /* text-gray-900 */
-  font-weight: bold;
-}
-.dark .page-number-title {
-  background: #374151;
-  color: white;
-}
-
-.pdf-page-image-container {
-  position: relative;
-  width: 100%;
-  height: auto;
-}
-.pdf-page-image-container img {
-  width: 100%;
-  display: block;
-}
-
-/* === SCROLLBAR CHUNG === */
-.ocr-results::-webkit-scrollbar,
-.pdf-preview-container::-webkit-scrollbar {
+/* Tùy chỉnh thanh cuộn cho Textarea */
+textarea::-webkit-scrollbar {
   width: 8px;
 }
-/* Light Mode */
-.ocr-results::-webkit-scrollbar-thumb,
-.pdf-preview-container::-webkit-scrollbar-thumb {
-  background-color: #d1d5db; /* gray-300 */
+textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+textarea::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
   border-radius: 10px;
-  border: 2px solid #ffffff; /* bg-white */
 }
-.ocr-results::-webkit-scrollbar-thumb:hover,
-.pdf-preview-container::-webkit-scrollbar-thumb:hover {
-  background-color: #9ca3af; /* gray-400 */
-}
-/* Dark Mode */
-.dark .ocr-results::-webkit-scrollbar-thumb,
-.dark .pdf-preview-container::-webkit-scrollbar-thumb {
-  background-color: #4b5563; /* gray-600 */
-  border: 2px solid #1f2937; /* bg-gray-800 */
-}
-.dark .ocr-results::-webkit-scrollbar-thumb:hover,
-.dark .pdf-preview-container::-webkit-scrollbar-thumb:hover {
-  background-color: #6b7280; /* gray-500 */
+.dark textarea::-webkit-scrollbar-thumb {
+  background-color: #475569;
 }
 </style>

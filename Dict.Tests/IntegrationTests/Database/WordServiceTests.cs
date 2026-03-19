@@ -44,7 +44,7 @@ public class WordServiceTests : IDisposable
         _mockLogger = new Mock<ILogger<WordService>>();
 
         // 3. KHỞI TẠO SERVICE (ĐÃ SỬA)
-        _service = new WordService(_context, _mockLogger.Object); // Thêm Logger
+        //_service = new WordService(_context, _mockLogger.Object); // Thêm Logger
 
         _transaction = _context.Database.BeginTransaction();
     }
