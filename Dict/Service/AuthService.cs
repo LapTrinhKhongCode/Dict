@@ -55,57 +55,109 @@ namespace Dict.Service
             _cache = cache;
         }
 
+        //public async Task<string> RegisterAsync(RegistrationRequestDto request)
+        //{
+        //    var passwordError = ValidatePassword(request.Password);
+        //    if (!string.IsNullOrEmpty(passwordError))
+        //    {
+        //        throw new InvalidOperationException(passwordError);
+        //    }
+
+        //    if (string.IsNullOrEmpty(request.Username) || !Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
+        //        throw new InvalidOperationException("Username chỉ được chứa chữ cái, số hoặc dấu gạch dưới, không có khoảng trắng hoặc dấu.");
+
+        //    // << --- CÁC DÒNG CODE CŨ (DÙNG _context) ĐÃ ĐƯỢC XÓA Ở ĐÂY --- >>
+
+        //    // 4. KIỂM TRA BẰNG USERNMANAGER (Code đúng)
+        //    var existingUserByEmail = await _userManager.FindByEmailAsync(request.Email);
+        //    if (existingUserByEmail != null)
+        //    {
+        //        throw new InvalidOperationException("Email already exists.");
+        //    }
+        //    var existingUserByName = await _userManager.FindByNameAsync(request.Username);
+        //    if (existingUserByName != null)
+        //    {
+        //        throw new InvalidOperationException("Username already exists.");
+        //    }
+
+        //    // 5. KHÔNG HASH MẬT KHẨU NỮA
+        //    // var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password); // <-- XÓA
+
+        //    var confirmationToken = Guid.NewGuid().ToString();
+
+        //    // 6. LƯU MẬT KHẨU GỐC (RAW) VÀO CACHE
+        //    // (Vì UserManager cần mật khẩu gốc để hash)
+        //    // var cacheEntry = new { RequestData = request, HashedPassword = hashedPassword }; // <-- SỬA
+        //    var cacheEntry = new { RequestData = request }; // Chỉ cần lưu request
+        //    _cache.Set(confirmationToken, cacheEntry, TimeSpan.FromMinutes(30));
+
+        //    // Gửi email (giữ nguyên)
+        //    var frontendUrl = _configuration["FrontendUrl"];
+        //    if (string.IsNullOrEmpty(frontendUrl))
+        //    {
+        //        throw new Exception("FrontendUrl is not configured");
+        //    }
+        //    var confirmationUrl = $"{frontendUrl}/confirm-account?token={confirmationToken}";
+        //    var subject = "Chào mừng bạn đến với Miyo Dictionary - Xác nhận tài khoản";
+        //    var body = $"Cảm ơn bạn đã đăng ký. Vui lòng nhấp vào link sau để hoàn tất tạo tài khoản:<br/>" +
+        //               $"<a href='{confirmationUrl}'>Click để Xác nhận Tài khoản</a>" +
+        //               $"<br/><br/>Link này sẽ hết hạn sau 30 phút.";
+
+        //    await _emailService.SendEmailAsync(request.Email, subject, body);
+
+        //    return "Registration successful. Please check your email to confirm your account.";
+        //}
         public async Task<string> RegisterAsync(RegistrationRequestDto request)
         {
+            // 1. Validate password
             var passwordError = ValidatePassword(request.Password);
             if (!string.IsNullOrEmpty(passwordError))
             {
                 throw new InvalidOperationException(passwordError);
             }
 
-            if (string.IsNullOrEmpty(request.Username) || !Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
-                throw new InvalidOperationException("Username chỉ được chứa chữ cái, số hoặc dấu gạch dưới, không có khoảng trắng hoặc dấu.");
+            // 2. Validate username
+            if (string.IsNullOrEmpty(request.Username) ||
+                !Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
+            {
+                throw new InvalidOperationException("Username chỉ được chứa chữ cái, số hoặc dấu gạch dưới.");
+            }
 
-            // << --- CÁC DÒNG CODE CŨ (DÙNG _context) ĐÃ ĐƯỢC XÓA Ở ĐÂY --- >>
-
-            // 4. KIỂM TRA BẰNG USERNMANAGER (Code đúng)
+            // 3. Check email tồn tại
             var existingUserByEmail = await _userManager.FindByEmailAsync(request.Email);
             if (existingUserByEmail != null)
             {
                 throw new InvalidOperationException("Email already exists.");
             }
+
+            // 4. Check username tồn tại
             var existingUserByName = await _userManager.FindByNameAsync(request.Username);
             if (existingUserByName != null)
             {
                 throw new InvalidOperationException("Username already exists.");
             }
 
-            // 5. KHÔNG HASH MẬT KHẨU NỮA
-            // var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password); // <-- XÓA
-
-            var confirmationToken = Guid.NewGuid().ToString();
-
-            // 6. LƯU MẬT KHẨU GỐC (RAW) VÀO CACHE
-            // (Vì UserManager cần mật khẩu gốc để hash)
-            // var cacheEntry = new { RequestData = request, HashedPassword = hashedPassword }; // <-- SỬA
-            var cacheEntry = new { RequestData = request }; // Chỉ cần lưu request
-            _cache.Set(confirmationToken, cacheEntry, TimeSpan.FromMinutes(30));
-
-            // Gửi email (giữ nguyên)
-            var frontendUrl = _configuration["FrontendUrl"];
-            if (string.IsNullOrEmpty(frontendUrl))
+            // 5. Tạo user mới
+            var user = new ApplicationUser
             {
-                throw new Exception("FrontendUrl is not configured");
+                UserName = request.Username,
+                Email = request.Email,
+                EmailConfirmed = true, // 👈 bỏ xác nhận email luôn,
+                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/523d68a2-cc64-4537-b8b0-dbf9d40b26a8.png",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+            };
+
+            // 6. Create user + hash password tự động
+            var result = await _userManager.CreateAsync(user, request.Password);
+
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException(errors);
             }
-            var confirmationUrl = $"{frontendUrl}/confirm-account?token={confirmationToken}";
-            var subject = "Chào mừng bạn đến với Miyo Dictionary - Xác nhận tài khoản";
-            var body = $"Cảm ơn bạn đã đăng ký. Vui lòng nhấp vào link sau để hoàn tất tạo tài khoản:<br/>" +
-                       $"<a href='{confirmationUrl}'>Click để Xác nhận Tài khoản</a>" +
-                       $"<br/><br/>Link này sẽ hết hạn sau 30 phút.";
 
-            await _emailService.SendEmailAsync(request.Email, subject, body);
-
-            return "Registration successful. Please check your email to confirm your account.";
+            return "Register successful";
         }
 
         public async Task<LoginResponseDto> ConfirmRegistrationAsync(string token)
