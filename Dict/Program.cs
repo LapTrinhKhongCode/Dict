@@ -137,6 +137,7 @@ builder.Services.AddSingleton<IBlobService, BlobService>();
 builder.Services.AddScoped<IOcrProcessingService, OcrProcessingService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+
 builder.Services.AddScoped<IProjectService, ProjectService>();
 // Program.cs
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
