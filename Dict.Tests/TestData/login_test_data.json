@@ -1,0 +1,29 @@
+[
+  {
+    "TestCaseName": "User không tồn tại",
+    "InputUser": "user_khong_ton_tai",
+    "InputPass": "any_pass",
+    "FindByNameReturnsUser": false,
+    "CheckPasswordResult": "Failed",
+    "UserIsActive": true,
+    "ExpectedMessage": "Tên đăng nhập hoặc mật khẩu không chính xác."
+  },
+  {
+    "TestCaseName": "Sai mật khẩu",
+    "InputUser": "user_dung",
+    "InputPass": "password_sai",
+    "FindByNameReturnsUser": true,
+    "CheckPasswordResult": "Failed",
+    "UserIsActive": true,
+    "ExpectedMessage": "Tên đăng nhập hoặc mật khẩu không chính xác."
+  },
+  {
+    "TestCaseName": "Tài khoản bị khóa",
+    "InputUser": "user_bi_khoa",
+    "InputPass": "password_dung",
+    "FindByNameReturnsUser": true,
+    "CheckPasswordResult": "Success",
+    "UserIsActive": false,
+    "ExpectedMessage": "Tài khoản này đã bị khóa."
+  }
+]

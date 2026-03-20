@@ -1,0 +1,51 @@
+{
+  "name": "nuxt-app",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/eslint": "^1.9.0",
+    "@nuxt/fonts": "^0.11.4",
+    "@nuxt/icon": "^2.0.0",
+    "@nuxt/image": "^1.11.0",
+    "@nuxt/scripts": "^0.11.10",
+    "@nuxt/test-utils": "^3.19.2",
+    "@nuxt/ui": "^3.3.2",
+    "@tailwindcss/vite": "^4.1.12",
+    "@unhead/vue": "^2.0.14",
+    "ant-design-vue": "^4.2.6",
+    "chart.js": "^4.5.1",
+    "eslint": "^9.33.0",
+    "hanzi-writer": "^3.7.2",
+    "lucide-vue-next": "^0.542.0",
+    "nuxt": "^4.1.0",
+    "papaparse": "^5.5.3",
+    "pdfjs": "^2.5.4",
+    "pdfjs-dist": "^5.5.207",
+    "pinia": "^3.0.3",
+    "qrcode": "^1.5.4",
+    "qrcodejs2": "^0.0.2",
+    "signature_pad": "^5.1.0",
+    "tailwindcss": "^4.1.12",
+    "tesseract.js": "^6.0.1",
+    "three-spritetext": "^1.10.0",
+    "troika-three-text": "^0.52.4",
+    "v-hanziwriter": "^0.0.19",
+    "vue": "^3.5.18",
+    "vue-force-graph": "^0.1.2",
+    "vue-qrcode-component": "^2.1.1",
+    "vue-router": "^4.5.1",
+    "wanakana": "^5.3.1"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.3.16",
+    "@types/qrcode": "^1.5.6",
+    "@types/three": "^0.180.0"
+  }
+}
