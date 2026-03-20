@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'https://localhost:7084',
-      geminiApiKey: process.env.NUXT_PUBLIC_GEMINI_API_KEY || 'AIzaSyDFb-3C6db9o_OKb_x3sNokNNUL7zNWOXc'
+      geminiApiKey: process.env.NUXT_PUBLIC_GEMINI_API_KEY || ''
     }
   },
   devtools: { enabled: true },
