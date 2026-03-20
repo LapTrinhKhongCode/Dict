@@ -26,6 +26,7 @@ namespace Dict.Service
         private readonly IOcrJobService _ocrJobService;
         private readonly ApplicationDbContext _db;
         private readonly IBlobService _blobService;
+        private readonly IConfiguration _configuration;
 
         public OcrProcessingService(
             IHttpClientFactory httpFactory,
@@ -33,7 +34,8 @@ namespace Dict.Service
             ILogger<OcrProcessingService> logger,
             IOcrJobService ocrJobService,
             ApplicationDbContext db,
-            IBlobService blobService)
+            IBlobService blobService,
+            IConfiguration configuration)
         {
             _httpFactory = httpFactory;
             _cfg = cfg;
@@ -41,6 +43,7 @@ namespace Dict.Service
             _ocrJobService = ocrJobService;
             _db = db;
             _blobService = blobService;
+            _configuration = configuration;
         }
         public async Task<IEnumerable<OcrJobDetailDto>> GetRecentOcrJobsForUserAsync(int userId, int limit = 5)
         {
@@ -324,8 +327,14 @@ namespace Dict.Service
 
             try
             {
-                // Phép thuật: Lệnh này TỰ ĐỘNG móc chìa khóa tàng hình từ lệnh gcloud bạn vừa gõ
-                var client = await ImageAnnotatorClient.CreateAsync();
+                // Đọc API Key từ appsettings
+string apiKey = _configuration["GoogleCloud:ApiKey"];
+
+// Khởi tạo client bằng Builder và nhét Key vào
+var client = await new ImageAnnotatorClientBuilder 
+{ 
+    ApiKey = apiKey 
+}.BuildAsync();
                 var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(originalImageBytes);
 
                 // Hàm DetectDocumentTextAsync chuyên trị văn bản mật độ dày (như tiếng Nhật)
