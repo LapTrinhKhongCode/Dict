@@ -3,6 +3,7 @@ using Dict.Middleware;
 using Dict.Models;
 using Dict.Service;
 using Dict.Service.IService;
+using Dict.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,14 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 500MB
+});
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 500 * 1024 * 1024; // 500MB
+});
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -128,6 +137,9 @@ builder.Services.AddSingleton<IBlobService, BlobService>();
 builder.Services.AddScoped<IOcrProcessingService, OcrProcessingService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
+// Program.cs
+builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 
 // << --- ĐÃ XÓA KHỐI AddAuthentication BỊ LẶP Ở ĐÂY --- >>
 
@@ -149,6 +161,7 @@ if (app.Environment.IsDevelopment())
 app.UseStaticFiles();
 //app.UseHttpsRedirection();
 app.UseCors("AllowAnyOrigin");
+app.UseStaticFiles();
 app.UseMiddleware<ApiLoggingMiddleware>();
 // Thứ tự này là CHUẨN XÁC
 app.UseAuthentication();
