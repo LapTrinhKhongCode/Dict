@@ -22,7 +22,6 @@ namespace Dict.Middleware
 
         public async Task InvokeAsync(HttpContext context, ApplicationDbContext dbContext)
         {
-            // Bỏ qua các đường dẫn không phải API (ví dụ: Swagger)
             if (!context.Request.Path.StartsWithSegments("/api"))
             {
                 await _next(context);
@@ -31,19 +30,28 @@ namespace Dict.Middleware
 
             var stopwatch = Stopwatch.StartNew();
 
-            // Cho phép đọc body request
-            context.Request.EnableBuffering();
-            var requestBody = await GetRequestBodyAsync(context.Request);
+            // Skip đọc body nếu là file upload (multipart/form-data)
+            string requestBody = "";
+            var contentType = context.Request.ContentType ?? "";
+            bool isFileUpload = contentType.Contains("multipart/form-data");
 
-            // Chạy các middleware/controller khác
+            if (!isFileUpload)
+            {
+                context.Request.EnableBuffering();
+                requestBody = await GetRequestBodyAsync(context.Request);
+            }
+            else
+            {
+                requestBody = "[file upload]";
+            }
+
             await _next(context);
-
             stopwatch.Stop();
 
             var apiCall = new ApiCall
             {
                 Endpoint = context.Request.Path,
-                RequestJson = requestBody, // Lưu body
+                RequestJson = requestBody,
                 ResponseStatus = context.Response.StatusCode,
                 ResponseTimeMs = (int)stopwatch.ElapsedMilliseconds,
                 CreatedAt = DateTime.UtcNow
@@ -51,8 +59,6 @@ namespace Dict.Middleware
 
             try
             {
-                // Dùng AddAsync và SaveChangesAsync trong một DbContext riêng
-                // (DbContext được inject vào Middleware là 'scoped')
                 dbContext.ApiCalls.Add(apiCall);
                 await dbContext.SaveChangesAsync();
             }
@@ -64,11 +70,10 @@ namespace Dict.Middleware
 
         private async Task<string> GetRequestBodyAsync(HttpRequest request)
         {
-            // Đảm bảo stream có thể đọc lại được
             request.Body.Position = 0;
-            var reader = new StreamReader(request.Body, Encoding.UTF8);
+            var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
             var body = await reader.ReadToEndAsync();
-            request.Body.Position = 0; // Tua lại stream cho các Controller sau
+            request.Body.Position = 0;
             return body;
         }
     }
