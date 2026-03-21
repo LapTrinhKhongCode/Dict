@@ -8,6 +8,7 @@ namespace Dict.Service.IService
         Task<OcrProcessingResultDto> ProcessOcrLazyAsync(int jobId);
         Task<OcrProcessingResultDto> ProcessImageAsync(IFormFile image, int userId, int workspaceId, int? projectId, bool saveAnnotated);
         Task<IEnumerable<OcrJobDetailDto>> GetRecentOcrJobsForUserAsync(int userId, int limit = 5);
+
     }
 }
 

@@ -22,7 +22,43 @@
 
     <main class="main-content">
       <section ref="pdfPanelEl" class="panel pdf-panel">
-        <div v-if="!pdfDoc" class="pdf-empty">
+        <!-- OCR Mode -->
+        <div v-if="ocrMode" class="pdf-viewer-wrap">
+          <div class="pdf-toolbar">
+            <span class="page-info-scroll" style="flex:1">
+              {{ pdfName || 'Tài liệu OCR' }}
+            </span>
+            <div class="tool-sep"></div>
+            <button class="tool-btn" @click="zoomOut">−</button>
+            <span class="zoom-label">{{ Math.round(scale * 100) }}%</span>
+            <button class="tool-btn" @click="zoomIn">+</button>
+          </div>
+          <div class="pdf-scroll" ref="pdfScrollEl">
+            <div v-if="ocrLoading" class="loading-wrap" style="padding:40px">
+              <div class="spinner"></div>
+              <p class="loading-text">AI đang đọc tài liệu...</p>
+            </div>
+            <div v-else-if="ocrImageUrl" class="ocr-container" :style="`transform:scale(${scale});transform-origin:top center`">
+              <!-- Ảnh gốc -->
+              <img :src="ocrImageUrl" class="ocr-image" ref="ocrImgEl"
+                @load="onOcrImageLoad" />
+              <!-- Text overlay từ OCR results -->
+              <div v-if="ocrResults" class="ocr-overlay">
+                <div
+                  v-for="(r, i) in ocrResults" :key="i"
+                  class="ocr-text-box"
+                  :style="getOcrBoxStyle(r)"
+                  :title="r.wordText"
+                  @click="copyWord(r.wordText)"
+                >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PDF Mode -->
+        <div v-else-if="!pdfDoc" class="pdf-empty">
           <div v-if="loadingPdf" class="loading-wrap">
             <div class="spinner"></div>
             <p class="loading-text">Đang tải tài liệu...</p>
@@ -270,7 +306,7 @@
 </template>
 
 <script setup>
-definePageMeta({ layout: 'reader' })
+definePageMeta({ layout: 'reader', ssr: false })
 
 import { ref, shallowRef, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -284,11 +320,50 @@ const route = useRoute()
 const router = useRouter()
 const { jwt } = useJwt()
 const { showToast } = useToast()
+
+// Helper lấy token — ưu tiên localStorage (consistent với các page khác)
+const getToken = () => localStorage.getItem('jwt_token') || jwt.value || ''
+
 const apiKey = ref('')
 const pdfName = ref('')
 const loadingMsg = ref('Không có file được chọn.')
 const loadingPdf = ref(false)
 const pdfDoc = shallowRef(null)
+
+// ── OCR Mode state ───────────────────────────────────────────────
+const ocrMode = ref(false)       // true khi đọc từ OCR thay vì PDF
+const ocrImageUrl = ref('')      // URL ảnh từ OCR
+const ocrResults = ref(null)     // kết quả OCR [{wordText, boundingBox}]
+const ocrFullText = ref('')      // toàn bộ text OCR để đưa vào Gemini
+const ocrLoading = ref(false)
+const ocrImgEl = ref(null)
+const ocrNaturalW = ref(0)
+const ocrNaturalH = ref(0)
+const ocrDisplayW = ref(0)
+const ocrDisplayH = ref(0)
+
+async function onOcrImageLoad() {
+  if (!ocrImgEl.value) return
+  await nextTick()
+  ocrNaturalW.value = ocrImgEl.value.naturalWidth
+  ocrNaturalH.value = ocrImgEl.value.naturalHeight
+  ocrDisplayW.value = ocrImgEl.value.offsetWidth
+  ocrDisplayH.value = ocrImgEl.value.offsetHeight
+  if (window._ocrResizeObs) window._ocrResizeObs.disconnect()
+  window._ocrResizeObs = new ResizeObserver(() => {
+    if (ocrImgEl.value) {
+      ocrDisplayW.value = ocrImgEl.value.offsetWidth
+      ocrDisplayH.value = ocrImgEl.value.offsetHeight
+    }
+  })
+  window._ocrResizeObs.observe(ocrImgEl.value)
+}
+
+function refreshOcrSize() {
+  if (!ocrImgEl.value) return
+  ocrDisplayW.value = ocrImgEl.value.offsetWidth
+  ocrDisplayH.value = ocrImgEl.value.offsetHeight
+}
 
 const pdfCanvas = ref(null)
 const pdfScrollEl = ref(null)
@@ -319,6 +394,59 @@ const inputEl = ref(null)
 
 const quickQuestions = ['Tóm tắt tài liệu này', 'Các điểm chính là gì?', 'Giải thích trang hiện tại']
 
+// ── RAG: Extract → Chunk → Index → Retrieve → Augment ───────────
+const ragIndex = ref([])
+const ragReady = ref(false)
+
+async function buildRagIndex() {
+  if (!pdfDoc.value) return
+  ragReady.value = false
+  ragIndex.value = []
+  for (let i = 1; i <= pdfDoc.value.numPages; i++) {
+    const page = await pdfDoc.value.getPage(i)
+    const tc = await page.getTextContent()
+    const text = tc.items.map(it => it.str || '').join(' ').replace(/\s+/g, ' ').trim()
+    if (!text) continue
+    // Chunk ~300 ký tự với overlap 50 ký tự
+    let start = 0
+    let chunkIdx = 0
+    while (start < text.length) {
+      const end = Math.min(start + 300, text.length)
+      ragIndex.value.push({ page: i, chunkIdx: chunkIdx++, text: text.slice(start, end) })
+      start += 250 // overlap 50
+    }
+  }
+  ragReady.value = true
+}
+
+function ragRetrieve(query, topK = 5) {
+  if (!ragIndex.value.length) return []
+  const qLower = query.toLowerCase()
+  const qWords = qLower.split(/\s+/).filter(w => w.length > 1)
+
+  const scored = ragIndex.value.map(chunk => {
+    const cLower = chunk.text.toLowerCase()
+    let score = 0
+    // Exact phrase
+    if (cLower.includes(qLower)) score += 30
+    // Keyword match
+    for (const w of qWords) {
+      const n = (cLower.match(new RegExp(w, 'g')) || []).length
+      score += n * 2
+    }
+    // Bigram
+    for (let i = 0; i < qWords.length - 1; i++) {
+      if (cLower.includes(qWords[i] + ' ' + qWords[i+1])) score += 8
+    }
+    return { ...chunk, score }
+  })
+  .filter(c => c.score > 0)
+  .sort((a, b) => b.score - a.score)
+  .slice(0, topK)
+
+  return scored
+}
+
 function goBack() { router.back() }
 
 // ── Init pdfjs ────────────────────────────────────────────────────
@@ -346,6 +474,64 @@ async function loadFromUrl(url) {
   }
 }
 
+// ── Load từ OCR API ──────────────────────────────────────────────
+async function loadFromOcr(jobId) {
+  ocrLoading.value = true
+  ocrMode.value = true
+  try {
+    const config = useRuntimeConfig()
+    const token = localStorage.getItem('jwt_token')
+    if (!token) throw new Error('Vui lòng đăng nhập.')
+
+    // Thử load từ sessionStorage cache trước
+    const cached = sessionStorage.getItem(`ocr_view_meta_${jobId}`)
+    if (cached) {
+      const meta = JSON.parse(cached)
+      if (meta.imageUrl) ocrImageUrl.value = meta.imageUrl
+    }
+
+    // Gọi endpoint có sẵn: GET /api/Infer/job/{jobId} — lazy OCR
+    const apiUrl = `${config.public.apiBaseUrl}/api/Infer/job/${jobId}`
+    const res = await fetch(apiUrl, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error('Không thể kết nối với máy chủ AI.')
+    const data = await res.json()
+
+    if (!ocrImageUrl.value) ocrImageUrl.value = data.imageUrl
+    else ocrImageUrl.value = data.imageUrl || ocrImageUrl.value
+    if (!pdfName.value) pdfName.value = decodeURIComponent(route.query.name || '') || 'Tài liệu OCR'
+    ocrResults.value = data.results || null
+
+    // Build full text + RAG
+    const fullText = data.detectedText ||
+      (data.results || []).map(r => r.wordText || '').join(' ').replace(/\s+/g, ' ').trim()
+
+    // Set ocrFullText để đưa vào Gemini context
+    ocrFullText.value = fullText
+
+    if (fullText) {
+      ragIndex.value = []
+      let start = 0, chunkIdx = 0
+      while (start < fullText.length) {
+        const end = Math.min(start + 300, fullText.length)
+        ragIndex.value.push({ page: 1, chunkIdx: chunkIdx++, text: fullText.slice(start, end) })
+        start += 250
+      }
+      ragReady.value = true
+    }
+    totalPages.value = 1
+    currentPage.value = 1
+  } catch (e) {
+    loadingMsg.value = `Lỗi OCR: ${e.message}`
+    ocrMode.value = false
+    console.error(e)
+  } finally {
+    ocrLoading.value = false
+  }
+}
+
 async function loadPdf(data) {
   await initPdfJs()
   pdfDoc.value = await pdfjsLib.getDocument({ data }).promise
@@ -354,6 +540,8 @@ async function loadPdf(data) {
   gotoPage.value = 1
   await nextTick()
   await fitWidth()
+  // Build RAG index background
+  buildRagIndex().catch(e => console.warn('RAG index failed:', e))
 }
 
 // ── Text Layer — pdfjs v5 TextLayer class ────────────────────────
@@ -474,11 +662,73 @@ async function fitWidth() {
 }
 async function zoomIn() {
   scale.value = Math.min(3, +(scale.value + 0.2).toFixed(1))
+  if (ocrMode.value) { await nextTick(); refreshOcrSize(); return }
   if (viewMode.value === 'single') await renderPage(); else await renderAllPages()
 }
 async function zoomOut() {
   scale.value = Math.max(0.3, +(scale.value - 0.2).toFixed(1))
+  if (ocrMode.value) { await nextTick(); refreshOcrSize(); return }
   if (viewMode.value === 'single') await renderPage(); else await renderAllPages()
+}
+
+// ── OCR: copy từ khi click bbox ──────────────────────────────────
+function copyWord(word) {
+  if (!word) return
+  navigator.clipboard?.writeText(word).catch(() => {})
+  // Trigger vocab popup nếu từ đủ ngắn
+  if (word.length <= 50) {
+    const popup = document.querySelector('.vocab-popup')
+    vocabPopup.value = {
+      visible: true,
+      word,
+      meaning: '',
+      editMeaning: '',
+      x: 20, y: 60,
+      loading: false,
+      saving: false,
+    }
+    fetchWordMeaning(word)
+  }
+}
+
+// ── OCR: tính vị trí text box từ Google Vision bbox ─────────────
+// BoundingBox là JSON string: [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+function getOcrBoxStyle(result) {
+  const bboxRaw = result.boundingBox || result.bounding_box || result.bbox
+  if (!bboxRaw) return { display: 'none' }
+
+  try {
+    const pts = typeof bboxRaw === 'string' ? JSON.parse(bboxRaw) : bboxRaw
+    if (!Array.isArray(pts) || pts.length < 2) return { display: 'none' }
+
+    const xs = pts.map(p => Array.isArray(p) ? p[0] : p.x || 0)
+    const ys = pts.map(p => Array.isArray(p) ? p[1] : p.y || 0)
+
+    let x = Math.min(...xs)
+    let y = Math.min(...ys)
+    let w = Math.max(...xs) - x
+    let h = Math.max(...ys) - y
+
+    // Scale bbox từ tọa độ ảnh gốc → tọa độ ảnh đang hiển thị
+    if (ocrNaturalW.value > 0 && ocrDisplayW.value > 0) {
+      const scaleX = ocrDisplayW.value / ocrNaturalW.value
+      const scaleY = ocrDisplayH.value > 0 ? ocrDisplayH.value / ocrNaturalH.value : scaleX
+      x = x * scaleX
+      y = y * scaleY
+      w = w * scaleX
+      h = h * scaleY
+    }
+
+    return {
+      position: 'absolute',
+      left: `${x}px`,
+      top: `${y}px`,
+      width: `${Math.max(w, 8)}px`,
+      height: `${Math.max(h, 8)}px`,
+    }
+  } catch {
+    return { display: 'none' }
+  }
 }
 
 // ── Scroll All ────────────────────────────────────────────────────
@@ -566,43 +816,90 @@ function stopResize() {
   document.removeEventListener('mouseup', stopResize)
 }
 
+// ── Lấy text trang hiện tại để làm context cho Gemini ───────────
+async function getCurrentPageText() {
+  // OCR mode: dùng text từ OCR results thay vì PDF
+  if (ocrMode.value && ocrResults.value?.length) {
+    return ocrResults.value
+      .map(r => r.wordText || '')
+      .join(' ')
+      .slice(0, 3000)
+  }
+  if (!pdfDoc.value) return ''
+  try {
+    const page = await pdfDoc.value.getPage(currentPage.value)
+    const content = await page.getTextContent({ disableNormalization: false })
+    return content.items
+      .filter(item => item.str?.trim())
+      .map(item => item.str)
+      .join(' ')
+      .slice(0, 3000)
+  } catch { return '' }
+}
+
 // ── Gemini ────────────────────────────────────────────────────────
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-lite']
 
-async function callGemini(model, systemContext, history, text, imageBase64 = null) {
-  // Build parts cho message hiện tại
+async function callGeminiStream(model, systemContext, history, text, imageBase64 = null, onChunk) {
   const userParts = []
-
-  // Nếu có ảnh đính kèm, gửi ảnh trước rồi mới đến text
   if (imageBase64) {
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '')
-    userParts.push({
-      inline_data: {
-        mime_type: 'image/jpeg',
-        data: base64Data
-      }
-    })
+    userParts.push({ inline_data: { mime_type: 'image/jpeg', data: base64Data } })
   }
   userParts.push({ text })
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.value}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey.value}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemContext }] },
-        contents: [
-          ...history,
-          { role: 'user', parts: userParts }
-        ],
+        contents: [...history, { role: 'user', parts: userParts }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
       })
     }
   )
-  const data = await res.json()
-  if (data.error) throw { message: data.error.message, status: data.error.status }
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Không có phản hồi.'
+
+  if (!res.ok) {
+    const err = await res.json()
+    throw { message: err.error?.message || 'API error', status: err.error?.status }
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let fullText = ''
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() // giữ lại dòng chưa hoàn chỉnh
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const raw = line.slice(6).trim()
+      if (raw === '[DONE]') continue
+      try {
+        const json = JSON.parse(raw)
+        const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        if (chunk) {
+          fullText += chunk
+          onChunk(fullText)
+        }
+        // Check for errors in stream
+        if (json.error) throw { message: json.error.message, status: json.error.status }
+      } catch (e) {
+        if (e.message && e.status) throw e
+        // ignore parse errors for non-data lines
+      }
+    }
+  }
+
+  return fullText || 'Không có phản hồi.'
 }
 
 async function sendMessage() {
@@ -622,20 +919,85 @@ async function sendMessage() {
       role: m.role === 'user' ? 'user' : 'model',
       parts: [{ text: m.content }]
     }))
+    // Lấy text trang hiện tại làm context (giống RAG đơn giản)
+    const pageText = await getCurrentPageText()
+    // RAG: Retrieve đoạn liên quan nhất
+    const chunks = ragRetrieve(text)
+    const ragCtx = chunks.length
+      ? '\n\n---\nĐOẠN THAM KHẢO TỪ TÀI LIỆU:\n' +
+        chunks.map(c => `[Trang ${c.page}]: ${c.text}`).join('\n\n') +
+        '\n---'
+      : ''
+
+    // Detect xem câu hỏi có liên quan đến tiếng Nhật không
+    const isJapaneseQuery = /[\u3000-\u9fff\u30a0-\u30ff\u3040-\u309f]/.test(text) ||
+      /ngữ pháp|văn phạm|jlpt|kanji|hiragana|katakana|dịch nghĩa|giải thích câu|phân tích/i.test(text)
+
+    const jsonInstruction = isJapaneseQuery ? `
+
+Khi phân tích tiếng Nhật, LUÔN trả về JSON theo format sau (không markdown, chỉ JSON thuần):
+{
+  "type": "japanese_analysis",
+  "sentence": "câu gốc",
+  "translation": "dịch nghĩa tự nhiên",
+  "explanation": "giải thích tổng quan bằng tiếng Việt",
+  "grammar": [
+    {
+      "pattern": "tên ngữ pháp (vd:〜ている)",
+      "jlpt": "N5/N4/N3/N2/N1",
+      "meaning": "ý nghĩa",
+      "example": "ví dụ khác"
+    }
+  ],
+  "vocabulary": [
+    {
+      "word": "từ",
+      "reading": "cách đọc",
+      "meaning": "nghĩa",
+      "jlpt": "N5/N4/N3/N2/N1"
+    }
+  ]
+}
+
+Nếu câu hỏi không phải phân tích ngữ pháp thì trả lời bình thường bằng text.` : ''
+
+    // OCR mode: đưa toàn bộ text đã quét vào context
+    const ocrCtx = ocrMode.value && ocrFullText.value
+      ? `\n\n=== NỘI DUNG TÀI LIỆU (được quét bằng AI OCR) ===\n${ocrFullText.value.slice(0, 8000)}\n=== HẾT NỘI DUNG ===`
+      : ''
+
     const systemContext = pdfName.value
-      ? `Bạn là trợ lý AI hỗ trợ đọc PDF "${pdfName.value}". Trang hiện tại: ${currentPage.value}/${totalPages.value}. Trả lời bằng tiếng Việt, rõ ràng và hữu ích.`
-      : 'Bạn là trợ lý AI hữu ích. Trả lời bằng tiếng Việt.'
+      ? `Bạn là trợ lý AI đọc tài liệu "${pdfName.value}".${ocrCtx}${ragCtx}\n\nQuy tắc:\n- Ưu tiên dùng nội dung tài liệu trên để trả lời\n- Nếu không có thông tin phù hợp, hãy nói rõ\n- Trả lời bằng tiếng Việt${jsonInstruction}`
+      : `Bạn là trợ lý AI hữu ích. Trả lời bằng tiếng Việt.${jsonInstruction}`
+    // Thêm placeholder message để streaming update vào đúng chỗ
+    messages.value.push({ role: 'model', content: '', streaming: true })
+    const streamingIdx = messages.value.length - 1
+
     let reply = null, lastError = null
     for (const model of GEMINI_MODELS) {
-      try { reply = await callGemini(model, systemContext, history, text, capturedImage.value); break }
-      catch (err) { lastError = err; if (err.status === 'RESOURCE_EXHAUSTED') continue; throw err }
+      try {
+        reply = await callGeminiStream(
+          model, systemContext, history, text, capturedImage.value,
+          (partial) => {
+            // Update streaming message realtime
+            messages.value[streamingIdx] = { role: 'model', content: partial, streaming: true }
+            scrollBottom()
+          }
+        )
+        break
+      } catch (err) {
+        lastError = err
+        if (err.status === 'RESOURCE_EXHAUSTED') continue
+        throw err
+      }
     }
     if (!reply) {
       const m = lastError?.message?.match(/retry in (\d+)s/i)
       throw new Error(`Hết quota.${m ? ` Thử lại sau ${Math.ceil(m[1]/60)} phút.` : ''}`)
     }
-    messages.value.push({ role: 'model', content: reply })
-    capturedImage.value = null // Xóa ảnh sau khi gửi
+    // Finalize message (bỏ streaming flag)
+    messages.value[streamingIdx] = { role: 'model', content: reply, streaming: false }
+    capturedImage.value = null
   } catch (err) {
     const isQuota = err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED')
     messages.value.push({
@@ -682,12 +1044,75 @@ function handlePaste(e) {
     }
   }
 }
-function formatMessage(text) {
-  return text
+function formatMessage(rawText) {
+  // Thử parse JSON phân tích tiếng Nhật
+  try {
+    const jsonMatch = rawText.match(/\{[\s\S]*"type"\s*:\s*"japanese_analysis"[\s\S]*\}/)
+    if (jsonMatch) {
+      const data = JSON.parse(jsonMatch[0])
+      return renderJapaneseAnalysis(data)
+    }
+  } catch {}
+
+  // Fallback: render markdown thường
+  return rawText
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\n/g, '<br />')
+}
+
+function renderJapaneseAnalysis(data) {
+  const jlptColor = (level) => {
+    const colors = { N5: '#4ade80', N4: '#60a5fa', N3: '#f59e0b', N2: '#f87171', N1: '#c084fc' }
+    return colors[level] || '#9ca3af'
+  }
+
+  let html = `<div class="jp-card">`
+
+  // Câu gốc + dịch
+  html += `<div class="jp-sentence">${data.sentence || ''}</div>`
+  if (data.translation) {
+    html += `<div class="jp-translation">🇻🇳 ${data.translation}</div>`
+  }
+  if (data.explanation) {
+    html += `<div class="jp-explanation">${data.explanation}</div>`
+  }
+
+  // Ngữ pháp
+  if (data.grammar?.length) {
+    html += `<div class="jp-section-title">📐 Ngữ pháp</div>`
+    html += `<div class="jp-grammar-list">`
+    for (const g of data.grammar) {
+      html += `<div class="jp-grammar-item">
+        <div class="jp-grammar-header">
+          <span class="jp-pattern">${g.pattern}</span>
+          <span class="jp-badge" style="background:${jlptColor(g.jlpt)}22;color:${jlptColor(g.jlpt)};border-color:${jlptColor(g.jlpt)}44">${g.jlpt}</span>
+        </div>
+        <div class="jp-grammar-meaning">${g.meaning}</div>
+        ${g.example ? `<div class="jp-example">例: ${g.example}</div>` : ''}
+      </div>`
+    }
+    html += `</div>`
+  }
+
+  // Từ vựng
+  if (data.vocabulary?.length) {
+    html += `<div class="jp-section-title">📚 Từ vựng</div>`
+    html += `<div class="jp-vocab-list">`
+    for (const v of data.vocabulary) {
+      html += `<div class="jp-vocab-item">
+        <span class="jp-vocab-word">${v.word}</span>
+        ${v.reading ? `<span class="jp-vocab-reading">【${v.reading}】</span>` : ''}
+        <span class="jp-vocab-meaning">${v.meaning}</span>
+        <span class="jp-badge" style="background:${jlptColor(v.jlpt)}22;color:${jlptColor(v.jlpt)};border-color:${jlptColor(v.jlpt)}44">${v.jlpt}</span>
+      </div>`
+    }
+    html += `</div>`
+  }
+
+  html += `</div>`
+  return html
 }
 
 function handleWindowResize() { if (pdfDoc.value) fitWidth() }
@@ -734,7 +1159,7 @@ function handleTextSelect(e) {
     return
   }
 
-  // Chỉ bắt selection trong pdf panel
+  // Bắt selection trong pdf panel (cả PDF mode và OCR mode)
   const pdfPanel = document.querySelector('.pdf-panel')
   if (!pdfPanel?.contains(sel.anchorNode)) return
 
@@ -810,7 +1235,7 @@ async function saveVocab() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${jwt.value}`
+            'Authorization': `Bearer ${getToken()}`
           },
           body: JSON.stringify({
             wordText: vocabPopup.value.word,
@@ -852,7 +1277,7 @@ async function removeVocab(index) {
       `${config.public.apiBaseUrl}/api/projects/${projectId.value}/vocabularies/${v.id}`,
       {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${jwt.value}` }
+        headers: { 'Authorization': `Bearer ${getToken()}` }
       }
     )
   }
@@ -866,7 +1291,7 @@ async function loadVocabs() {
   try {
     const res = await fetch(
       `${config.public.apiBaseUrl}/api/projects/${projectId.value}/vocabularies`,
-      { headers: { 'Authorization': `Bearer ${jwt.value}` } }
+      { headers: { 'Authorization': `Bearer ${getToken()}` } }
     )
     if (res.ok) vocabList.value = await res.json()
   } catch (e) { console.error(e) }
@@ -900,7 +1325,7 @@ async function createDeckFromVocab() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt.value}`
+        'Authorization': `Bearer ${getToken()}`
       },
       body: JSON.stringify({
         title: deckName,
@@ -936,13 +1361,18 @@ onMounted(async () => {
   const sessionId = route.query.id
   const pid = route.query.projectId
 
-  pdfName.value = name || ''
+  pdfName.value = name ? decodeURIComponent(name) : ''
   if (pid) {
     projectId.value = parseInt(pid)
     await loadVocabs()
   }
 
-  if (url) {
+  const jobId = route.query.jobId
+
+  if (jobId) {
+    // OCR mode — load từ API
+    await loadFromOcr(jobId)
+  } else if (url) {
     await loadFromUrl(url)
   } else if (sessionId) {
     const raw = sessionStorage.getItem(`pdf_${sessionId}`)
@@ -1440,6 +1870,126 @@ onBeforeUnmount(() => {
 
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
+
+/* ── OCR Mode ── */
+.ocr-container {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+.ocr-image {
+  display: block;
+  max-width: 100%;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.35);
+}
+.ocr-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ocr-text-box {
+  position: absolute;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 2px;
+  border: 2px solid rgba(59, 130, 246, 0.7);
+  box-sizing: border-box;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.ocr-text-box:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 1);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3);
+}
+.ocr-text-box.selected {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 1);
+}
+.ocr-text-box.selected {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+
+/* ── Japanese Analysis Card ── */
+.jp-card {
+  display: flex; flex-direction: column; gap: 10px;
+  font-family: inherit;
+}
+.jp-sentence {
+  font-size: 18px; font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.05em;
+  line-height: 1.6;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+}
+.jp-translation {
+  font-size: 14px; color: var(--text);
+  padding: 6px 10px;
+  background: rgba(91,141,238,0.08);
+  border-radius: 6px;
+  line-height: 1.5;
+}
+.jp-explanation {
+  font-size: 13px; color: var(--text-muted);
+  line-height: 1.6;
+}
+.jp-section-title {
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.jp-grammar-list, .jp-vocab-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.jp-grammar-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.jp-grammar-header {
+  display: flex; align-items: center; gap: 8px;
+}
+.jp-pattern {
+  font-size: 14px; font-weight: 700;
+  color: var(--accent);
+}
+.jp-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 20px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.jp-grammar-meaning {
+  font-size: 13px; color: var(--text);
+}
+.jp-example {
+  font-size: 12px; color: var(--text-muted);
+  font-style: italic;
+}
+.jp-vocab-item {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.jp-vocab-word {
+  font-size: 15px; font-weight: 700; color: var(--text);
+}
+.jp-vocab-reading {
+  font-size: 12px; color: var(--text-muted);
+}
+.jp-vocab-meaning {
+  font-size: 13px; color: var(--text); flex: 1;
+}
 </style>
 
 <style>
