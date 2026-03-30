@@ -1,208 +1,264 @@
 <template>
-  <div class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
-    <div class="max-w-5xl mx-auto px-6 py-10">
+  <div
+    class="bg-gray-50 dark:bg-gray-900 transition-colors min-h-full"
+    @dragover.prevent="isDragging = true"
+    @dragleave.prevent="isDragging = false"
+    @drop.prevent="handleDrop"
+  >
+    <div v-if="isDragging"
+      class="fixed inset-0 bg-blue-600/90 z-50 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+      <svg class="w-24 h-24 mb-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p class="text-3xl font-bold">Thả file vào đây</p>
+      <p class="text-xl mt-2 opacity-80">Trợ lý AI sẽ nhận diện ngay!</p>
+    </div>
 
-      <!-- Loading -->
-      <div v-if="!project" class="flex justify-center py-20">
-        <div class="w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
+    <main class="p-6 md:p-8">
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <button @click="$router.back()"
+            class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+          </button>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ projectName || 'Dự án' }}</h1>
+            <p class="text-xs text-gray-400 mt-0.5">{{ files.length }} tài liệu</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- Upload button với inline loading -->
+          <button @click="$refs.fileInput.click()" :disabled="uploading"
+            class="px-5 py-2.5 bg-blue-600 text-white rounded-full font-semibold text-sm hover:bg-blue-700 disabled:opacity-60 transition flex items-center gap-2 shadow">
+            <svg v-if="uploading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+            </svg>
+            {{ uploading ? 'Đang tải lên...' : 'Tải lên tài liệu' }}
+          </button>
+          <input type="file" ref="fileInput" @change="handleFileChange"
+            accept="image/*,application/pdf" class="hidden" />
+        </div>
       </div>
 
-      <template v-else>
-        <!-- Breadcrumb -->
-        <div class="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500 mb-6">
-          <!-- <button @click="router.push('/workspace')" class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-            Workspaces
-          </button>
-          <span>/</span>
-          <button @click="router.push(`/workspace/${project.workspaceId}`)" class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-            Workspace
-          </button>
-          <span>/</span>
-          <span class="text-gray-700 dark:text-gray-300 font-medium truncate max-w-[200px]">{{ project.name }}</span> -->
-        </div>
+      <!-- Upload progress banner — không che cả trang -->
+      <div v-if="uploading"
+        class="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-sm text-blue-700 dark:text-blue-300">
+        <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+        Đang tải file lên... Danh sách tài liệu sẽ cập nhật sau khi hoàn tất.
+      </div>
 
-        <!-- Header -->
-        <div class="flex items-start justify-between gap-4 mb-8 flex-wrap">
-          <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-1">{{ project.name }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ project.description || 'Chưa có mô tả' }}</p>
-            <div class="flex items-center gap-4 mt-2 text-xs text-gray-400 dark:text-gray-500">
-              <span>{{ project.mediaCount }} PDF</span>
-              <span>{{ project.vocabularyCount }} từ vựng</span>
-              <span>Tạo bởi {{ project.createdByUserName }}</span>
-            </div>
-          </div>
+      <!-- Upload error -->
+      <div v-if="uploadError"
+        class="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">
+        {{ uploadError }}
+        <button @click="uploadError = ''" class="ml-2 underline">Đóng</button>
+      </div>
 
-          <!-- Upload -->
-          <label
-            class="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors flex-shrink-0"
-            :class="{ 'opacity-50 cursor-not-allowed': uploading }"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            {{ uploading ? 'Đang upload...' : 'Upload PDF' }}
-            <input
-              v-if="!uploading"
-              type="file"
-              accept=".pdf"
-              hidden
-              @change="handleUpload"
-            />
-          </label>
-        </div>
+      <!-- Initial loading -->
+      <div v-if="isLoading" class="flex items-center gap-3 py-10 text-gray-500 text-sm">
+        <div class="w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+        Đang tải danh sách...
+      </div>
 
-        <!-- Upload progress -->
-        <div v-if="uploading"
-          class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4 flex items-center gap-3">
-          <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-          <p class="text-sm text-blue-700 dark:text-blue-300">Đang upload {{ uploadingName }}...</p>
-        </div>
+      <!-- Empty -->
+      <div v-else-if="!files.length"
+        class="text-center py-32 bg-white dark:bg-gray-800 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700 shadow-xl">
+        <svg class="mx-auto w-24 h-24 mb-6 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Chưa có tài liệu nào!</h3>
+        <p class="text-gray-500 mt-2">Upload file để AI nhận diện chữ.</p>
+      </div>
 
-        <!-- Error -->
-        <div v-if="uploadError"
-          class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-4">
-          <p class="text-sm text-red-600 dark:text-red-400">{{ uploadError }}</p>
-        </div>
+      <!-- File table -->
+      <div v-else class="bg-white dark:bg-gray-800 shadow-xl rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
+        <table class="w-full text-sm text-left">
+          <thead class="text-xs text-gray-500 uppercase bg-gray-50/50 dark:bg-gray-700/50 border-b dark:border-gray-700">
+            <tr>
+              <th class="px-6 py-4 w-5/12">Tên tài liệu</th>
+              <th class="px-6 py-4">Loại</th>
+              <th class="px-6 py-4">Trạng thái AI</th>
+              <th class="px-6 py-4">Ngày tạo</th>
+              <th class="px-6 py-4 w-[80px]">Mở</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- File mới upload đang pending — hiện ngay không cần chờ refresh -->
+            <tr v-if="pendingFile"
+              class="border-b dark:border-gray-700 bg-blue-50/50 dark:bg-blue-900/10">
+              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <span class="truncate text-blue-600 dark:text-blue-400">{{ pendingFile.name }}</span>
+              </td>
+              <td class="px-6 py-4 text-gray-400 font-mono uppercase text-xs">{{ pendingFile.type }}</td>
+              <td class="px-6 py-4">
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                  Đang tải lên...
+                </span>
+              </td>
+              <td class="px-6 py-4 text-gray-400">Vừa xong</td>
+              <td class="px-6 py-4"></td>
+            </tr>
 
-        <!-- PDF list -->
-        <div v-if="mediaList.length > 0" class="space-y-2">
-          <div
-            v-for="m in mediaList" :key="m.id"
-            class="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-5 py-4 flex items-center gap-4 hover:border-blue-400 dark:hover:border-blue-500 transition-colors cursor-pointer"
-            @click="openReader(m)"
-          >
-            <!-- PDF icon -->
-            <div class="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-            </div>
-
-            <!-- Info -->
-            <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 dark:text-white text-sm truncate">{{ m.fileName }}</p>
-              <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                {{ formatSize(m.sizeBytes) }} · Upload bởi {{ m.ownerName }} · {{ formatDate(m.createdAt) }}
-              </p>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                @click.stop="openReader(m)"
-                class="flex items-center gap-1.5 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
+            <tr v-for="file in files" :key="file.id"
+              class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition"
+              @click="openFile(file)">
+              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                <svg v-if="file.type === 'pdf'" class="w-6 h-6 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path fill-rule="evenodd" d="M4 5a2 2 0 012-2h8.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10 1V4.5l3.5 3.5H16a2 2 0 01-2-2z" clip-rule="evenodd"/>
                 </svg>
-                Đọc
-              </button>
-              <button
-                @click.stop="handleDeleteMedia(m.id)"
-                class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >✕</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Empty -->
-        <div v-else class="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-600">
-          <svg class="w-12 h-12 mb-4 opacity-40" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <line x1="9" y1="15" x2="15" y2="15"/>
-          </svg>
-          <p class="font-medium text-base">Chưa có file PDF nào</p>
-          <p class="text-sm mt-1">Upload PDF để bắt đầu đọc và lưu từ vựng</p>
-        </div>
-      </template>
-    </div>
+                <svg v-else class="w-6 h-6 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path fill-rule="evenodd" d="M4 5a2 2 0 012-2h8.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10 1V4.5l3.5 3.5H16a2 2 0 01-2-2z" clip-rule="evenodd"/>
+                </svg>
+                <span class="truncate">{{ file.name }}</span>
+              </td>
+              <td class="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono uppercase text-xs">{{ file.type }}</td>
+              <td class="px-6 py-4">
+                <span :class="statusClass(file.status)"
+                  class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+                  {{ statusText(file.status) }}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ formatDate(file.createdAt) }}</td>
+              <td class="px-6 py-4 text-center" @click.stop>
+                <button @click="openFile(file)"
+                  class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
+definePageMeta({ layout: 'default', ssr: false })
+
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useProject, type ProjectDto, type MediaDto } from '~/composables/useProject'
-import { useRuntimeConfig } from '#app'
-
-definePageMeta({ middleware: 'auth-client' })
 
 const route = useRoute()
 const router = useRouter()
-const projectId = parseInt(route.params.projectid as string)
-
-const { getProject, getMedia, uploadMedia, deleteMedia } = useProject()
 const config = useRuntimeConfig()
 
-const project = ref<ProjectDto | null>(null)
-const mediaList = ref<MediaDto[]>([])
+const projectId = route.params.projectid
+const projectName = ref('')
+const files = ref([])
+const isLoading = ref(true)
 const uploading = ref(false)
-const uploadingName = ref('')
 const uploadError = ref('')
+const isDragging = ref(false)
+const pendingFile = ref(null) // file vừa upload, hiện ngay trong list
 
-async function load() {
-  const [p, m] = await Promise.all([getProject(projectId), getMedia(projectId)])
-  project.value = p
-  mediaList.value = m
-}
-
-async function handleUpload(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-
-  uploadError.value = ''
-  uploading.value = true
-  uploadingName.value = file.name
-
+async function fetchFiles() {
+  const token = localStorage.getItem('jwt_token')
+  if (!token) return
   try {
-    const media = await uploadMedia(projectId, file)
-    mediaList.value.unshift(media)
-    if (project.value) project.value.mediaCount++
-  } catch (err: any) {
-    uploadError.value = err?.data?.message || 'Upload thất bại. Vui lòng thử lại.'
+    const res = await fetch(
+      `${config.public.apiBaseUrl}/api/projects/${projectId}/files`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (res.ok) files.value = await res.json()
+  } catch (e) {
+    console.error(e)
   } finally {
-    uploading.value = false
-    uploadingName.value = ''
-    ;(e.target as HTMLInputElement).value = ''
+    isLoading.value = false
   }
 }
 
-async function handleDeleteMedia(id: number) {
-  if (!confirm('Xóa file PDF này?')) return
-  await deleteMedia(id)
-  mediaList.value = mediaList.value.filter(m => m.id !== id)
-  if (project.value) project.value.mediaCount--
+function openFile(file) {
+  // Navigate sang reader với jobId để lazy OCR
+  const name = encodeURIComponent(file.name || '')
+  router.push(`/reader?jobId=${file.id}&projectId=${projectId}&name=${name}`)
 }
 
-function openReader(m: MediaDto) {
-  router.push({
-    path: '/reader',
-    query: {
-      mediaId: String(m.id),
-      name: m.fileName,
-      projectId: String(projectId),
-      url: m.storageUrl
-    }
-  })
+async function handleFileUpload(pickedFile) {
+  if (!pickedFile || uploading.value) return
+  const token = localStorage.getItem('jwt_token')
+  if (!token) { uploadError.value = 'Vui lòng đăng nhập.'; return }
+
+  uploading.value = true
+  uploadError.value = ''
+
+  // Hiện file pending ngay trong list
+  const ext = pickedFile.name.split('.').pop()?.toLowerCase() || ''
+  pendingFile.value = { name: pickedFile.name, type: ext }
+
+  const formData = new FormData()
+  formData.append('image', pickedFile)
+  formData.append('projectId', projectId)
+
+  try {
+    const res = await fetch(
+      `${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`,
+      { method: 'POST', body: formData, headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (!res.ok) throw new Error(await res.text() || res.statusText)
+    const jobData = await res.json()
+
+    // Cache để reader hiện ảnh ngay
+    sessionStorage.setItem(
+      `ocr_view_meta_${jobData.jobId}`,
+      JSON.stringify({ jobId: jobData.jobId, imageUrl: jobData.imageUrl })
+    )
+
+    // Refresh list sau khi upload xong
+    await fetchFiles()
+    pendingFile.value = null
+  } catch (err) {
+    uploadError.value = `Lỗi upload: ${err.message}`
+    pendingFile.value = null
+  } finally {
+    uploading.value = false
+  }
 }
 
-function formatSize(bytes: number | null) {
-  if (!bytes) return '—'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+function handleFileChange(e) {
+  handleFileUpload(e.target.files[0])
+  // Reset input để có thể upload cùng file lần 2
+  e.target.value = ''
+}
+function handleDrop(e) {
+  isDragging.value = false
+  const f = e.dataTransfer.files[0]
+  if (!f || !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
+    uploadError.value = 'Chỉ hỗ trợ JPG, PNG hoặc PDF.'
+    return
+  }
+  handleFileUpload(f)
 }
 
-function formatDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('vi-VN')
+function statusClass(s) {
+  const map = {
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+    processing: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  }
+  return map[s?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+}
+function statusText(s) {
+  return { completed: 'Hoàn thành', processing: 'Đang quét AI', failed: 'Lỗi' }[s?.toLowerCase()] || 'Chờ xử lý'
+}
+function formatDate(d) {
+  if (!d) return ''
+  const date = new Date(d)
+  return date.toLocaleDateString('vi-VN') + ' ' +
+    date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
-onMounted(load)
+onMounted(fetchFiles)
 </script>

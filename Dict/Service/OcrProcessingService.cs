@@ -324,7 +324,7 @@ namespace Dict.Service
 
             string finalDetectedText = string.Empty;
             var createResults = new List<CreateOcrResultDto>();
-
+             
             try
             {
                 // Đọc API Key từ appsettings
