@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bg-gray-50 dark:bg-gray-900 transition-colors min-h-full"
+    class="bg-gray-50 dark:bg-gray-900 transition-colors min-h-screen"
     @dragover.prevent="isDragging = true"
     @dragleave.prevent="isDragging = false"
     @drop.prevent="handleDrop"
@@ -15,164 +15,189 @@
       <p class="text-xl mt-2 opacity-80">Trợ lý AI sẽ nhận diện ngay!</p>
     </div>
 
-    <main class="p-6 md:p-8">
-      <div class="flex items-center justify-between mb-6">
+  <main class="max-w-[1400px] mx-auto p-6 md:p-8">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <button @click="$router.back()"
+        class="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-all border border-gray-100 dark:border-gray-700">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+      </button>
+      <div>
         <div class="flex items-center gap-3">
-          <button @click="$router.back()"
-            class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500">
+          <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            {{ projectName || 'Chi tiết Dự án' }}
+          </h1>
+          <button @click="showDeleteConfirm = true" 
+            class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+            title="Xóa toàn bộ dự án">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </button>
-          <div>
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ projectName || 'Dự án' }}</h1>
-            <p class="text-xs text-gray-400 mt-0.5">{{ files.length }} tài liệu</p>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">{{ files.length }} tài liệu hiện có</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button @click="$refs.fileInput.click()" :disabled="uploading"
+        class="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-60 transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20">
+        <svg v-if="uploading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+        </svg>
+        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+        </svg>
+        {{ uploading ? 'Đang xử lý...' : 'Tải lên tài liệu' }}
+      </button>
+      <input type="file" ref="fileInput" @change="handleFileChange" accept="image/*,application/pdf" class="hidden" />
+    </div>
+  </div>
+
+  <div v-if="isLoading" class="space-y-4">
+    <div v-for="i in 3" :key="i" class="h-20 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-2xl"></div>
+  </div>
+
+  <div v-else class="bg-white dark:bg-gray-800 shadow-2xl rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-700">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-left">
+        <thead class="text-xs text-gray-400 uppercase bg-gray-50/50 dark:bg-gray-700/50 border-b">
+          <tr>
+            <th class="px-8 py-5 font-bold">Tài liệu</th>
+            <th class="px-6 py-5 font-bold">Định dạng</th>
+            <th class="px-6 py-5 font-bold">Trạng thái AI</th>
+            <th class="px-6 py-5 font-bold">Ngày tải lên</th>
+            <th class="px-8 py-5 font-bold text-center">Mở</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50 dark:divide-gray-700/50">
+          <tr v-for="file in files" :key="file.id" @click="openFile(file)" class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all cursor-pointer group">
+            <td class="px-8 py-5">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+                  :class="file.type === 'pdf' ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-500'">
+                  <svg v-if="file.type === 'pdf'" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M4 5a2 2 0 012-2h8.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10 1V4.5l3.5 3.5H16a2 2 0 01-2-2z"/>
+                  </svg>
+                  <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                     <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <span class="font-bold text-gray-700 dark:text-gray-200">{{ file.name }}</span>
+              </div>
+            </td>
+            <td class="px-6 py-5 uppercase font-bold text-xs text-gray-400">{{ file.type }}</td>
+            <td class="px-6 py-5">
+              <span :class="statusClass(file.status)" class="px-3 py-1 rounded-full text-[8px] font-black uppercase">
+                {{ statusText(file.status) }}
+              </span>
+            </td>
+            <td class="px-6 py-5 text-gray-500">{{ formatDate(file.createdAt) }}</td>
+            <td class="px-8 py-5 text-center">
+               <button @click.stop="openFile(file)" class="p-2.5 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 transition-all">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+               </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+    <Transition name="fade">
+      <div v-if="showDeleteConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
+        <div class="bg-[#1c2128] border border-red-500/30 p-8 rounded-[2rem] shadow-2xl w-full max-w-md text-center">
+          <div class="w-20 h-20 bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          </div>
+          <h3 class="text-2xl font-black text-white mb-3">Xóa vĩnh viễn dự án?</h3>
+          <p class="text-gray-400 text-sm leading-relaxed mb-8">Bạn đang thực hiện xóa <b>{{ projectName }}</b>. Tất cả dữ liệu dự án sẽ biến mất vĩnh viễn.</p>
+          <div class="flex gap-4">
+            <button @click="showDeleteConfirm = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy bỏ</button>
+            <button @click="handleDeleteProject" :disabled="isDeleting" class="flex-1 px-6 py-3 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 flex items-center justify-center gap-2">
+              <span v-if="isDeleting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              Xác nhận xóa
+            </button>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <!-- Upload button với inline loading -->
-          <button @click="$refs.fileInput.click()" :disabled="uploading"
-            class="px-5 py-2.5 bg-blue-600 text-white rounded-full font-semibold text-sm hover:bg-blue-700 disabled:opacity-60 transition flex items-center gap-2 shadow">
-            <svg v-if="uploading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-            </svg>
-            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-            </svg>
-            {{ uploading ? 'Đang tải lên...' : 'Tải lên tài liệu' }}
-          </button>
-          <input type="file" ref="fileInput" @change="handleFileChange"
-            accept="image/*,application/pdf" class="hidden" />
+      </div>
+    </Transition>
+
+    <Transition name="toast-fade">
+      <div v-if="toast.visible" class="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none px-4">
+        <div class="bg-[#1c2128] border p-5 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center transform transition-all pointer-events-auto"
+          :class="toast.type === 'error' ? 'border-red-500/50' : 'border-blue-500/50'">
+          <div class="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+            :class="toast.type === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'">
+            <svg v-if="toast.type === 'error'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <p class="text-white font-bold line-clamp-5 break-words">{{ toast.message }}</p>
         </div>
       </div>
-
-      <!-- Upload progress banner — không che cả trang -->
-      <div v-if="uploading"
-        class="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-sm text-blue-700 dark:text-blue-300">
-        <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-        Đang tải file lên... Danh sách tài liệu sẽ cập nhật sau khi hoàn tất.
-      </div>
-
-      <!-- Upload error -->
-      <div v-if="uploadError"
-        class="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">
-        {{ uploadError }}
-        <button @click="uploadError = ''" class="ml-2 underline">Đóng</button>
-      </div>
-
-      <!-- Initial loading -->
-      <div v-if="isLoading" class="flex items-center gap-3 py-10 text-gray-500 text-sm">
-        <div class="w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
-        Đang tải danh sách...
-      </div>
-
-      <!-- Empty -->
-      <div v-else-if="!files.length"
-        class="text-center py-32 bg-white dark:bg-gray-800 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700 shadow-xl">
-        <svg class="mx-auto w-24 h-24 mb-6 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
-        <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Chưa có tài liệu nào!</h3>
-        <p class="text-gray-500 mt-2">Upload file để AI nhận diện chữ.</p>
-      </div>
-
-      <!-- File table -->
-      <div v-else class="bg-white dark:bg-gray-800 shadow-xl rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
-        <table class="w-full text-sm text-left">
-          <thead class="text-xs text-gray-500 uppercase bg-gray-50/50 dark:bg-gray-700/50 border-b dark:border-gray-700">
-            <tr>
-              <th class="px-6 py-4 w-5/12">Tên tài liệu</th>
-              <th class="px-6 py-4">Loại</th>
-              <th class="px-6 py-4">Trạng thái AI</th>
-              <th class="px-6 py-4">Ngày tạo</th>
-              <th class="px-6 py-4 w-[80px]">Mở</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- File mới upload đang pending — hiện ngay không cần chờ refresh -->
-            <tr v-if="pendingFile"
-              class="border-b dark:border-gray-700 bg-blue-50/50 dark:bg-blue-900/10">
-              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                <span class="truncate text-blue-600 dark:text-blue-400">{{ pendingFile.name }}</span>
-              </td>
-              <td class="px-6 py-4 text-gray-400 font-mono uppercase text-xs">{{ pendingFile.type }}</td>
-              <td class="px-6 py-4">
-                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                  Đang tải lên...
-                </span>
-              </td>
-              <td class="px-6 py-4 text-gray-400">Vừa xong</td>
-              <td class="px-6 py-4"></td>
-            </tr>
-
-            <tr v-for="file in files" :key="file.id"
-              class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition"
-              @click="openFile(file)">
-              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                <svg v-if="file.type === 'pdf'" class="w-6 h-6 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                  <path fill-rule="evenodd" d="M4 5a2 2 0 012-2h8.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10 1V4.5l3.5 3.5H16a2 2 0 01-2-2z" clip-rule="evenodd"/>
-                </svg>
-                <svg v-else class="w-6 h-6 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                  <path fill-rule="evenodd" d="M4 5a2 2 0 012-2h8.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10 1V4.5l3.5 3.5H16a2 2 0 01-2-2z" clip-rule="evenodd"/>
-                </svg>
-                <span class="truncate">{{ file.name }}</span>
-              </td>
-              <td class="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono uppercase text-xs">{{ file.type }}</td>
-              <td class="px-6 py-4">
-                <span :class="statusClass(file.status)"
-                  class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
-                  {{ statusText(file.status) }}
-                </span>
-              </td>
-              <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ formatDate(file.createdAt) }}</td>
-              <td class="px-6 py-4 text-center" @click.stop>
-                <button @click="openFile(file)"
-                  class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                  </svg>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </main>
+    </Transition>
   </div>
 </template>
 
 <script setup>
 definePageMeta({ layout: 'default', ssr: false })
 
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
 const config = useRuntimeConfig()
 
+// --- STATES ---
 const projectId = route.params.projectid
 const projectName = ref('')
 const files = ref([])
 const isLoading = ref(true)
 const uploading = ref(false)
-const uploadError = ref('')
 const isDragging = ref(false)
-const pendingFile = ref(null) // file vừa upload, hiện ngay trong list
+const pendingFile = ref(null)
+
+// States cho Xóa Project
+const showDeleteConfirm = ref(false)
+const isDeleting = ref(false)
+
+// State cho Toast UI
+const toast = reactive({
+  visible: false,
+  message: '',
+  type: 'success'
+})
+
+// --- FUNCTIONS ---
+
+function showToast(message, type = 'success') {
+  toast.message = message
+  toast.type = type
+  toast.visible = true
+  setTimeout(() => { toast.visible = false }, 3000)
+}
+
+const getToken = () => localStorage.getItem('jwt_token') || ''
 
 async function fetchFiles() {
-  const token = localStorage.getItem('jwt_token')
+  const token = getToken()
   if (!token) return
+  isLoading.value = true
   try {
-    const res = await fetch(
-      `${config.public.apiBaseUrl}/api/projects/${projectId}/files`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-    if (res.ok) files.value = await res.json()
+    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/files`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.ok) {
+      files.value = await res.json()
+      if (files.value.length > 0) projectName.value = files.value[0].projectName
+    }
   } catch (e) {
     console.error(e)
   } finally {
@@ -180,21 +205,38 @@ async function fetchFiles() {
   }
 }
 
-function openFile(file) {
-  // Navigate sang reader với jobId để lazy OCR
-  const name = encodeURIComponent(file.name || '')
-  router.push(`/reader?jobId=${file.id}&projectId=${projectId}&name=${name}`)
+async function handleDeleteProject() {
+  const token = getToken()
+  if (!token) return
+  isDeleting.value = true
+
+  try {
+    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (res.ok) {
+      showToast("Đã xóa dự án thành công!")
+      setTimeout(() => { router.push('/projects') }, 1000)
+    } else {
+      const err = await res.text()
+      showToast(err || "Không có quyền xóa dự án này", "error")
+    }
+  } catch (e) {
+    showToast("Lỗi kết nối máy chủ", "error")
+  } finally {
+    isDeleting.value = false
+    showDeleteConfirm.value = false
+  }
 }
 
 async function handleFileUpload(pickedFile) {
   if (!pickedFile || uploading.value) return
-  const token = localStorage.getItem('jwt_token')
-  if (!token) { uploadError.value = 'Vui lòng đăng nhập.'; return }
+  const token = getToken()
+  if (!token) { showToast("Vui lòng đăng nhập", "error"); return }
 
   uploading.value = true
-  uploadError.value = ''
-
-  // Hiện file pending ngay trong list
   const ext = pickedFile.name.split('.').pop()?.toLowerCase() || ''
   pendingFile.value = { name: pickedFile.name, type: ext }
 
@@ -203,62 +245,68 @@ async function handleFileUpload(pickedFile) {
   formData.append('projectId', projectId)
 
   try {
-    const res = await fetch(
-      `${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`,
-      { method: 'POST', body: formData, headers: { Authorization: `Bearer ${token}` } }
-    )
-    if (!res.ok) throw new Error(await res.text() || res.statusText)
-    const jobData = await res.json()
-
-    // Cache để reader hiện ảnh ngay
-    sessionStorage.setItem(
-      `ocr_view_meta_${jobData.jobId}`,
-      JSON.stringify({ jobId: jobData.jobId, imageUrl: jobData.imageUrl })
-    )
-
-    // Refresh list sau khi upload xong
+    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`, {
+      method: 'POST', body: formData, headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error(await res.text() || "Lỗi upload")
+    
+    showToast("Tải lên thành công!")
     await fetchFiles()
-    pendingFile.value = null
   } catch (err) {
-    uploadError.value = `Lỗi upload: ${err.message}`
-    pendingFile.value = null
+    showToast(err.message, "error")
   } finally {
     uploading.value = false
+    pendingFile.value = null
   }
 }
 
-function handleFileChange(e) {
-  handleFileUpload(e.target.files[0])
-  // Reset input để có thể upload cùng file lần 2
-  e.target.value = ''
-}
+function handleFileChange(e) { if (e.target.files[0]) handleFileUpload(e.target.files[0]); e.target.value = '' }
+
 function handleDrop(e) {
   isDragging.value = false
   const f = e.dataTransfer.files[0]
-  if (!f || !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
-    uploadError.value = 'Chỉ hỗ trợ JPG, PNG hoặc PDF.'
-    return
-  }
-  handleFileUpload(f)
+  if (f) handleFileUpload(f)
 }
 
-function statusClass(s) {
+function openFile(file) {
+  const name = encodeURIComponent(file.name || '')
+  router.push(`/reader?jobId=${file.id}&projectId=${projectId}&name=${name}`)
+}
+
+// UI HELPERS
+const statusClass = (s) => {
   const map = {
     completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
     processing: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+    // failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+       failed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
   }
-  return map[s?.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+  return map[s?.toLowerCase()] || 'bg-gray-100 text-gray-800'
 }
-function statusText(s) {
-  return { completed: 'Hoàn thành', processing: 'Đang quét AI', failed: 'Lỗi' }[s?.toLowerCase()] || 'Chờ xử lý'
+
+const statusText = (s) => {
+  const map = { completed: 'Hoàn thành', processing: 'Đang quét', failed: 'Hoàn thành' }
+  return map[s?.toLowerCase()] || 'Chờ xử lý'
 }
-function formatDate(d) {
-  if (!d) return ''
-  const date = new Date(d)
-  return date.toLocaleDateString('vi-VN') + ' ' +
-    date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-}
+
+const formatDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') + ' ' + new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''
 
 onMounted(fetchFiles)
 </script>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.toast-fade-enter-active { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.toast-fade-leave-active { transition: all 0.3s ease; }
+.toast-fade-enter-from { opacity: 0; transform: translateY(20px) scale(0.8); }
+.toast-fade-leave-to { opacity: 0; transform: scale(0.9); }
+
+.line-clamp-5 {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

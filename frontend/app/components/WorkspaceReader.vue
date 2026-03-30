@@ -1,23 +1,16 @@
 <template>
   <div class="flex h-screen bg-gray-50 overflow-hidden font-sans">
-    <div
-      class="w-[60%] h-full flex flex-col border-r border-gray-200 bg-gray-100 relative"
-    >
-      <div
-        class="h-14 bg-white border-b border-gray-200 flex items-center px-4 justify-between shadow-sm z-10 shrink-0"
-      >
+    <div class="w-full h-full flex flex-col border-r border-gray-200 bg-gray-100 relative">
+      
+      <div class="h-14 bg-white border-b border-gray-200 flex items-center px-4 justify-between shadow-sm z-10 shrink-0">
         <div class="font-semibold text-gray-700 truncate">
           Chi tiết tài liệu
         </div>
         <div class="flex gap-2">
-          <button
-            class="px-3 py-1 hover:bg-gray-100 rounded text-sm text-gray-600 font-medium"
-          >
+          <button class="px-3 py-1 hover:bg-gray-100 rounded text-sm text-gray-600 font-medium">
             100%
           </button>
-          <button
-            class="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium transition"
-          >
+          <button class="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium transition">
             Lưu kết quả
           </button>
         </div>
@@ -34,9 +27,7 @@
         >
           &lt; Trang trước
         </button>
-        <span class="text-sm font-semibold text-gray-700"
-          >Trang {{ currentPage }} / {{ totalPages }}</span
-        >
+        <span class="text-sm font-semibold text-gray-700">Trang {{ currentPage }} / {{ totalPages }}</span>
         <button
           @click="changePage(1)"
           :disabled="currentPage >= totalPages"
@@ -51,6 +42,7 @@
         @mouseup="handleTextSelection"
       >
         <div class="relative inline-block max-w-full shadow-xl bg-white">
+          
           <img
             v-if="!isPdf"
             :src="imageUrl"
@@ -83,112 +75,24 @@
         </div>
       </div>
     </div>
-
-    <div class="w-[40%] h-full flex flex-col bg-white">
-      <div class="flex border-b border-gray-200 bg-gray-50 shrink-0">
-        <button
-          @click="activeTab = 'dict'"
-          :class="[
-            'flex-1 py-4 text-sm font-semibold border-b-2 transition-colors',
-            activeTab === 'dict'
-              ? 'border-blue-600 text-blue-600 bg-white'
-              : 'border-transparent text-gray-500 hover:text-gray-700',
-          ]"
-        >
-          📖 Tra Từ Điển
-        </button>
-        <button
-          @click="activeTab = 'ai'"
-          :class="[
-            'flex-1 py-4 text-sm font-semibold border-b-2 transition-colors',
-            activeTab === 'ai'
-              ? 'border-blue-600 text-blue-600 bg-white'
-              : 'border-transparent text-gray-500 hover:text-gray-700',
-          ]"
-        >
-          ✨ Trợ lý AI
-        </button>
-      </div>
-
-      <div
-        v-if="activeTab === 'dict'"
-        class="flex-1 flex flex-col overflow-hidden bg-white"
-      >
-        <div class="p-4 border-b border-gray-100">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Bôi đen chữ bên trái hoặc gõ vào đây..."
-            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base"
-          />
-        </div>
-        <div class="flex-1 p-6 overflow-y-auto">
-          <div v-if="!searchQuery" class="text-center text-gray-400 mt-10">
-            Hãy bôi đen một từ trong tài liệu để tra cứu ngay lập tức.
-          </div>
-          <div v-else class="space-y-4">
-            <h1 class="text-3xl font-bold text-gray-900">{{ searchQuery }}</h1>
-            <p class="text-gray-600">
-              Đang tìm kiếm ý nghĩa trong ngữ cảnh dự án...
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-if="activeTab === 'ai'"
-        class="flex-1 flex flex-col overflow-hidden"
-      >
-        <div class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50">
-          <div
-            class="bg-blue-50 p-3 rounded-lg text-sm text-gray-800 shadow-sm border border-blue-100 w-5/6"
-          >
-            Xin chào! Bạn cần tôi tóm tắt tài liệu này hay giải thích một đoạn
-            cụ thể nào đó? (Hãy bôi đen đoạn cần hỏi nhé).
-          </div>
-          <div
-            v-if="userMessage"
-            class="bg-white p-3 rounded-lg text-sm text-gray-800 shadow-sm border border-gray-200 w-5/6 ml-auto self-end"
-          >
-            {{ userMessage }}
-          </div>
-        </div>
-        <div class="p-4 border-t border-gray-200 bg-white shrink-0">
-          <div class="flex items-center bg-gray-100 rounded-full px-4 py-2">
-            <input
-              v-model="chatInput"
-              type="text"
-              placeholder="Hỏi trợ lý AI..."
-              class="flex-1 bg-transparent border-none focus:ring-0 text-sm outline-none"
-              @keyup.enter="sendAiMessage"
-            />
-            <button @click="sendAiMessage" class="text-blue-600 font-bold ml-2">
-              Gửi
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, shallowRef, onMounted, watch, nextTick } from "vue";
+import { useRuntimeConfig } from "#app";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+
+// --- Định nghĩa Emits để gửi dữ liệu ra trang index.vue ---
+const emit = defineEmits(['text-selected', 'rag-updated']);
 
 // --- Props ---
 const props = defineProps({
   imageUrl: { type: String, required: true },
   results: { type: Array, default: () => [] },
 });
-
-// --- States UI ---
-const activeTab = ref("dict");
-const searchQuery = ref("");
-const chatInput = ref("");
-const userMessage = ref("");
 
 // --- States Media & PDF ---
 const isPdf = ref(false);
@@ -201,7 +105,7 @@ const pdfDoc = shallowRef(null);
 const currentPage = ref(1);
 const totalPages = ref(0);
 const scannedPagesCache = ref({});
-const localResults = ref([]); // Quan trọng: Dùng mảng này để vẽ chữ
+const localResults = ref([]);
 
 // --- WATCHERS & MOUNTED ---
 onMounted(() => {
@@ -211,13 +115,12 @@ onMounted(() => {
 watch(
   () => props.imageUrl,
   () => {
-    currentPage.value = 1; // Reset trang về 1 khi đổi file
-    scannedPagesCache.value = {}; // Xóa cache
+    currentPage.value = 1;
+    scannedPagesCache.value = {};
     checkAndRenderMedia();
   },
 );
 
-// Cập nhật localResults nếu file là ẢNH (được trả về từ props)
 watch(
   () => props.results,
   (newVal) => {
@@ -250,17 +153,13 @@ async function renderPdf() {
     pdfDoc.value = await loadingTask.promise;
     totalPages.value = pdfDoc.value.numPages;
 
-    // Vẽ trang 1
     await drawPageToScreen(currentPage.value);
-
-    // Kích hoạt quét ngầm trang 1, 2, 3
     preloadOcr(currentPage.value, 3);
   } catch (error) {
     console.error("Lỗi khi render PDF:", error);
   }
 }
 
-// Hàm vẽ trang PDF lên giao diện
 async function drawPageToScreen(pageNum) {
   if (!pdfDoc.value) return;
   const page = await pdfDoc.value.getPage(pageNum);
@@ -275,24 +174,22 @@ async function drawPageToScreen(pageNum) {
 
   await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-  // Lấy chữ từ kho đắp lên
   if (
     scannedPagesCache.value[pageNum] &&
     Array.isArray(scannedPagesCache.value[pageNum])
   ) {
     localResults.value = scannedPagesCache.value[pageNum];
   } else {
-    localResults.value = []; // Tạm thời xóa chữ nếu trang chưa quét xong
+    localResults.value = [];
   }
 }
 
-// Hàm chuyển trang
 async function changePage(delta) {
   const newPage = currentPage.value + delta;
   if (newPage >= 1 && newPage <= totalPages.value) {
     currentPage.value = newPage;
     await drawPageToScreen(currentPage.value);
-    preloadOcr(currentPage.value, 3); // Gọi quét ngầm tiếp
+    preloadOcr(currentPage.value, 3);
   }
 }
 
@@ -302,10 +199,9 @@ async function preloadOcr(startPage, lookAheadCount) {
   const endPage = Math.min(startPage + lookAheadCount - 1, totalPages.value);
 
   for (let i = startPage; i <= endPage; i++) {
-    if (scannedPagesCache.value[i]) continue; // Bỏ qua nếu đã quét/đang quét
+    if (scannedPagesCache.value[i]) continue;
 
     scannedPagesCache.value[i] = "scanning";
-    console.log(`Đang âm thầm quét OCR trang ${i}...`);
 
     try {
       const page = await pdfDoc.value.getPage(i);
@@ -342,11 +238,9 @@ async function preloadOcr(startPage, lookAheadCount) {
             const data = await response.json();
             scannedPagesCache.value[i] = data.results;
 
-            // Nếu user đang ở trang này, lập tức hiện chữ
             if (currentPage.value === i) {
               localResults.value = data.results;
             }
-            console.log(`✅ Đã quét xong trang ${i}`);
           } else {
             scannedPagesCache.value[i] = null;
           }
@@ -369,7 +263,7 @@ function onImageLoad(e) {
   }
 }
 
-// --- TÍNH TOÁN TỌA ĐỘ BÔI ĐEN ---
+// --- TÍNH TOÁN TỌA ĐỘ BÔI ĐEN (Đã sửa tàng hình) ---
 function calculateTextStyle(item) {
   if (!item.boundingBox || nativeWidth.value === 0 || nativeHeight.value === 0)
     return { display: "none" };
@@ -402,30 +296,32 @@ function calculateTextStyle(item) {
     fontSize: `${fontSizeCqw * 0.8}cqw`,
     lineHeight: `${fontSizeCqw}cqw`,
     whiteSpace: "nowrap",
-    backgroundColor: "rgba(255, 0, 0, 0.2)", // Vẫn để màu đỏ cho bác dễ test chữ
-    color: "rgba(255, 0, 0, 1)",
+    color: "transparent", // Xóa màu đỏ, làm chữ trong suốt đè lên ảnh
+    backgroundColor: "transparent",
   };
 }
 
-// --- TƯƠNG TÁC NGƯỜI DÚNG ---
-function handleTextSelection() {
+// --- TƯƠNG TÁC NGƯỜI DÙNG: PHÁT SỰ KIỆN RA TRANG CHÍNH ---
+function handleTextSelection(e) {
   const selectedText = window.getSelection().toString().trim();
-  if (selectedText) {
-    searchQuery.value = selectedText;
-    activeTab.value = "dict";
+  if (selectedText && selectedText.length > 0 && selectedText.length < 200) {
+    // Copy vào bộ nhớ tạm
+    navigator.clipboard?.writeText(selectedText).catch(() => {});
+    
+    // Gửi đoạn text bị bôi đen cùng tọa độ con chuột ra index.vue
+    emit('text-selected', { 
+      text: selectedText, 
+      x: e.clientX, 
+      y: e.clientY 
+    });
   }
-}
-
-function sendAiMessage() {
-  if (!chatInput.value.trim()) return;
-  userMessage.value = chatInput.value;
-  chatInput.value = "";
 }
 </script>
 
 <style scoped>
+/* Chữ mờ tàng hình, chỉ hiện màu xanh lam khi user bôi đen */
 ::selection {
-  background: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.35);
   color: transparent;
 }
 </style>
