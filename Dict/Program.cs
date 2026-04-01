@@ -1,4 +1,5 @@
 ﻿using Dict.Data;
+using Dict.Hubs;
 using Dict.Middleware;
 using Dict.Models;
 using Dict.Service;
@@ -6,12 +7,15 @@ using Dict.Service.IService;
 using Dict.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Text.RegularExpressions;
 
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options =>
 {
@@ -60,16 +64,19 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl"); // Lấy từ appsettings
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAnyOrigin", policy =>
     {
-        policy.AllowAnyOrigin()  // Cho phép tất cả các domain
-              .AllowAnyMethod()  // Cho phép tất cả các phương thức HTTP
-              .AllowAnyHeader(); // Cho phép tất cả các headers
+        policy.WithOrigins(frontendUrl)
+       .AllowAnyMethod()
+       .AllowAnyHeader()
+       .AllowCredentials();
     });
 });
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSignalR();
 
 // --- Cấu hình Identity và Authentication (KHỐI CHUẨN) ---
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -111,6 +118,22 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) &&
+                path.StartsWithSegments("/notificationHub"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        }
+    };
 });
 // --- Kết thúc khối Identity/Auth ---
 
@@ -137,8 +160,10 @@ builder.Services.AddSingleton<IBlobService, BlobService>();
 builder.Services.AddScoped<IOcrProcessingService, OcrProcessingService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
-
+builder.Services.AddScoped<IWorkspaceInvitationService, WorkspaceInvitationService>();
+builder.Services.AddScoped<IFileCommentService, FileCommentService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddSingleton<IUserIdProvider, EmailBasedUserIdProvider>();
 // Program.cs
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 
@@ -167,7 +192,7 @@ app.UseMiddleware<ApiLoggingMiddleware>();
 // Thứ tự này là CHUẨN XÁC
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.MapHub<NotificationHub>("/notificationHub"); // Frontend sẽ connect vào wss://domain/notificationHub
 app.MapControllers();
 //using (var scope = app.Services.CreateScope())
 //{

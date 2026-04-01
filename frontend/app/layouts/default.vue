@@ -5,7 +5,7 @@
     <div class="fixed top-[64px] left-0 h-[calc(100vh-64px)] flex">
       <WorkspaceSidebar v-if="isAuthenticated" @panel-change="onPanelChange" />
       <aside
-        class="w-56 h-full bg-white text-gray-900 border-r border-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-700 overflow-y-auto transition-colors flex-shrink-0"
+        class="w-50 h-full bg-white text-gray-900 border-r border-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-700 overflow-y-auto transition-colors flex-shrink-0"
       >
         <AppSideBar />
       </aside>

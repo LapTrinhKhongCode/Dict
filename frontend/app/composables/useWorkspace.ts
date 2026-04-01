@@ -1,4 +1,3 @@
-// composables/useWorkspace.ts
 import { useRuntimeConfig } from '#app'
 import { useJwt } from './useJwt'
 import { useRouter } from 'vue-router'
@@ -20,10 +19,22 @@ export interface WorkspaceMemberDto {
   role: string
 }
 
+// Thêm Interface cho Lời mời
+export interface WorkspaceInvitationDto {
+  id: number
+  workspaceId: number
+  workspaceName: string
+  inviterName: string
+  expectedRole: string
+  status: string
+  createdAt: string
+}
+
 export const useWorkspace = () => {
   const config = useRuntimeConfig()
   const { jwt, isAuthenticated } = useJwt()
   const router = useRouter()
+  // Lấy API base URL từ nuxt.config.ts
   const base = config.public.apiBaseUrl
 
   // Lấy token mới nhất mỗi lần gọi
@@ -77,13 +88,6 @@ export const useWorkspace = () => {
     })
   }
 
-  const inviteMember = (workspaceId: number, email: string, role = 'Member') => {
-    guard()
-    return $fetch(`${base}/api/workspaces/${workspaceId}/members`, {
-      method: 'POST', body: { email, role }, headers: headers()
-    })
-  }
-
   const updateMemberRole = (workspaceId: number, userId: number, role: string) => {
     guard()
     return $fetch(`${base}/api/workspaces/${workspaceId}/members/${userId}/role`, {
@@ -105,9 +109,45 @@ export const useWorkspace = () => {
     })
   }
 
+  // ── Workspace Invitations (Lời mời) ──────────────────────────
+  
+// Thay vì URL cũ: /api/workspaces/${workspaceId}/members
+const inviteMember = (workspaceId: number, email: string, role = 'MEMBER') => {
+  guard()
+  // GỌI ĐÚNG VÀO API LỜI MỜI MỚI VÀ TRUYỀN ĐÚNG BIẾN inviteeEmail
+  return $fetch(`${base}/api/WorkspaceInvitation/invite`, {
+    method: 'POST', 
+    body: { 
+      workspaceId: workspaceId,
+      inviteeEmail: email, 
+      expectedRole: role 
+    }, 
+    headers: headers()
+  })
+}
+  // Lấy danh sách lời mời đang chờ duyệt của User hiện tại
+  const getMyPendingInvitations = () => {
+    guard()
+    // Lưu ý: Tùy theo ResponseDTO bên Backend bạn trả về, có thể bạn sẽ cần .result ở nơi gọi hàm này
+    return $fetch<WorkspaceInvitationDto[]>(`${base}/api/WorkspaceInvitation/my-pending`, {
+      headers: headers()
+    })
+  }
+
+  // Đồng ý hoặc Từ chối lời mời
+  const respondToInvitation = (invitationId: number, isAccepted: boolean) => {
+    guard()
+    return $fetch(`${base}/api/WorkspaceInvitation/${invitationId}/respond?accept=${isAccepted}`, {
+      method: 'POST',
+      headers: headers()
+    })
+  }
+
   return {
     getMyWorkspaces, getWorkspace,
     createWorkspace, updateWorkspace, deleteWorkspace,
-    getMembers, inviteMember, updateMemberRole, removeMember, leaveWorkspace
+    getMembers, updateMemberRole, removeMember, leaveWorkspace,
+    // Export các hàm Invitation mới
+    inviteMember, getMyPendingInvitations, respondToInvitation
   }
 }

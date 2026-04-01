@@ -2,13 +2,11 @@
   <div class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
     <div class="max-w-4xl mx-auto px-6 py-10">
 
-      <!-- Loading -->
       <div v-if="!workspace" class="flex justify-center items-center py-20">
         <div class="w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
       </div>
 
       <template v-else>
-        <!-- Header -->
         <div class="mb-8">
           <button
             @click="router.push('/workspaces')"
@@ -30,7 +28,7 @@
                   <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ workspace.name }}</h1>
                   <span :class="[
                     'text-xs font-semibold px-2.5 py-1 rounded-full',
-                    workspace.myRole === 'Admin'
+                    isAdmin
                       ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
                       : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
                   ]">{{ workspace.myRole }}</span>
@@ -39,7 +37,6 @@
               </div>
             </div>
 
-            <!-- Admin actions -->
             <div v-if="isAdmin" class="flex gap-2">
               <button
                 @click="openEdit"
@@ -57,7 +54,6 @@
           </div>
         </div>
 
-        <!-- Tabs -->
         <div class="flex border-b border-gray-200 dark:border-gray-700 mb-6">
           <button
             v-for="t in tabs" :key="t.key"
@@ -76,15 +72,12 @@
           </button>
         </div>
 
-        <!-- ── Tab: Projects ── -->
-      <div v-if="tab === 'projects'">
-  <ProjectTab :workspace-id="id" />
-</div>
+        <div v-if="tab === 'projects'">
+          <ProjectTab :workspace-id="id" />
+        </div>
 
-        <!-- ── Tab: Members ── -->
         <div v-if="tab === 'members'" class="space-y-4">
 
-          <!-- Invite bar (Admin only) -->
           <div v-if="isAdmin" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Mời thành viên</p>
             <div class="flex gap-2">
@@ -99,8 +92,8 @@
                 v-model="inviteRole"
                 class="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors cursor-pointer"
               >
-                <option value="Member">Member</option>
-                <option value="Admin">Admin</option>
+                <option value="MEMBER">Member</option>
+                <option value="ADMIN">Admin</option>
               </select>
               <button
                 @click="handleInvite"
@@ -113,7 +106,6 @@
             <p v-if="inviteError" class="text-red-500 dark:text-red-400 text-xs mt-2">{{ inviteError }}</p>
           </div>
 
-          <!-- Member list -->
           <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
             <div
               v-for="(m, i) in members"
@@ -123,14 +115,12 @@
                 i !== members.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
               ]"
             >
-              <!-- Avatar -->
               <img
                 :src="m.avatarUrl || `https://ui-avatars.com/api/?name=${m.userName}&background=6366f1&color=fff`"
                 :alt="m.userName"
                 class="w-9 h-9 rounded-full object-cover flex-shrink-0"
               />
 
-              <!-- Info -->
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {{ m.userName }}
@@ -139,28 +129,24 @@
                 <p class="text-xs text-gray-400 dark:text-gray-500 truncate">{{ m.email }}</p>
               </div>
 
-              <!-- Role -->
               <div class="flex items-center gap-2">
-                <!-- Admin có thể đổi role của người khác -->
                 <select
                   v-if="isAdmin && m.userId !== currentUserId"
-                  :value="m.role"
+                  :value="m.role?.toUpperCase()"
                   @change="handleRoleChange(m.userId, ($event.target as HTMLSelectElement).value)"
                   class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 cursor-pointer transition-colors"
                 >
-                  <option value="Member">Member</option>
-                  <option value="Admin">Admin</option>
+                  <option value="MEMBER">Member</option>
+                  <option value="ADMIN">Admin</option>
                 </select>
 
-                <!-- Badge cho chính mình hoặc khi không phải admin -->
                 <span v-else :class="[
                   'text-xs font-semibold px-2.5 py-1 rounded-full',
-                  m.role === 'Admin'
+                  m.role?.toUpperCase() === 'ADMIN'
                     ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
                     : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
                 ]">{{ m.role }}</span>
 
-                <!-- Xóa thành viên -->
                 <button
                   v-if="isAdmin && m.userId !== currentUserId"
                   @click="handleRemove(m.userId)"
@@ -171,10 +157,9 @@
             </div>
           </div>
 
-          <!-- Leave workspace -->
           <div class="flex justify-end pt-2">
             <button
-              @click="confirmLeave = true"
+              @click="openLeaveModal"
               class="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 border border-red-200 dark:border-red-800 hover:border-red-400 dark:hover:border-red-600 px-4 py-2 rounded-lg transition-colors"
             >
               Rời workspace
@@ -184,7 +169,6 @@
       </template>
     </div>
 
-    <!-- ── Modal sửa workspace ── -->
     <Transition name="modal">
       <div v-if="showEdit"
         class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -223,7 +207,6 @@
       </div>
     </Transition>
 
-    <!-- ── Modal xác nhận xóa ── -->
     <Transition name="modal">
       <div v-if="confirmDelete"
         class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -242,32 +225,58 @@
               class="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
               Hủy
             </button>
-            <button @click="handleDelete"
-              class="px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold transition-colors">
-              Xóa workspace
+            <button @click="handleDelete" :disabled="deleting"
+              class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold transition-colors">
+              <svg v-if="deleting" class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+              </svg>
+              {{ deleting ? 'Đang xóa...' : 'Xóa workspace' }}
             </button>
           </div>
         </div>
       </div>
     </Transition>
 
-    <!-- ── Modal xác nhận rời ── -->
     <Transition name="modal">
       <div v-if="confirmLeave"
         class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
         @click.self="confirmLeave = false"
       >
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 w-full max-w-md shadow-2xl">
           <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Rời workspace?</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Bạn sẽ không còn truy cập được workspace và các tài nguyên trong đó.</p>
+          
+          <div v-if="members.length <= 1">
+            <p class="text-sm text-red-500 dark:text-red-400 mb-6">Bạn là thành viên duy nhất. Vui lòng sử dụng tính năng Xóa Workspace thay vì rời đi.</p>
+          </div>
+          <div v-else>
+            <div v-if="isSoleAdmin" class="mb-6">
+              <p class="text-sm text-yellow-600 dark:text-yellow-500 font-medium mb-3">
+                Bạn là Admin duy nhất. Vui lòng nhượng quyền Admin cho một thành viên khác trước khi rời đi:
+              </p>
+              <select
+                v-model="newAdminId"
+                class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 transition-colors cursor-pointer"
+              >
+                <option value="" disabled>-- Chọn người kế nhiệm --</option>
+                <option v-for="m in eligibleSuccessors" :key="m.userId" :value="m.userId">
+                  {{ m.userName }} ({{ m.email }})
+                </option>
+              </select>
+            </div>
+            <p v-else class="text-sm text-gray-500 dark:text-gray-400 mb-6">Bạn sẽ không còn truy cập được workspace và các tài nguyên trong đó.</p>
+          </div>
+
           <div class="flex justify-end gap-3">
             <button @click="confirmLeave = false"
               class="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
               Hủy
             </button>
-            <button @click="handleLeave"
-              class="px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold transition-colors">
-              Rời workspace
+            <button v-if="members.length > 1" @click="handleLeave" :disabled="leaving"
+              class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold transition-colors">
+              <svg v-if="leaving" class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+              </svg>
+              {{ leaving ? 'Đang xử lý...' : 'Xác nhận rời' }}
             </button>
           </div>
         </div>
@@ -286,14 +295,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspace } from '~/composables/useWorkspace'
 import { useJwt } from '~/composables/useJwt'
-import { useAuth } from '~/composables/useAuth'
 import { useToast } from '~/composables/useToast'
 import ProjectTab from '~/components/ProjectTab.vue'
 
-
 const { showToast } = useToast()
-
-
 const route = useRoute()
 const router = useRouter()
 const id = parseInt(route.params.id as string)
@@ -313,20 +318,38 @@ const showEdit = ref(false)
 const confirmDelete = ref(false)
 const confirmLeave = ref(false)
 const saving = ref(false)
+const deleting = ref(false)
+const leaving = ref(false) // Trạng thái loading khi rời
 const inviting = ref(false)
 const inviteEmail = ref('')
-const inviteRole = ref('Member')
+const inviteRole = ref('MEMBER')
 const inviteError = ref('')
 const editForm = ref({ name: '', description: '' })
+const newAdminId = ref<number | ''>('') // Lưu ID của người kế nhiệm Admin
 
-// Lấy userId trực tiếp từ useJwt — không cần decode JWT thủ công
 const { userId: currentUserId } = useJwt()
 
-const isAdmin = computed(() => workspace.value?.myRole === 'Admin')
+const isAdmin = computed(() => workspace.value?.myRole?.toUpperCase() === 'ADMIN')
+
+// Kiểm tra xem User hiện tại có phải là Admin DUY NHẤT hay không
+const isSoleAdmin = computed(() => {
+  if (!isAdmin.value) return false
+  const adminCount = members.value.filter(m => m.role?.toUpperCase() === 'ADMIN').length
+  return adminCount === 1
+})
+
+// Lấy danh sách thành viên có thể kế nhiệm (Không chứa bản thân mình)
+const eligibleSuccessors = computed(() => members.value.filter(m => m.userId !== currentUserId.value))
 
 function openEdit() {
   editForm.value = { name: workspace.value.name, description: workspace.value.description }
   showEdit.value = true
+}
+
+// Mở modal rời nhóm, reset lại trạng thái người kế nhiệm
+function openLeaveModal() {
+  newAdminId.value = ''
+  confirmLeave.value = true
 }
 
 async function load() {
@@ -340,12 +363,21 @@ async function handleUpdate() {
     saving.value = true
     workspace.value = await updateWorkspace(id, editForm.value)
     showEdit.value = false
+    showToast('Cập nhật thành công', 'success')
+  } catch (error) {
+    showToast('Lỗi cập nhật', 'error')
   } finally { saving.value = false }
 }
 
 async function handleDelete() {
-  await deleteWorkspace(id)
-  router.push('/workspaces')
+  try {
+    deleting.value = true
+    await deleteWorkspace(id)
+    showToast('Xóa Workspace thành công', 'success')
+    router.push('/workspaces')
+  } catch (error) {
+    showToast('Bạn không thể xóa', 'error')
+  } finally { deleting.value = false }
 }
 
 async function handleInvite() {
@@ -356,47 +388,62 @@ async function handleInvite() {
     await inviteMember(id, inviteEmail.value, inviteRole.value)
     members.value = await getMembers(id)
     inviteEmail.value = ''
+    showToast('Mời thành công', 'success')
   } catch (e: any) {
     inviteError.value = e?.data?.message || 'Không tìm thấy user hoặc đã là thành viên.'
   } finally { inviting.value = false }
 }
 
 async function handleRoleChange(userId: number, role: string) {
-  await updateMemberRole(id, userId, role)
-  const m = members.value.find(m => m.userId === userId)
-  if (m) m.role = role
+  try {
+    await updateMemberRole(id, userId, role)
+    const m = members.value.find(m => m.userId === userId)
+    if (m) m.role = role
+    showToast('Đã đổi quyền thành viên', 'success')
+  } catch (error) {
+    showToast('Lỗi cập nhật quyền', 'error')
+  }
 }
 
 async function handleRemove(userId: number) {
-  await removeMember(id, userId)
-  members.value = members.value.filter(m => m.userId !== userId)
+  try {
+    await removeMember(id, userId)
+    members.value = members.value.filter(m => m.userId !== userId)
+    showToast('Đã xóa thành viên', 'success')
+  } catch (error) {
+    showToast('Lỗi xóa thành viên', 'error')
+  }
 }
 
 async function handleLeave() {
-  // Nếu chỉ còn 1 thành viên thì không cho rời
-  if (members.value.length <= 1) {
-    confirmLeave.value = false
-    showToast('Bạn là thành viên duy nhất, không thể rời workspace. Hãy xóa workspace nếu muốn.', 'error')
-    return
-  }
-
-  // Nếu là Admin duy nhất thì cũng không cho rời
-  const adminCount = members.value.filter(m => m.role === 'Admin').length
-  if (adminCount <= 1 && currentUserId.value === members.value.find(m => m.role === 'Admin')?.userId) {
-    confirmLeave.value = false
-    showToast('Bạn là Admin duy nhất. Hãy chỉ định Admin khác trước khi rời.', 'error')
-    return
-  }
+  if (members.value.length <= 1) return // Đã chặn trên UI, nhưng chặn thêm cho chắc
 
   try {
+    leaving.value = true
+
+    // Nếu là admin duy nhất, thực hiện bước NHƯỢNG QUYỀN trước
+    if (isSoleAdmin.value) {
+      if (!newAdminId.value) {
+        showToast('Vui lòng chọn người kế nhiệm trước khi rời', 'error')
+        return
+      }
+      // Đổi role cho người mới lên làm Admin
+      await updateMemberRole(id, Number(newAdminId.value), 'ADMIN')
+    }
+
+    // Sau khi an toàn có người cầm quyền rồi, mới tiến hành Out
     await leaveWorkspace(id)
     showToast('Đã rời workspace.', 'success')
-    router.push('/workspaces')
-  } catch (e: any) {
     confirmLeave.value = false
+    router.push('/workspaces')
+
+  } catch (e: any) {
     showToast(e?.data?.message || 'Không thể rời workspace.', 'error')
+  } finally {
+    leaving.value = false
   }
 }
+
 onMounted(load)
 </script>
 

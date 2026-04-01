@@ -205,10 +205,10 @@ namespace Dict.Service
             var member = await GetMemberOrThrowAsync(workspaceId, userId);
 
             // Nếu là Admin duy nhất thì không được rời
-            if (member.Role == "Admin")
+            if (member.Role == "ADMIN")
             {
                 var adminCount = await _db.WorkspaceMembers
-                    .CountAsync(m => m.WorkspaceId == workspaceId && m.Role == "Admin");
+                    .CountAsync(m => m.WorkspaceId == workspaceId && m.Role == "ADMIN");
                 if (adminCount <= 1)
                     throw new InvalidOperationException("Cần có ít nhất 1 Admin. Hãy chỉ định Admin khác trước khi rời.");
             }

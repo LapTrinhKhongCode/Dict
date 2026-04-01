@@ -96,9 +96,30 @@ namespace Dict.Data
         public DbSet<ProjectVocabulary> ProjectVocabularies { get; set; }
         public DbSet<Workspace> Workspaces { get; set; }
         public DbSet<WorkspaceMember> WorkspaceMembers { get; set; }
+        public DbSet<WorkspaceInvitation> WorkspaceInvitations { get; set; }
+        public DbSet<FileComment> FileComments { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            // 2. Cấu hình WorkspaceInvitation: Chặn xóa User kéo theo xóa lời mời
+            modelBuilder.Entity<WorkspaceInvitation>()
+                .HasOne(wi => wi.Invitee)
+                .WithMany()
+                .HasForeignKey(wi => wi.InviteeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkspaceInvitation>()
+                .HasOne(wi => wi.Inviter)
+                .WithMany()
+                .HasForeignKey(wi => wi.InviterId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // 3. Cấu hình FileComment: Chặn xóa Comment cha kéo theo xóa Comment con
+            modelBuilder.Entity<FileComment>()
+                .HasOne(c => c.ParentComment)
+                .WithMany(c => c.Replies)
+                .HasForeignKey(c => c.ParentCommentId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<SearchMiss>(b =>
             {

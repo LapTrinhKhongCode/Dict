@@ -19,7 +19,7 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           Upload tài liệu
         </button>
-        <button @click="showCreateProject = true" class="flex items-center gap-2 px-4 py-2 bg-[#f0c040] text-black rounded-lg text-sm font-bold hover:bg-[#e3b330] shadow-sm transition-colors">
+        <button @click="openCreateProjectModal" class="flex items-center gap-2 px-4 py-2 bg-[#f0c040] text-black rounded-lg text-sm font-bold hover:bg-[#e3b330] shadow-sm transition-colors">
           <span>+</span> Dự án mới
         </button>
       </div>
@@ -164,12 +164,20 @@
             <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Tạo dự án mới</h3>
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Tên dự án</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Tên dự án <span class="text-red-500">*</span></label>
                 <input v-model="projectForm.name" type="text" placeholder="VD: Tài liệu học thi N3..." 
                   class="w-full bg-gray-50 dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#f0c040] focus:border-transparent transition-all">
               </div>
+              
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Thuộc Workspace</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Mô tả</label>
+                <textarea v-model="projectForm.description" rows="2"
+                  class="w-full bg-gray-50 dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#f0c040] transition-all resize-none"
+                  placeholder="Mô tả ngắn..."></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Thuộc Workspace <span class="text-red-500">*</span></label>
                 <select v-model="projectForm.workspaceId" 
                   class="w-full bg-gray-50 dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#f0c040] focus:border-transparent transition-all">
                   <option value="" disabled>-- Chọn Workspace --</option>
@@ -306,34 +314,56 @@ async function onWorkspaceChange() {
   await fetchRecentFilesForWorkspace(projects.value);
 }
 
-// --- LOGIC TẠO PROJECT ---
+// ==========================================
+// --- LOGIC TẠO PROJECT (ĐÃ FIX LỖI 400) ---
+// ==========================================
 const showCreateProject = ref(false)
 const creatingProject = ref(false)
-const projectForm = reactive({ name: '', workspaceId: '' })
+// Đã thêm trường description vào form để tránh backend báo lỗi
+const projectForm = reactive({ name: '', description: '', workspaceId: '' })
 
 function openCreateProjectModal() {
   projectForm.name = ''
+  projectForm.description = ''
+  // Lấy ID chuẩn của Workspace hiện tại gắn vào select box
   projectForm.workspaceId = activeWsId.value || (workspaces.value.length > 0 ? workspaces.value[0].id : '')
   showCreateProject.value = true
 }
 
 async function handleCreateProject() {
-  if (!projectForm.name || !projectForm.workspaceId) return
+  if (!projectForm.name.trim() || !projectForm.workspaceId) return
+  
   creatingProject.value = true
   try {
-    const p = await createProject(Number(projectForm.workspaceId), { name: projectForm.name })
+    // 1. Ép kiểu workspaceId sang dạng số (Number)
+    const wsId = Number(projectForm.workspaceId);
+    
+    // 2. Gói data thành payload gửi xuống hàm createProject
+    const payload = {
+      name: projectForm.name.trim(),
+      description: projectForm.description || '' // Gửi chuỗi rỗng nếu không nhập mô tả
+    };
+
+    // 3. Gọi API (Đảm bảo file useProject.ts của bạn cũng nhận 2 tham số này)
+    const p = await createProject(wsId, payload)
+    
+    // 4. Update UI danh sách dự án ngay lập tức
     if (activeWsId.value && activeWsId.value === projectForm.workspaceId) {
       projects.value.unshift(p)
     }
+    
     showCreateProject.value = false
+    showToast("Tạo dự án thành công", "success")
     goToProject(p.id)
-    showToast("Tạo dự án thành công")
+    
   } catch (error) {
-    showToast("Lỗi tạo dự án", "error")
+    console.error("CHI TIẾT LỖI TẠO DỰ ÁN:", error);
+    showToast("Lỗi tạo dự án! Vui lòng kiểm tra Console (F12).", "error")
   } finally {
     creatingProject.value = false
   }
 }
+// ==========================================
 
 // --- LOGIC UPLOAD MODAL ---
 const showUploadModal = ref(false)
