@@ -172,11 +172,9 @@ namespace Dict.Services
         {
             await RequireMemberAsync(projectId, userId);
 
-            var project = await _db.Projects.FindAsync(projectId)!;
-
+            // Truy vấn trực tiếp bằng ProjectId (Nhanh và tối ưu hơn rất nhiều)
             return await _db.MediaStore
-                .Where(m => m.WorkspaceId == project.WorkspaceId
-                         && m.OcrJobs.Any(j => j.ProjectId == projectId))
+                .Where(m => m.ProjectId == projectId)
                 .Include(m => m.Owner)
                 .Select(m => new MediaDtos
                 {
@@ -204,9 +202,9 @@ namespace Dict.Services
             using var stream = file.OpenReadStream();
             var sha256 = ComputeSha256(stream);
 
-            // Kiểm tra file đã tồn tại trong workspace chưa
+            // SỬA LẠI: Chỉ kiểm tra trùng lặp trong phạm vi CÙNG Project
             var existing = await _db.MediaStore
-                .FirstOrDefaultAsync(m => m.WorkspaceId == project.WorkspaceId && m.Sha256 == sha256);
+                .FirstOrDefaultAsync(m => m.ProjectId == projectId && m.Sha256 == sha256);
 
             MediaStore media;
             if (existing != null)
@@ -231,11 +229,12 @@ namespace Dict.Services
                 media = new MediaStore
                 {
                     WorkspaceId = project.WorkspaceId,
+                    ProjectId = projectId, // ĐÃ THÊM: Ánh xạ cứng file này vào Project
                     OwnerId = userId,
                     FileName = file.FileName,
                     MimeType = file.ContentType,
                     SizeBytes = file.Length,
-                    StorageUrl = storageUrl, // URL đầy đủ trên Azure Blob
+                    StorageUrl = storageUrl,
                     Sha256 = sha256,
                     CreatedAt = DateTime.UtcNow,
                 };
@@ -244,7 +243,7 @@ namespace Dict.Services
                 await _db.SaveChangesAsync();
             }
 
-            // Tạo OcrJob để liên kết media ↔ project
+            // Vẫn giữ logic tạo OcrJob vì nó phục vụ cho tiến trình AI/OCR chạy ngầm
             var alreadyLinked = await _db.OcrJobs
                 .AnyAsync(j => j.MediaId == media.Id && j.ProjectId == projectId);
 
@@ -263,6 +262,8 @@ namespace Dict.Services
             }
 
             await _db.Entry(media).Reference(m => m.Owner).LoadAsync();
+
+            // Lưu ý: Mình giữ nguyên hàm ToProjectMediaDto(media) theo code cũ của bạn
             return ToProjectMediaDto(media);
         }
 
@@ -283,7 +284,7 @@ namespace Dict.Services
             // Xóa file trên Azure Blob
             if (!string.IsNullOrEmpty(media.StorageUrl))
             {
-                // Lấy blob name từ URL: https://xxx.blob.core.windows.net/pdfs/filename.pdf
+                // Lấy blob name từ URL
                 var blobName = Path.GetFileName(new Uri(media.StorageUrl).LocalPath);
                 await _blobService.DeleteFileBlobAsync(PdfContainer, blobName);
             }

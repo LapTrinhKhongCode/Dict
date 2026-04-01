@@ -1,9 +1,7 @@
 <template>
-  <!-- Wrapper bọc cả sidebar workspace + panel project -->
   <div class="relative flex h-full">
 
-    <!-- ── Cột 1: Workspace icons (kiểu Slack) ── -->
-    <div class="flex flex-col items-center gap-2 w-14 py-3 bg-gray-200 dark:bg-neutral-900 border-r border-gray-300 dark:border-neutral-700 flex-shrink-0">
+    <div class="flex flex-col items-center gap-2 w-14 py-3 bg-gray-200 dark:bg-neutral-900 border-r border-gray-300 dark:border-neutral-700 flex-shrink-0 z-50 relative">
       <div v-if="loading" class="flex flex-col gap-2 mt-2">
         <div v-for="i in 3" :key="i"
           class="w-9 h-9 rounded-xl bg-gray-300 dark:bg-neutral-700 animate-pulse">
@@ -33,12 +31,10 @@
       </template>
     </div>
 
-    <!-- ── Cột 2: Project panel ── -->
     <Transition name="slide">
       <div v-if="activeWs"
-        class="absolute left-14 top-0 h-full flex flex-col w-56 bg-gray-100 dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 z-40 shadow-lg overflow-hidden"
+        class="absolute left-14 top-0 h-full flex flex-col w-50 bg-gray-100 dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 z-40 shadow-lg overflow-hidden"
       >
-        <!-- Workspace header -->
         <div class="px-3 py-3 border-b border-gray-200 dark:border-neutral-700">
           <div class="flex items-center justify-between">
             <div class="min-w-0">
@@ -61,7 +57,6 @@
           </div>
         </div>
 
-        <!-- Project list -->
         <div class="flex-1 overflow-y-auto py-2 scrollbar-thin">
           <div class="px-3 mb-1 flex items-center justify-between">
             <span class="text-xs font-semibold text-gray-400 dark:text-neutral-500 uppercase tracking-wider">Dự án</span>
@@ -79,7 +74,6 @@
             Chưa có dự án nào
           </div>
 
-          <!-- Project row với nút xóa (chỉ Admin) -->
           <div
             v-else
             v-for="p in projects" :key="p.id"
@@ -90,14 +84,12 @@
                 : 'text-gray-600 dark:text-neutral-300 hover:bg-gray-200 dark:hover:bg-neutral-700'
             ]"
           >
-            <!-- Click vào tên để navigate -->
             <button @click="goToProject(p.id)" class="flex items-center gap-1.5 flex-1 min-w-0 text-left">
               <span class="text-xs opacity-60">#</span>
               <span class="truncate">{{ p.name }}</span>
               <span class="ml-auto text-xs text-gray-400 dark:text-neutral-500 flex-shrink-0">{{ p.mediaCount }}</span>
             </button>
 
-            <!-- Nút xóa — chỉ hiện khi Admin + hover -->
             <button
               v-if="activeWs?.myRole === 'Admin'"
               @click.stop="confirmDeleteProject(p)"
@@ -111,14 +103,12 @@
           </div>
         </div>
 
-        <!-- Đóng panel -->
         <button @click="activeWs = null; emit('panel-change', false)"
           class="mx-3 mb-3 py-1.5 text-xs text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 border border-gray-200 dark:border-neutral-700 rounded-lg transition-colors"
         >Thu gọn</button>
       </div>
     </Transition>
 
-    <!-- ── Modal xác nhận xóa project ── -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="deleteTarget"
@@ -160,7 +150,6 @@
       </Transition>
     </Teleport>
 
-    <!-- ── Modal tạo Workspace ── -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showCreate"
@@ -199,7 +188,6 @@
       </Transition>
     </Teleport>
 
-    <!-- ── Modal tạo Project ── -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showCreateProject"
@@ -282,22 +270,47 @@ const showCreateProject = ref(false)
 const creatingProject = ref(false)
 const projectForm = ref({ name: '', description: '' })
 
-// Delete project state
 const deleteTarget = ref<any>(null)
 const deletingProject = ref(false)
 
-async function load() {
+// 🪄 HÀM LOAD THÔNG MINH: Có tham số 'silent' để không bị chớp giật loading khi tải ngầm
+async function load(silent = false) {
   const token = jwt.value || (process.client ? localStorage.getItem('jwt_token') : null)
   if (!token) return
+  
   try {
-    loading.value = true
-    workspaces.value = await getMyWorkspaces()
+    if (!silent) loading.value = true
+    const freshWorkspaces = await getMyWorkspaces()
+    workspaces.value = freshWorkspaces
+
+    // Đồng bộ trạng thái của Workspace đang mở (phòng khi bạn vừa sửa/xóa nó ở trang chi tiết)
+    if (activeWs.value) {
+      const stillExists = freshWorkspaces.find((w: any) => w.id === activeWs.value.id)
+      if (stillExists) {
+        activeWs.value = stillExists // Cập nhật tên mới
+      } else {
+        // Workspace đã bị xóa mất tiêu -> dọn dẹp panel
+        activeWs.value = null
+        emit('panel-change', false)
+      }
+    }
   } catch (e) {
     console.error(e)
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
+
+// 🪄 WATCHER "THẦN THÁNH": Theo dõi mỗi khi bạn chuyển URL
+watch(() => route.path, (newPath) => {
+  // Khi bạn từ trang xóa/sửa quay về, hàm này tự động gọi API lấy lại ds Workspace mới nhất
+  load(true) 
+
+  // Kéo theo update trạng thái bôi xanh Project đang chọn
+  const match = newPath.match(/\/project\/(\d+)/)
+  activeProjectId.value = match ? parseInt(match[1]) : null
+}, { immediate: true })
+
 
 async function selectWorkspace(ws: any) {
   if (activeWs.value?.id === ws.id) {
@@ -354,7 +367,6 @@ async function handleCreateProject() {
   } finally { creatingProject.value = false }
 }
 
-// ── Delete project ────────────────────────────────────────────────
 function confirmDeleteProject(p: any) {
   deleteTarget.value = p
 }
@@ -370,7 +382,6 @@ async function handleDeleteProject() {
     )
     if (res.ok || res.status === 204) {
       projects.value = projects.value.filter(p => p.id !== deleteTarget.value.id)
-      // Nếu đang ở trang project bị xóa thì về workspace
       if (activeProjectId.value === deleteTarget.value.id) {
         activeProjectId.value = null
         router.push(`/workspaces/${activeWs.value?.id}`)
@@ -384,18 +395,29 @@ async function handleDeleteProject() {
   }
 }
 
-watch(() => route.path, (path) => {
-  const match = path.match(/\/project\/(\d+)/)
-  activeProjectId.value = match ? parseInt(match[1]) : null
-}, { immediate: true })
+const { $bus } = useNuxtApp();
 
-onMounted(load)
+onMounted(() => {
+  load(); // Lần đầu load trang
+  
+  // 🔥 Lắng nghe sự kiện từ AppNavBar
+  $bus.on('workspace-updated', () => {
+    console.log("Sidebar nhận tín hiệu cập nhật...");
+    load(true); // Gọi hàm load lại danh sách Workspace (silent mode)
+  });
+});
+
+// Nhớ dọn dẹp khi unmount
+onUnmounted(() => {
+  $bus.off('workspace-updated');
+});
 </script>
 
 <style scoped>
-.slide-enter-active, .slide-leave-active { transition: all 0.2s ease; }
+/* Hiệu ứng trượt cho độ rộng 56 (14rem) */
+.slide-enter-active, .slide-leave-active { transition: all 0.12s ease; }
 .slide-enter-from, .slide-leave-to { width: 0; opacity: 0; overflow: hidden; }
-.slide-enter-to, .slide-leave-from { width: 13rem; }
+.slide-enter-to, .slide-leave-from { width: 12rem; }
 
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }

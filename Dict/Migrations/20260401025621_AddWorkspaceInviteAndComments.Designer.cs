@@ -4,6 +4,7 @@ using Dict.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dict.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260401025621_AddWorkspaceInviteAndComments")]
+    partial class AddWorkspaceInviteAndComments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -827,9 +830,6 @@ namespace Dict.Migrations
                     b.Property<int>("OwnerId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ProjectId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Sha256")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -849,8 +849,6 @@ namespace Dict.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId");
-
-                    b.HasIndex("ProjectId");
 
                     b.HasIndex("WorkspaceId");
 
@@ -1890,10 +1888,6 @@ namespace Dict.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Dict.Models.Project", "Project")
-                        .WithMany("MediaFiles")
-                        .HasForeignKey("ProjectId");
-
                     b.HasOne("Dict.Models.Workspace", "Workspace")
                         .WithMany("MediaFiles")
                         .HasForeignKey("WorkspaceId")
@@ -1901,8 +1895,6 @@ namespace Dict.Migrations
                         .IsRequired();
 
                     b.Navigation("Owner");
-
-                    b.Navigation("Project");
 
                     b.Navigation("Workspace");
                 });
@@ -2358,8 +2350,6 @@ namespace Dict.Migrations
 
             modelBuilder.Entity("Dict.Models.Project", b =>
                 {
-                    b.Navigation("MediaFiles");
-
                     b.Navigation("OcrJobs");
 
                     b.Navigation("ProjectVocabularies");
