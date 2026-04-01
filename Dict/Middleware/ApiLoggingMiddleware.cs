@@ -1,11 +1,9 @@
-﻿using Dict.Data;
-using Dict.Models;
+﻿using Dict.Models;
+using Dict.Service; // Đảm bảo đúng namespace của LogQueueService
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Dict.Middleware
 {
@@ -13,14 +11,17 @@ namespace Dict.Middleware
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<ApiLoggingMiddleware> _logger;
+        private readonly LogQueueService _logQueue; // Thêm hàng đợi vào đây
 
-        public ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddleware> logger)
+        public ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddleware> logger, LogQueueService logQueue)
         {
             _next = next;
             _logger = logger;
+            _logQueue = logQueue;
         }
 
-        public async Task InvokeAsync(HttpContext context, ApplicationDbContext dbContext)
+        // Xóa ApplicationDbContext dbContext khỏi tham số của InvokeAsync luôn
+        public async Task InvokeAsync(HttpContext context)
         {
             if (!context.Request.Path.StartsWithSegments("/api"))
             {
@@ -30,7 +31,6 @@ namespace Dict.Middleware
 
             var stopwatch = Stopwatch.StartNew();
 
-            // Skip đọc body nếu là file upload (multipart/form-data)
             string requestBody = "";
             var contentType = context.Request.ContentType ?? "";
             bool isFileUpload = contentType.Contains("multipart/form-data");
@@ -45,26 +45,31 @@ namespace Dict.Middleware
                 requestBody = "[file upload]";
             }
 
-            await _next(context);
+            // --- GIAI ĐOẠN QUAN TRỌNG ---
+            await _next(context); // Chạy API (Trie tìm kiếm ở đây)
             stopwatch.Stop();
+            // ----------------------------
 
+            // Replace the incorrect usage of 'endpoint' with the correct value from context.Request.Path.ToString()
+            var endpoint = context.Request.Path.ToString();
             var apiCall = new ApiCall
             {
-                Endpoint = context.Request.Path,
+                Endpoint = endpoint.Length > 500 ? endpoint.Substring(0, 500) : endpoint,
                 RequestJson = requestBody,
                 ResponseStatus = context.Response.StatusCode,
                 ResponseTimeMs = (int)stopwatch.ElapsedMilliseconds,
                 CreatedAt = DateTime.UtcNow
             };
 
+            // THAY VÌ LƯU DB, TA NÉM VÀO HÀNG ĐỢI RỒI KẾT THÚC REQUEST LUÔN
             try
             {
-                dbContext.ApiCalls.Add(apiCall);
-                await dbContext.SaveChangesAsync();
+                _logQueue.QueueLogAsync(apiCall);
+                // Không dùng await ở đây cũng được vì nó chỉ là ném vào RAM, cực nhanh.
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Không thể ghi log ApiCall xuống DB.");
+                _logger.LogError(ex, "Không thể đưa ApiCall vào hàng đợi.");
             }
         }
 

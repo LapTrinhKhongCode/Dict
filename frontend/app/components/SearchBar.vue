@@ -12,6 +12,7 @@
       <input
         v-model="internalSearchWord"
         type="text"
+        maxlength="50"
         placeholder="日本語, にほんご, nihongo..."
         class="flex-grow bg-transparent outline-none text-base text-gray-900 dark:text-white"
         @keyup.enter="onSearch"
@@ -436,7 +437,7 @@ watch(internalSearchWord, (newValue) => {
       suggestions.value = [];
       showSuggestions.value = false;
     }
-  }, 350);
+  }, 200);
 });
 
 // --- Watcher to manage canvas listeners ---

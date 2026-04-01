@@ -11,7 +11,11 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+<<<<<<< HEAD
 using System.IdentityModel.Tokens.Jwt;
+=======
+using System.ComponentModel.Design;
+>>>>>>> e991f92 (toi uu)
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -162,13 +166,19 @@ builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWorkspaceInvitationService, WorkspaceInvitationService>();
 builder.Services.AddScoped<IFileCommentService, FileCommentService>();
+builder.Services.AddSingleton<TrieAutocompleteCache>();
+builder.Services.AddHostedService<TrieLoaderService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddSingleton<IUserIdProvider, EmailBasedUserIdProvider>();
 // Program.cs
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
-
+builder.Services.AddMemoryCache(); // Thêm dòng này nếu chưa có
 // << --- ĐÃ XÓA KHỐI AddAuthentication BỊ LẶP Ở ĐÂY --- >>
-
+// Đăng ký cái ống (Singleton vì dùng chung cho mọi request)
+builder.Services.AddSingleton<LogQueueService>();
+builder.Services.AddSingleton<KanjiCache>();
+// Đăng ký thằng công nhân chạy ngầm (HostedService)
+builder.Services.AddHostedService<LogProcessorService>();
 builder.Services.AddScoped<IJsonBuilderService, JsonBuilder>();
 builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddScoped<IKanjiService, KanjiService>();

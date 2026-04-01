@@ -15,18 +15,28 @@ namespace Dict.Controllers
         private readonly IWordService _wordService;
         private readonly IJsonBuilderService _jsonBuilderService;
         private readonly IServiceProvider _serviceProvider;
-        public WordController(IWordService kanjiService, IJsonBuilderService jsonBuilderService, IServiceProvider serviceProvider)
+        private readonly ILogger<WordController> _logger;
+        private readonly IAdminService _adminService;
+
+        public WordController(IWordService kanjiService, IJsonBuilderService jsonBuilderService, IServiceProvider serviceProvider, ILogger<WordController> logger, IAdminService adminService)
         {
             _response = new ResponseDTO();
             _wordService = kanjiService;
             _jsonBuilderService = jsonBuilderService;
             _serviceProvider = serviceProvider;
+            _logger = logger;
+            _adminService = adminService;
         }
 
         [HttpGet]
         [Route("GetWordJson/{label}")]
         public async Task<IActionResult> GetWordJson(string label)
         {
+            if (string.IsNullOrWhiteSpace(label) || label.Length > 50)
+            {
+                //_logger.LogWarning("Phát hiện request quá dài hoặc rỗng: {Label}", label?.Substring(0, Math.Min(label?.Length ?? 0, 20)));
+                return BadRequest("Từ khóa không hợp lệ (quá dài hoặc rỗng).");
+            }
             // 1. Thử lấy từ cache (RawJson)
             var json = await _wordService.GetWordJson(label);
             bool isRebuilt = false;
@@ -34,6 +44,21 @@ namespace Dict.Controllers
             // 2. Nếu không có -> Build lại
             if (string.IsNullOrEmpty(json))
             {
+                int missCount = await _wordService.GetSearchMissCountAsync(label);
+
+                if (missCount >= 5) // Ngưỡng Threshold: Chỉ build nếu bị miss từ 5 lần trở lên
+                {
+                    _logger.LogInformation("Từ '{Label}' đã bị miss {Count} lần. Tiến hành Build JSON...", label, missCount);
+                    json = await _jsonBuilderService.RebuildJsonForWordAsync(label);
+                    isRebuilt = true;
+                }
+                else
+                {
+                    // Nếu chưa đủ 5 lần, ta chỉ ghi nhận thêm 1 lần Miss nữa rồi thôi
+                    // Không tốn CPU để Rebuild, không tốn dung lượng DB để lưu JSON rác
+                    await _wordService.IncrementSearchMissAsync(label);
+                    return NotFound();
+                }
                 json = await _jsonBuilderService.RebuildJsonForWordAsync(label);
                 isRebuilt = true; // Đánh dấu là vừa build
             }

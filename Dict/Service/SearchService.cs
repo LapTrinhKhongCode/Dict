@@ -9,11 +9,13 @@ namespace Dict.Service
     public class SearchService : ISearchService
     {
         private readonly ApplicationDbContext _db;
+        private readonly TrieAutocompleteCache _trieCache;
         private readonly string sensitiveCollation = "Japanese_CS_AS_KS_WS"; // Collation phân biệt Kana
         // Tiêm (inject) DbContext vào constructor
-        public SearchService(ApplicationDbContext dbContext)
+        public SearchService(ApplicationDbContext dbContext, TrieAutocompleteCache trieCache)
         {
             _db = dbContext;
+            _trieCache = trieCache;
         }
 
         public Task<Entry?> FindExactLabelMatchAsync(string term)
@@ -83,32 +85,53 @@ namespace Dict.Service
         // Triển khai phương thức lấy gợi ý
         public async Task<List<AutocompleteSuggestionDto>> GetAutocompleteSuggestionsAsync(string term)
         {
+            if (string.IsNullOrEmpty(term) || term.Length > 100)
+            {
+                // Return an empty list instead of BadRequest, since this is a service class
+                return new List<AutocompleteSuggestionDto>();
+            }
             if (string.IsNullOrWhiteSpace(term)) return new List<AutocompleteSuggestionDto>();
+            string cleanTerm = term.Trim().ToLower();
 
-            // 1. Chuẩn bị dữ liệu tìm kiếm (Chỉ cần LIKE là đủ cân hết)
-            string cleanTerm = term.Trim();
-            string startsWithTerm = cleanTerm + "%";
+            // 1. ƯU TIÊN: TÌM TRONG TRIE (RAM) - Tốc độ < 1ms
+            if (_trieCache.IsLoaded)
+            {
+                var curr = _trieCache.Root;
+                bool found = true;
+                foreach (var c in cleanTerm)
+                {
+                    if (!curr.Children.TryGetValue(c, out curr))
+                    {
+                        found = false;
+                        break;
+                    }
+                }
 
-            // 2. Truy vấn - Tận dụng tối đa Covering Index (IX_entries_SmartSearch)
-            var suggestions = await _db.Entries
+                if (found && curr.Suggestions.Any())
+                {
+                    return curr.Suggestions;
+                }
+            }
+
+            // 2. DỰ PHÒNG (FALLBACK): TRUY VẤN SQL SERVER (Code gốc của Đức Anh)
+            // Chạy khi Trie chưa load xong hoặc cần tìm kiếm sâu hơn
+            return await _db.Entries
                 .AsNoTracking()
                 .Where(e => e.Type == "word" &&
-                           (EF.Functions.Like(e.Label, startsWithTerm) || EF.Functions.Like(e.Phonetic, startsWithTerm)))
-                .Select(e => new
-                {
-                    // Lấy các cột nằm trong Index để EF Core không phải load toàn bộ bảng
+                           (EF.Functions.Like(e.Label, cleanTerm + "%") ||
+                            EF.Functions.Like(e.Phonetic, cleanTerm + "%")))
+                .Select(e => new {
                     e.Label,
                     e.Phonetic,
                     e.ShortMean,
                     e.Weight,
-                    // Tính điểm ưu tiên: Khớp chính xác > Khớp bắt đầu bằng
                     Score = (e.Label == cleanTerm ? 100 : 0) +
                             (e.Phonetic == cleanTerm ? 90 : 0) +
-                            (EF.Functions.Like(e.Label, startsWithTerm) ? 50 : 0)
+                            (EF.Functions.Like(e.Label, cleanTerm + "%") ? 50 : 0)
                 })
                 .OrderByDescending(x => x.Score)
-                .ThenByDescending(x => x.Weight) // Weight cao hiện lên trước
-                .Take(15) // Lấy nhiều hơn một chút để lọc
+                .ThenByDescending(x => x.Weight)
+                .Take(15)
                 .Select(x => new AutocompleteSuggestionDto
                 {
                     Word = x.Label,
@@ -116,8 +139,6 @@ namespace Dict.Service
                     Meaning = x.ShortMean
                 })
                 .ToListAsync();
-
-            return suggestions;
         }
     }
 }

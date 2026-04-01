@@ -59,8 +59,22 @@ namespace Dict.Controllers
         [HttpGet("autocomplete/{term}")]
         public async Task<ActionResult<List<AutocompleteSuggestionDto>>> GetAutocompleteSuggestions(string term)
         {
+            if (string.IsNullOrWhiteSpace(term) || term.Length > 50)
+            {
+                return BadRequest("Input invalid");
+            }
+            if (ContainsTrash(term))
+            {
+                return Ok(new List<AutocompleteSuggestionDto>()); // Trả về mảng rỗng luôn cho nhanh
+            }
             var suggestions = await _searchService.GetAutocompleteSuggestionsAsync(term);
             return Ok(suggestions);
+        }
+
+        private bool ContainsTrash(string input)
+        {
+            // Ví dụ: Nếu chứa quá nhiều ký tự đặc biệt hoặc dấu ngoặc, log... thì coi là rác
+            return input.Contains("Executed DbCommand") || input.Contains("[Parameters=");
         }
     }
 }

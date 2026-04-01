@@ -1,16 +1,18 @@
 ﻿using Dict.Data;
 using Dict.DTO;
+using Dict.Models;
 using Dict.Service.IService;
 using EllipticCurve.Utils;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection; // <-- QUAN TRỌNG: Thêm thư viện này
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using System;
-using Dict.Models;
-using Microsoft.Extensions.DependencyInjection; // <-- QUAN TRỌNG: Thêm thư viện này
 
 public class KanjiService : IKanjiService
 {
@@ -19,30 +21,43 @@ public class KanjiService : IKanjiService
     private readonly ILogger<KanjiService> _logger;
     private readonly string _sensitiveCollation = "Japanese_CS_AS_KS_WS";
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly KanjiCache _kanjiCache;
+    private readonly IMemoryCache _memoryCache; // L2 Cache
 
     public KanjiService(
         ApplicationDbContext db,
         IJsonBuilderService jsonBuilderService,
         ILogger<KanjiService> logger,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        KanjiCache kanjiCache,
+        IMemoryCache memoryCache)
     {
         _db = db;
         _jsonBuilderService = jsonBuilderService;
         _logger = logger;
         _scopeFactory = scopeFactory;
+        _kanjiCache = kanjiCache;
+        _memoryCache = memoryCache;
     }
 
     public async Task<string?> GetKanjiJson(string label)
     {
-        // 1. Lọc lấy các ký tự là Kanji và đảm bảo không bị trùng lặp
-        var kanjiList = label.Where(c => c >= 0x4E00 && c <= 0x9FFF)
-                             .Select(c => c.ToString())
-                             .Distinct()
-                             .ToList();
-
-        if (!kanjiList.Any())
+        if (string.IsNullOrWhiteSpace(label)) return null;
+        if (label.Length > 50)
         {
-            // Kịch bản tìm theo phiên âm (giữ nguyên)
+            return JsonConvert.SerializeObject(new { status = 400, error = "Input too long" });
+        }
+        string fullCacheKey = $"kanji_full_{label}";
+        if (_memoryCache.TryGetValue(fullCacheKey, out string? cachedResult))
+        {
+            return cachedResult;
+        }
+        // 1. Lọc Kanji từ chuỗi nhập vào (Unique)
+        var kanjiChars = label.Where(c => c >= 0x4E00 && c <= 0x9FFF).Distinct().ToList();
+
+        // --- TRƯỜNG HỢP 1: KHÔNG CÓ KÝ TỰ KANJI (TÌM THEO PHIÊN ÂM) ---
+        if (!kanjiChars.Any())
+        {
             var phoneticMatch = await _db.Entries.AsNoTracking()
                 .Where(k => k.Type == "kanji" && k.Phonetic == label)
                 .Select(k => new { k.Id, k.RawJson })
@@ -57,46 +72,70 @@ public class KanjiService : IKanjiService
             return JsonConvert.SerializeObject(new { status = 404, error = "No Kanji found" });
         }
 
-        // 2. KỊCH BẢN TỐI ƯU NHẤT: Bắn 1 lệnh IN quét toàn bộ các chữ Hán
-        var entries = await _db.Entries.AsNoTracking()
-            .Where(k => k.Type == "kanji" && kanjiList.Contains(k.Label))
-            .Select(k => new { k.Id, k.Label, k.RawJson })
-            .ToListAsync();
+        // --- TRƯỜNG HỢP 2: CÓ KANJI -> TRIỂN KHAI CHIẾN THUẬT HYBRID ---
+        var rawJsonResults = new List<string>(); // Lưu chuỗi thô, không Parse Object
+        var missingInCache = new List<string>();
 
-        if (entries.Any())
+        // 2.1. Quét RAM trước (O(1) mỗi ký tự)
+        foreach (var c in kanjiChars)
         {
-            LogSearchHitAsync(entries.First().Id); // Ghi log 1 phát đại diện
-
-            // 3. Gom Json
-            var combinedResults = new List<object>();
-
-            foreach (var entry in entries)
-            {
-                if (!string.IsNullOrWhiteSpace(entry.RawJson) && entry.RawJson != "{}")
-                {
-                    try
-                    {
-                        // Parse cái JSON gốc (vd: của chữ 大) ra thành Object
-                        var parsed = JsonConvert.DeserializeObject<dynamic>(entry.RawJson);
-
-                        // ÉP NÓ VÀO MẢNG LUÔN, KHÔNG CẦN CHỌC VÀO TÌM KEY NÀO NỮA
-                        combinedResults.Add(parsed);
-                    }
-                    catch { /* Bỏ qua lỗi */ }
-                }
-            }
-
-            if (combinedResults.Any())
-            {
-                // Trả về đúng format: {"status": 200, "results": [ {chữ Đại}, {chữ Học} ]}
-                // Ở đây mình bọc cái mảng combinedResults vào biến "results"
-                return JsonConvert.SerializeObject(new { status = 200, results = combinedResults });
-            }
+            if (_kanjiCache.IsLoaded && _kanjiCache.Data.TryGetValue(c, out var json))
+                rawJsonResults.Add(json);
+            else
+                missingInCache.Add(c.ToString());
         }
 
-        // 4. Nếu không có trong DB thì cho Rebuild
-        string kanjiStringForRebuild = string.Join("", kanjiList);
+        // 2.2. Nếu RAM thiếu chữ nào, mới đi tìm trong DB (Chỉ tìm những chữ thiếu)
+        if (missingInCache.Any())
+        {
+            var dbEntries = await _db.Entries.AsNoTracking()
+                .Where(k => k.Type == "kanji" && missingInCache.Contains(k.Label))
+                .Select(k => new { k.Id, k.Label, k.RawJson })
+                .ToListAsync();
+
+            foreach (var entry in dbEntries)
+            {
+                rawJsonResults.Add(entry.RawJson);
+                missingInCache.Remove(entry.Label);
+            }
+            if (dbEntries.Any()) LogSearchHitAsync(dbEntries.First().Id);
+        }
+
+        // 2.3. Trả về kết quả nếu tìm thấy đủ
+        if (rawJsonResults.Any())
+        {
+            // Tối ưu: Dùng string.Join để nối chuỗi JSON thô, không tốn CPU Deserialize/Serialize
+            var finalResult = "{\"status\":200,\"results\":[" + string.Join(",", rawJsonResults) + "]}";
+
+            // Lưu vào L2 Cache trong 60 phút
+            _memoryCache.Set(fullCacheKey, finalResult, TimeSpan.FromMinutes(60));
+
+            if (missingInCache.Any())
+            {
+                _logger.LogWarning($"Thiếu {missingInCache.Count} chữ: {string.Join("", missingInCache)}");
+                // Có thể gọi Rebuild ngầm ở đây nếu muốn
+            }
+
+            return finalResult;
+        }
+
+        // --- TRƯỜNG HỢP 3: KHÔNG THẤY GÌ CẢ -> REBUILD TẤT CẢ ---
+        string kanjiStringForRebuild = string.Join("", kanjiChars);
         return await _jsonBuilderService.RebuildJsonForKanjiAsync(kanjiStringForRebuild);
+    }
+
+    // Hàm phụ để parse JSON an toàn
+    private dynamic? TryParseJson(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "{}") return null;
+        try
+        {
+            return JsonConvert.DeserializeObject<dynamic>(json);
+        }
+        catch
+        {
+            return null;
+        }
     }
     public async Task<KanjiDto?> GetKanjiInfoAsync(
         string character,
@@ -110,81 +149,47 @@ public class KanjiService : IKanjiService
 
     // --- CÁC HÀM GHI LOG (ĐÃ ĐƯỢC "ĐỘ" LÊN FIRE-AND-FORGET) ---
 
-    private void LogSearchHitAsync(int entryId) // <-- ĐỔI THÀNH VOID
+    private void LogSearchHitAsync(int entryId)
     {
         _ = Task.Run(async () =>
         {
             try
             {
-                // TẠO SCOPE MỚI ĐỂ TRÁNH LỖI DISPOSED DBCONTEXT
                 using var scope = _scopeFactory.CreateScope();
-                var backgroundDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                var stat = await backgroundDb.StatsWordFreq
-                    .FirstOrDefaultAsync(s => s.EntryId == entryId);
-
-                if (stat != null)
-                {
-                    stat.Occurrences = (stat.Occurrences ?? 0) + 1;
-                    stat.LastSeenAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    stat = new StatsWordFreq
-                    {
-                        EntryId = entryId,
-                        Occurrences = 1,
-                        LastSeenAt = DateTime.UtcNow
-                    };
-                    backgroundDb.StatsWordFreq.Add(stat); // Dùng backgroundDb
-                }
-                await backgroundDb.SaveChangesAsync(); // Dùng backgroundDb
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                string sql = @"
+                    MERGE INTO stats_word_freq AS target
+                    USING (SELECT @id AS EntryId) AS source
+                    ON (target.EntryId = source.EntryId)
+                    WHEN MATCHED THEN UPDATE SET Occurrences = target.Occurrences + 1, LastSeenAt = GETUTCDATE()
+                    WHEN NOT MATCHED THEN INSERT (EntryId, Occurrences, LastSeenAt) VALUES (@id, 1, GETUTCDATE());";
+                await db.Database.ExecuteSqlRawAsync(sql, new SqlParameter("@id", entryId));
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi ghi log StatsWordFreq cho EntryId {EntryId}", entryId);
-            }
+            catch (Exception ex) { _logger.LogError(ex, "Lỗi Hit Log"); }
         });
     }
 
-    private void LogSearchMissAsync(string term) // <-- ĐỔI THÀNH VOID
+    private void LogSearchMissAsync(string term)
     {
         if (string.IsNullOrWhiteSpace(term)) return;
-        var normalizedTerm = term.Trim().ToLower();
-
         _ = Task.Run(async () =>
         {
             try
             {
-                // BỌC LUÔN THẰNG NÀY VÀO SCOPE RIÊNG BIỆT
                 using var scope = _scopeFactory.CreateScope();
-                var backgroundDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                var miss = await backgroundDb.SearchMiss
-                    .FirstOrDefaultAsync(sm => sm.NormalizedTerm == normalizedTerm);
-
-                if (miss != null)
-                {
-                    miss.SearchCount++;
-                    miss.LastSearchedAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    miss = new SearchMiss
-                    {
-                        SearchTerm = term.Length > 255 ? term.Substring(0, 255) : term,
-                        NormalizedTerm = normalizedTerm,
-                        SearchCount = 1,
-                        LastSearchedAt = DateTime.UtcNow
-                    };
-                    backgroundDb.SearchMiss.Add(miss); // Dùng backgroundDb
-                }
-                await backgroundDb.SaveChangesAsync(); // Dùng backgroundDb
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                string sql = @"
+                    MERGE INTO SearchMisses AS target
+                    USING (SELECT @t AS SearchTerm, @n AS NormalizedTerm) AS source
+                    ON (target.NormalizedTerm = source.NormalizedTerm)
+                    WHEN MATCHED THEN UPDATE SET SearchCount = target.SearchCount + 1, LastSearchedAt = GETUTCDATE()
+                    WHEN NOT MATCHED THEN INSERT (SearchTerm, NormalizedTerm, SearchCount, LastSearchedAt) 
+                    VALUES (@t, @n, 1, GETUTCDATE());";
+                await db.Database.ExecuteSqlRawAsync(sql,
+                    new SqlParameter("@t", term),
+                    new SqlParameter("@n", term.Trim().ToLower()));
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi ghi log SearchMiss cho Term {Term}", term);
-            }
+            catch (Exception ex) { _logger.LogError(ex, "Lỗi Miss Log"); }
         });
     }
 }
