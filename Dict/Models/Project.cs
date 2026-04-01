@@ -23,5 +23,6 @@ namespace Dict.Models
         public virtual ICollection<ProjectVocabulary> ProjectVocabularies { get; set; }
 
         public virtual ICollection<OcrJob> OcrJobs { get; set; }
+        public virtual ICollection<MediaStore> MediaFiles { get; set; }
     }
 }

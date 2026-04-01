@@ -35,18 +35,16 @@ namespace Dict.Hubs
         /// <summary>
         /// Frontend gọi hàm này khi mở trang đọc PDF (/reader)
         /// </summary>
-        public async Task JoinDocumentRoom(int mediaStoreId)
+        public async Task JoinDocumentRoom(int documentId)
         {
-            string roomName = $"Document_{mediaStoreId}";
+            string roomName = $"Document_{documentId}";
             await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
         }
 
-        /// <summary>
-        /// Frontend gọi hàm này khi thoát trang đọc PDF
-        /// </summary>
-        public async Task LeaveDocumentRoom(int mediaStoreId)
+        // Frontend sẽ gọi hàm này khi người dùng đóng file / tắt trang
+        public async Task LeaveDocumentRoom(int documentId)
         {
-            string roomName = $"Document_{mediaStoreId}";
+            string roomName = $"Document_{documentId}";
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomName);
         }
 

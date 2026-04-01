@@ -291,7 +291,7 @@ definePageMeta({
   middleware: 'auth-client'
 })
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue' // <-- 1. Import watch
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspace } from '~/composables/useWorkspace'
 import { useJwt } from '~/composables/useJwt'
@@ -306,6 +306,15 @@ const id = parseInt(route.params.id as string)
 const { getWorkspace, updateWorkspace, deleteWorkspace,
         getMembers, inviteMember, updateMemberRole, removeMember, leaveWorkspace } = useWorkspace()
 
+const { userId: currentUserId, isAuthenticated } = useJwt() // <-- 2. Lấy isAuthenticated từ useJwt
+
+// <-- 3. Thêm watcher theo dõi isAuthenticated -->
+watch(isAuthenticated, (newVal) => {
+  if (!newVal) {
+    router.push('/login')
+  }
+}, { immediate: true })
+
 const workspace = ref<any>(null)
 const members = ref<any[]>([])
 const tab = ref('members')
@@ -319,26 +328,22 @@ const confirmDelete = ref(false)
 const confirmLeave = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
-const leaving = ref(false) // Trạng thái loading khi rời
+const leaving = ref(false) 
 const inviting = ref(false)
 const inviteEmail = ref('')
 const inviteRole = ref('MEMBER')
 const inviteError = ref('')
 const editForm = ref({ name: '', description: '' })
-const newAdminId = ref<number | ''>('') // Lưu ID của người kế nhiệm Admin
-
-const { userId: currentUserId } = useJwt()
+const newAdminId = ref<number | ''>('') 
 
 const isAdmin = computed(() => workspace.value?.myRole?.toUpperCase() === 'ADMIN')
 
-// Kiểm tra xem User hiện tại có phải là Admin DUY NHẤT hay không
 const isSoleAdmin = computed(() => {
   if (!isAdmin.value) return false
   const adminCount = members.value.filter(m => m.role?.toUpperCase() === 'ADMIN').length
   return adminCount === 1
 })
 
-// Lấy danh sách thành viên có thể kế nhiệm (Không chứa bản thân mình)
 const eligibleSuccessors = computed(() => members.value.filter(m => m.userId !== currentUserId.value))
 
 function openEdit() {
@@ -346,16 +351,22 @@ function openEdit() {
   showEdit.value = true
 }
 
-// Mở modal rời nhóm, reset lại trạng thái người kế nhiệm
 function openLeaveModal() {
   newAdminId.value = ''
   confirmLeave.value = true
 }
 
 async function load() {
-  const [ws, mb] = await Promise.all([getWorkspace(id), getMembers(id)])
-  workspace.value = ws
-  members.value = mb
+  // <-- Kiểm tra thêm một lớp bảo vệ trong hàm load
+  if (!isAuthenticated.value) return; 
+
+  try {
+     const [ws, mb] = await Promise.all([getWorkspace(id), getMembers(id)])
+     workspace.value = ws
+     members.value = mb
+  } catch(error) {
+     console.error(error)
+  }
 }
 
 async function handleUpdate() {
@@ -416,22 +427,19 @@ async function handleRemove(userId: number) {
 }
 
 async function handleLeave() {
-  if (members.value.length <= 1) return // Đã chặn trên UI, nhưng chặn thêm cho chắc
+  if (members.value.length <= 1) return 
 
   try {
     leaving.value = true
 
-    // Nếu là admin duy nhất, thực hiện bước NHƯỢNG QUYỀN trước
     if (isSoleAdmin.value) {
       if (!newAdminId.value) {
         showToast('Vui lòng chọn người kế nhiệm trước khi rời', 'error')
         return
       }
-      // Đổi role cho người mới lên làm Admin
       await updateMemberRole(id, Number(newAdminId.value), 'ADMIN')
     }
 
-    // Sau khi an toàn có người cầm quyền rồi, mới tiến hành Out
     await leaveWorkspace(id)
     showToast('Đã rời workspace.', 'success')
     confirmLeave.value = false

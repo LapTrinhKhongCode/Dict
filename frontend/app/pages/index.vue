@@ -267,23 +267,36 @@
 </template>
 
 <script setup>
-definePageMeta({ layout: 'default', ssr: false })
+definePageMeta({ 
+  layout: 'default', 
+  ssr: false,
+  middleware: 'auth-client' // Đảm bảo có middleware bảo vệ route
+})
 
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue' // 1. Import thêm watch
 import { useRouter } from 'vue-router'
 import { useWorkspace } from '~/composables/useWorkspace'
 import { useProject } from '~/composables/useProject'
 import { useRecentSearches } from '~/composables/useRecentSearches'
+import { useJwt } from '~/composables/useJwt' // 2. Import useJwt
 
 const router = useRouter()
 const config = useRuntimeConfig()
 const { getMyWorkspaces } = useWorkspace()
 const { getProjects, createProject } = useProject()
+const { jwt, isAuthenticated } = useJwt() // 3. Lấy trạng thái Auth
 
 // Lịch sử tra từ vựng
 const { recentSearches, removeSearch, clearSearches } = useRecentSearches()
 
-const getToken = () => localStorage.getItem('jwt_token') || ''
+const getToken = () => localStorage.getItem('jwt_token') || jwt.value || ''
+
+// 4. WATCHER: Bắt sự kiện đăng xuất (Token rỗng)
+watch(isAuthenticated, (newVal) => {
+  if (!newVal) {
+    router.push('/login')
+  }
+}, { immediate: true })
 
 // --- TOAST ---
 const toast = reactive({ visible: false, message: '', type: 'success' })
@@ -315,17 +328,15 @@ async function onWorkspaceChange() {
 }
 
 // ==========================================
-// --- LOGIC TẠO PROJECT (ĐÃ FIX LỖI 400) ---
+// --- LOGIC TẠO PROJECT ---
 // ==========================================
 const showCreateProject = ref(false)
 const creatingProject = ref(false)
-// Đã thêm trường description vào form để tránh backend báo lỗi
 const projectForm = reactive({ name: '', description: '', workspaceId: '' })
 
 function openCreateProjectModal() {
   projectForm.name = ''
   projectForm.description = ''
-  // Lấy ID chuẩn của Workspace hiện tại gắn vào select box
   projectForm.workspaceId = activeWsId.value || (workspaces.value.length > 0 ? workspaces.value[0].id : '')
   showCreateProject.value = true
 }
@@ -335,19 +346,14 @@ async function handleCreateProject() {
   
   creatingProject.value = true
   try {
-    // 1. Ép kiểu workspaceId sang dạng số (Number)
     const wsId = Number(projectForm.workspaceId);
-    
-    // 2. Gói data thành payload gửi xuống hàm createProject
     const payload = {
       name: projectForm.name.trim(),
-      description: projectForm.description || '' // Gửi chuỗi rỗng nếu không nhập mô tả
+      description: projectForm.description || '' 
     };
 
-    // 3. Gọi API (Đảm bảo file useProject.ts của bạn cũng nhận 2 tham số này)
     const p = await createProject(wsId, payload)
     
-    // 4. Update UI danh sách dự án ngay lập tức
     if (activeWsId.value && activeWsId.value === projectForm.workspaceId) {
       projects.value.unshift(p)
     }
@@ -420,7 +426,6 @@ async function handleConfirmUpload() {
     showUploadModal.value = false
     showToast("Tải lên tài liệu thành công!", "success")
 
-    // Update danh sách file nếu upload đúng vào WS đang mở
     if (activeWsId.value && activeWsId.value === uploadForm.workspaceId) {
       projects.value = await getProjects(activeWsId.value)
       await fetchRecentFilesForWorkspace(projects.value)
@@ -435,6 +440,9 @@ async function handleConfirmUpload() {
 
 // --- LOGIC LOAD DỮ LIỆU ---
 async function loadInitialData() {
+  // 5. Kiểm tra an toàn trước khi gọi API
+  if (!isAuthenticated.value) return;
+
   loadingWs.value = true
   try {
     workspaces.value = await getMyWorkspaces()
@@ -444,6 +452,10 @@ async function loadInitialData() {
     }
   } catch (e) {
     console.error(e)
+    // Nếu token lỗi 401 từ Server, đá văng luôn
+    if (e.response?.status === 401) {
+      router.push('/login')
+    }
   } finally {
     loadingWs.value = false
   }
@@ -529,7 +541,7 @@ onMounted(loadInitialData)
 
 /* Các Transition CSS cơ bản */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }  
 .toast-fade-enter-active { transition: all 0.3s ease; }
 .toast-fade-leave-active { transition: all 0.2s ease; }
 .toast-fade-enter-from { opacity: 0; transform: translateY(20px); }

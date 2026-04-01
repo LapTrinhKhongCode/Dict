@@ -25,7 +25,7 @@ namespace Dict.Controllers
         {
             try
             {
-                int currentUserId = 1; // Lấy từ Token
+                int currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
                 _response.Result = await _commentService.AddCommentAsync(currentUserId, dto);
                 _response.Message = "Đã thêm bình luận.";
             }
@@ -59,7 +59,7 @@ namespace Dict.Controllers
         {
             try
             {
-                int currentUserId = 1; // Lấy từ Token
+                int currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
                 var success = await _commentService.DeleteCommentAsync(currentUserId, id);
                 if (success)
                     _response.Message = "Bình luận đã được xóa.";

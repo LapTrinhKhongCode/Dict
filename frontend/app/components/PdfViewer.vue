@@ -151,7 +151,8 @@ const props = defineProps({
   jobId: { type: [String, Number], required: false },
   apiKey: { type: String, required: true } 
 })
-const emit = defineEmits(['text-selected', 'rag-updated', 'page-changed'])
+// Thay đổi dòng defineEmits hiện tại thành:
+const emit = defineEmits(['text-selected', 'rag-updated', 'page-changed', 'media-id-loaded'])
 const config = useRuntimeConfig()
 const getToken = () => localStorage.getItem('jwt_token') || ''
 
@@ -222,6 +223,9 @@ async function loadFromOcr(jobId) {
     const apiUrl = `${config.public.apiBaseUrl}/api/Infer/job/${jobId}`
     const res = await fetch(apiUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}` } })
     const data = await res.json()
+   if (data.mediaId) {
+      emit('media-id-loaded', data.mediaId);
+    }
 
     if (data.imageUrl && data.imageUrl.toLowerCase().includes('.pdf')) {
       ocrMode.value = false
@@ -414,6 +418,7 @@ function setupScrollObserver() {
   const rootEl = pdfScrollAllEl.value
   if (!rootEl) return
 
+  // Thêm nhiều threshold để observer nhạy hơn khi cuộn
   scrollObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       const p = parseInt(entry.target.dataset.page)
@@ -430,18 +435,43 @@ function setupScrollObserver() {
       }
     })
 
-    const center = entries.find(e => e.intersectionRatio > 0.45)
-    if (center) {
-      currentPage.value = parseInt(center.target.dataset.page)
-      gotoPage.value = currentPage.value
-      emit('page-changed', currentPage.value)
-      if (visionEnabled.value) preloadOcr(currentPage.value, 3)
+    // --- FIX LỖI TÍNH TRANG HIỆN TẠI TẠI ĐÂY ---
+    const rootRect = rootEl.getBoundingClientRect()
+    // Lấy tọa độ Y ở chính giữa container cuộn
+    const viewportCenter = rootRect.top + rootRect.height / 2
+
+    let closestPage = currentPage.value
+    let minDistance = Infinity
+
+    // Duyệt qua những trang đang lọt vào tầm nhìn để tìm trang nằm giữa nhất
+    visiblePagesSet.forEach(p => {
+      const el = pageRefs.value[p]
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        // Tính tâm của trang
+        const pageCenter = rect.top + rect.height / 2
+        const distance = Math.abs(pageCenter - viewportCenter)
+        
+        if (distance < minDistance) {
+          minDistance = distance
+          closestPage = p
+        }
+      }
+    })
+
+    // Cập nhật lại số trang nếu có thay đổi
+    if (closestPage !== currentPage.value) {
+      currentPage.value = closestPage
+      gotoPage.value = closestPage
+      emit('page-changed', closestPage)
+      if (visionEnabled.value) preloadOcr(closestPage, 3)
     }
-  }, { root: rootEl, rootMargin: '800px 0px', threshold: [0, 0.5, 1] })
+    // --- KẾT THÚC FIX ---
+
+  }, { root: rootEl, rootMargin: '800px 0px', threshold: [0, 0.1, 0.5, 1] }) 
 
   nextTick(() => Object.values(pageRefs.value).forEach(el => el && scrollObserver.observe(el)))
 }
-
 // ==========================================
 // 3. BACKGROUND VISION OCR
 // ==========================================
@@ -571,23 +601,33 @@ const onVisionItemClick = (it, e) => {
 
 function startDrag(e, n) {
   if (e.button !== 0) return
+  
+  // Dùng getBoundingClientRect và clientX/Y để lấy tọa độ tuyệt đối
+  const rect = e.currentTarget.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+
   dragState.value = {
     active: true, page: n,
-    startX: e.offsetX, startY: e.offsetY,
-    endX: e.offsetX, endY: e.offsetY,
-    w: e.currentTarget.offsetWidth,
-    h: e.currentTarget.offsetHeight
+    startX: x, startY: y,
+    endX: x, endY: y,
+    w: rect.width,
+    h: rect.height
   }
   visionSelectedItems.value = []
 }
 
 function updateDrag(e, n) {
   if (dragState.value.active && dragState.value.page === n) {
-    dragState.value = { ...dragState.value, endX: e.offsetX, endY: e.offsetY }
+    // Tương tự, tính lại tọa độ tuyệt đối khi di chuyển chuột
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    dragState.value = { ...dragState.value, endX: x, endY: y }
     _updateSelection(n)
   }
 }
-
 function endDrag(e, n) {
   if (!dragState.value.active) return
   dragState.value = { ...dragState.value, active: false }
@@ -792,6 +832,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (scrollObserver) scrollObserver.disconnect()
+})
+defineExpose({
+  gotoPage,
+  jumpToPage
 })
 </script>
 

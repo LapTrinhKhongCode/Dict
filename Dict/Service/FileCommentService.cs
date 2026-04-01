@@ -21,6 +21,13 @@ namespace Dict.Services
         }
         public async Task<FileCommentDTO> AddCommentAsync(int userId, CreateCommentDTO dto)
         {
+            var fileExists = await _db.MediaStore.AnyAsync(m => m.Id == dto.MediaStoreId);
+            if (!fileExists)
+            {
+                throw new Exception($"Tài liệu này không tồn tại hoặc chưa được lưu chính thức vào hệ thống (ID: {dto.MediaStoreId}).");
+            }
+
+            // 2. Nếu file tồn tại, mới bắt đầu tạo Comment
             var comment = new FileComment
             {
                 UserId = userId,

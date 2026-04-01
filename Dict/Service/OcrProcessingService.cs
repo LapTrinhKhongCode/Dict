@@ -112,6 +112,7 @@ namespace Dict.Service
                     WorkspaceId = workspaceId,
                     FileName = image.FileName,
                     MimeType = image.ContentType,
+                    ProjectId = projectId,
                     SizeBytes = image.Length,
                     StorageUrl = uploadedUrl,
                     Sha256 = ComputeSha256(originalImageBytes),

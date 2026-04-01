@@ -10,6 +10,10 @@ namespace Dict.Models
         public int WorkspaceId { get; set; }
 
         public virtual Workspace Workspace { get; set; }
+        public int? ProjectId { get; set; }
+
+        [ForeignKey("ProjectId")]
+        public virtual Project Project { get; set; }
         public int OwnerId { get; set; }
         public virtual ApplicationUser Owner { get; set; }
 

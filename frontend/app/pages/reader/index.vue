@@ -15,15 +15,17 @@
     <main class="flex flex-1 overflow-hidden relative">
       
       <section class="flex flex-col relative h-full" :style="{ width: leftPanelWidth + '%' }">
-        <PdfViewer 
-          v-if="fileUrl || pdfData || jobId"
-          :file-url="fileUrl" 
-          :file-data="pdfData" 
-          :job-id="jobId"
-          :api-key="apiKey" 
-          @rag-updated="(data) => ragIndex = data"
-          @text-selected="handleTextSelection"
-        />
+    <PdfViewer 
+  v-if="fileUrl || pdfData || jobId"
+  ref="pdfViewerRef"
+  :file-url="fileUrl" 
+  :file-data="pdfData" 
+  :job-id="jobId"
+  :api-key="apiKey" 
+  @rag-updated="(data) => ragIndex = data"
+  @text-selected="handleTextSelection"
+  @page-changed="handlePageChanged"
+  @media-id-loaded="(id) => fileId = id" />
         <div v-else class="flex flex-col items-center justify-center h-full text-gray-400">
           <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
           <p>Đang chờ nạp dữ liệu OCR/PDF...</p>
@@ -33,9 +35,10 @@
       <div class="w-1.5 bg-[#161b22] border-x border-[#30363d] cursor-col-resize hover:bg-[#5b8dee] transition-colors z-20" @mousedown="startResize"></div>
 
       <section class="flex-1 flex flex-col bg-[#161b22]">
-        <div class="flex border-b border-[#30363d] bg-[#0d1117]">
-          <button @click="activeTab='chat'" :class="['flex-1 p-3 text-sm font-semibold transition', activeTab==='chat' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">💬 Trợ lý Chat</button>
-          <button @click="activeTab='vocab'" :class="['flex-1 p-3 text-sm font-semibold transition', activeTab==='vocab' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">📚 Sổ từ vựng</button>
+        <div class="flex border-b border-[#30363d] bg-[#0d1117] shrink-0 overflow-x-auto custom-scrollbar">
+          <button @click="activeTab='chat'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='chat' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">💬 Trợ lý AI</button>
+          <button @click="activeTab='vocab'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='vocab' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">📚 Từ vựng</button>
+          <button @click="activeTab='comment'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='comment' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">📝 Thảo luận</button>
         </div>
 
         <div v-show="activeTab === 'chat'" class="flex-1 overflow-hidden">
@@ -45,48 +48,34 @@
         <div v-show="activeTab === 'vocab'" class="flex-1 overflow-hidden">
           <VocabManager ref="vocabMgrRef" :project-id="projectId" :pdf-name="pdfName" />
         </div>
+
+        <div v-show="activeTab === 'comment'" class="flex-1 overflow-hidden">
+          <FileCommentTab 
+            v-if="fileId"
+            :file-id="Number(fileId)" 
+            :current-page="pdfCurrentPage"
+            @jump-to-page="triggerPdfJump"
+          />
+        </div>
       </section>
 
-     <Transition name="fade">
-  <div 
-    v-if="vocabPopup.visible" 
-    class="fixed z-[9999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1c2128] border border-[#f0c040] p-5 rounded-xl shadow-2xl w-[400px] max-w-[90vw]"
-  >
-    <h4 class="text-lg font-bold text-[#f0c040] mb-3 line-clamp-4 overflow-hidden break-words leading-tight">
-      {{ vocabPopup.word }}
-    </h4>
-
-    <div v-if="vocabPopup.loading" class="text-sm text-gray-400 flex items-center gap-2 py-2">
-      <span class="w-4 h-4 border-2 border-gray-400 border-t-[#f0c040] rounded-full animate-spin"></span> 
-      Đang dịch...
-    </div>
-
-    <div v-else>
-      <input 
-        v-model="vocabPopup.meaning" 
-        @keyup.enter="saveVocab" 
-        class="w-full bg-[#0d1117] border border-[#30363d] p-2.5 rounded text-sm mb-4 outline-none text-white focus:border-[#f0c040] transition-colors" 
-        placeholder="Nhập nghĩa..." 
-        ref="vocabInput"
-      />
-      
-      <div class="flex justify-end gap-2">
-        <button 
-          @click="vocabPopup.visible = false" 
-          class="px-4 py-1.5 bg-[#30363d] text-[#c9d1d9] rounded-lg text-sm hover:bg-[#444c56] transition"
-        >
-          Đóng
-        </button>
-        <button 
-          @click="saveVocab" 
-          class="px-4 py-1.5 bg-[#f0c040] text-black font-bold rounded-lg text-sm hover:bg-[#d4a017] transition shadow-lg"
-        >
-          Lưu từ
-        </button>
-      </div>
-    </div>
-  </div>
-</Transition>
+      <Transition name="fade">
+        <div v-if="vocabPopup.visible" class="fixed z-[9999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1c2128] border border-[#f0c040] p-5 rounded-xl shadow-2xl w-[400px] max-w-[90vw]">
+          <h4 class="text-lg font-bold text-[#f0c040] mb-3 line-clamp-4 overflow-hidden break-words leading-tight">
+            {{ vocabPopup.word }}
+          </h4>
+          <div v-if="vocabPopup.loading" class="text-sm text-gray-400 flex items-center gap-2 py-2">
+            <span class="w-4 h-4 border-2 border-gray-400 border-t-[#f0c040] rounded-full animate-spin"></span> Đang dịch...
+          </div>
+          <div v-else>
+            <input v-model="vocabPopup.meaning" @keyup.enter="saveVocab" class="w-full bg-[#0d1117] border border-[#30363d] p-2.5 rounded text-sm mb-4 outline-none text-white focus:border-[#f0c040] transition-colors" placeholder="Nhập nghĩa..." ref="vocabInput" />
+            <div class="flex justify-end gap-2">
+              <button @click="vocabPopup.visible = false" class="px-4 py-1.5 bg-[#30363d] text-[#c9d1d9] rounded-lg text-sm hover:bg-[#444c56] transition">Đóng</button>
+              <button @click="saveVocab" class="px-4 py-1.5 bg-[#f0c040] text-black font-bold rounded-lg text-sm hover:bg-[#d4a017] transition shadow-lg">Lưu từ</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
 
     </main>
   </div>
@@ -102,6 +91,7 @@ import { useRuntimeConfig } from '#app'
 import PdfViewer from '~/components/PdfViewer.vue'
 import GeminiChat from '~/components/GeminiChat.vue'
 import VocabManager from '~/components/VocabManager.vue'
+import FileCommentTab from '~/components/FileCommentTab.vue' // Import Tab Thảo luận
 
 const route = useRoute()
 const router = useRouter()
@@ -110,7 +100,8 @@ const config = useRuntimeConfig()
 // --- STATES TRUYỀN DATA ---
 const fileUrl = ref('')
 const pdfData = ref(null) 
-const jobId = ref(null) // <-- BỔ SUNG BIẾN JOB_ID
+const jobId = ref(null) 
+const fileId = ref(null) // Thêm ID của File để truyền vào FileCommentTab
 const pdfName = ref('')
 const projectId = ref(null)
 const apiKey = ref('')
@@ -121,24 +112,36 @@ const ragIndex = ref([])
 const vocabMgrRef = ref(null)
 const vocabPopup = ref({ visible: false, word: '', meaning: '', x: 0, y: 0, loading: false })
 
-// --- LOGIC XỬ LÝ SỰ KIỆN TỪ PDF VIEWER ---
+// --- STATES CHO BÌNH LUẬN & PDF VIEWER ---
+const pdfViewerRef = ref(null)
+const pdfCurrentPage = ref(1)
+
+// Cập nhật số trang khi người dùng cuộn PDF
+function handlePageChanged(page) {
+  pdfCurrentPage.value = page
+}
+
+// Bắn lệnh nhảy trang vào PdfViewer khi click "Xem trang X" bên Comment Tab
+function triggerPdfJump(pageNum) {
+  if (pdfViewerRef.value) {
+    // Ép Component PdfViewer nhảy trang
+    pdfViewerRef.value.gotoPage = pageNum
+    pdfViewerRef.value.jumpToPage()
+  }
+}
+
 // --- LOGIC XỬ LÝ SỰ KIỆN TỪ PDF VIEWER ---
 function handleTextSelection(data) {
-  const popupHeight = 220; // Ước lượng chiều cao của popup tra từ
-  const popupWidth = 270;  // Ước lượng chiều rộng
+  const popupHeight = 220; 
+  const popupWidth = 270;  
 
   let posX = data.x + 10;
-  let posY = data.y + 15; // Mặc định hiện hơi lệch xuống dưới con trỏ chuột
+  let posY = data.y + 15; 
 
-  // CHỐNG LẸM ĐÁY: Nếu thả popup xuống dưới mà vượt quá màn hình -> Lật ngược lên trên
   if (posY + popupHeight > window.innerHeight) {
     posY = data.y - popupHeight - 15;
   }
-
-  // BẢO VỆ: Không cho lẹm lên nóc màn hình
   posY = Math.max(10, posY);
-
-  // BẢO VỆ: Không cho lẹm sát mép phải
   posX = Math.min(posX, window.innerWidth - popupWidth - 10);
 
   vocabPopup.value = { 
@@ -150,9 +153,9 @@ function handleTextSelection(data) {
     loading: true 
   }
   
-  // Gọi API Dictionary thực tế của bạn
   fetchWordMeaning(data.text)
 }
+
 async function fetchWordMeaning(word) {
   try {
     const url = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(word)}`
@@ -191,12 +194,15 @@ const goBack = () => router.back()
 
 onMounted(() => {
   apiKey.value = config.public.geminiApiKey || ''
-  const { url, id, jobId: qJobId, projectId: pid, name } = route.query
+ const { url, id, jobId: qJobId, projectId: pid, name } = route.query
   
   fileUrl.value = url || ''
   pdfName.value = name ? decodeURIComponent(name) : 'Tài liệu'
   projectId.value = pid
-  jobId.value = qJobId // LẤY JOB ID TỪ URL
+  jobId.value = qJobId 
+  
+  // Dùng id từ URL làm fileId cho chức năng Comment.
+ fileId.value = id ? Number(id) : null
   
   if (id) {
     const raw = sessionStorage.getItem(`pdf_${id}`)
@@ -206,11 +212,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Hiệu ứng mượt mà cho Popup */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-5px); }
 
-/* Ghi đè CSS thuần để cứu Layout bị đen xì do thiếu Tailwind */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -259,4 +263,9 @@ main {
 .resizer:hover {
   background-color: #5b8dee;
 }
+/* Style custom scrollbar cho tabs */
+.custom-scrollbar::-webkit-scrollbar { height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #484f58; }
 </style>
