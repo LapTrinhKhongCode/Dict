@@ -246,8 +246,8 @@ namespace Dict.Data
             {
                 // --- BƯỚC 1: Cấu hình "Cơ bắp" (Bảng Gầy - entries) ---
                 b.Property(x => x.Type).HasMaxLength(32);
-                b.Property(x => x.Label).HasMaxLength(450); // Đã hạ xuống 450 để khớp Index
-                b.Property(x => x.Phonetic).HasMaxLength(255);
+                b.Property(x => x.Label).HasMaxLength(450).UseCollation("Japanese_CS_AS_KS_WS"); // Đã hạ xuống 450 để khớp Index
+                b.Property(x => x.Phonetic).HasMaxLength(255).UseCollation("Japanese_CS_AS_KS_WS");
                 b.Property(x => x.Romaji).HasMaxLength(255);
                 b.Property(x => x.EntryCategory).HasMaxLength(50);
 

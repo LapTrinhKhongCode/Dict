@@ -19,14 +19,20 @@ namespace Dict.Service
         private readonly string _sensitiveCollation = "Japanese_CS_AS_KS_WS";
         private readonly IMemoryCache _memoryCache;
         private readonly ILogger<WordService> _logger;
-        private readonly IServiceScopeFactory _scopeFactory;
 
-        public WordService(ApplicationDbContext db, ILogger<WordService> logger, IServiceScopeFactory scopeFactory, IMemoryCache memoryCache)
+        // THÊM ỐNG NƯỚC VÀO ĐÂY (Đã xóa IServiceScopeFactory)
+        private readonly LogQueueService _logQueue;
+
+        public WordService(
+            ApplicationDbContext db,
+            ILogger<WordService> logger,
+            IMemoryCache memoryCache,
+            LogQueueService logQueue) // <-- Inject vào đây
         {
             _db = db;
             _logger = logger;
-            _scopeFactory = scopeFactory;
             _memoryCache = memoryCache;
+            _logQueue = logQueue;
         }
 
         public async Task<string?> GetWordJson(string label)
@@ -47,7 +53,7 @@ namespace Dict.Service
             var entry = await _db.Entries
                 .AsNoTracking()
                 .Where(k => k.Type == "word" &&
-                            (EF.Functions.Collate(k.Label, _sensitiveCollation) == label))
+                            k.Label == label)
                 .Select(k => new { k.Id, k.RawJson })
                 .FirstOrDefaultAsync();
 
@@ -75,7 +81,7 @@ namespace Dict.Service
         {
             var existingEntry = await _db.Entries
                 .Where(k => k.Type == "word" &&
-                            EF.Functions.Collate(k.Label, _sensitiveCollation) == label)
+                            k.Label == label)
                 .FirstOrDefaultAsync();
 
             if (existingEntry != null)
@@ -157,76 +163,15 @@ namespace Dict.Service
 
         private void LogSearchHitAsync(int entryId)
         {
-            // BƯỚC 1: Thay vì tự chạy Task.Run ở đây, ta ném nó vào "ống dẫn" Channel
-            // Nếu bạn muốn nhanh nhất, hãy gửi một tín hiệu (Message) vào LogQueueService
-            // Ở đây mình sẽ sửa lại logic MERGE trước cho chuẩn:
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                    // Lệnh MERGE cho bảng Stats: Tăng Occurrences nếu có, nạp mới nếu chưa
-                    string sql = @"
-                MERGE INTO stats_word_freq AS target
-                USING (SELECT @entryId AS EntryId) AS source
-                ON (target.EntryId = source.EntryId)
-                WHEN MATCHED THEN
-                    UPDATE SET 
-                        Occurrences = target.Occurrences + 1, 
-                        LastSeenAt = GETUTCDATE()
-                WHEN NOT MATCHED THEN
-                    INSERT (EntryId, Occurrences, LastSeenAt)
-                    VALUES (@entryId, 1, GETUTCDATE());";
-
-                    await db.Database.ExecuteSqlRawAsync(sql, new Microsoft.Data.SqlClient.SqlParameter("@entryId", entryId));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Lỗi khi cập nhật Stats cho EntryId: {Id}", entryId);
-                }
-            });
+            // Ném gói hàng Hit vào ống nước (Cực kỳ an toàn, tốn 0.0001ms)
+            _ = _logQueue.QueueLogAsync(new SearchHitMessage(entryId));
         }
 
         private void LogSearchMissAsync(string term)
         {
             if (string.IsNullOrWhiteSpace(term)) return;
-            var normalizedTerm = term.Trim().ToLower();
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                    // DÙNG SQL MERGE ĐỂ "VÔ ĐỐI" CONCURRENCY
-                    // Nhớ dùng đúng tên bảng [SearchMisses] (có chữ es)
-                    string sql = @"
-                MERGE INTO SearchMisses AS target
-                USING (SELECT @term AS SearchTerm, @norm AS NormalizedTerm) AS source
-                ON (target.NormalizedTerm = source.NormalizedTerm)
-                WHEN MATCHED THEN
-                    UPDATE SET 
-                        SearchCount = target.SearchCount + 1, 
-                        LastSearchedAt = GETUTCDATE()
-                WHEN NOT MATCHED THEN
-                    INSERT (SearchTerm, NormalizedTerm, SearchCount, LastSearchedAt)
-                    VALUES (source.SearchTerm, source.NormalizedTerm, 1, GETUTCDATE());";
-
-                    await db.Database.ExecuteSqlRawAsync(sql,
-                        new Microsoft.Data.SqlClient.SqlParameter("@term", term),
-                        new Microsoft.Data.SqlClient.SqlParameter("@norm", normalizedTerm));
-                }
-                catch (Exception ex)
-                {
-                    // Bây giờ lỗi duy nhất có thể xảy ra là DB chết, 
-                    // còn lỗi trùng lặp sẽ bị triệt tiêu hoàn toàn.
-                    _logger.LogError(ex, "Lỗi khi Upsert SearchMisses cho Term: {Term}", term);
-                }
-            });
+            // Ném gói hàng Miss vào ống nước
+            _ = _logQueue.QueueLogAsync(new SearchMissMessage(term));
         }
     }
 }

@@ -11,11 +11,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-<<<<<<< HEAD
 using System.IdentityModel.Tokens.Jwt;
-=======
 using System.ComponentModel.Design;
->>>>>>> e991f92 (toi uu)
 using System.Text;
 using System.Text.RegularExpressions;
 

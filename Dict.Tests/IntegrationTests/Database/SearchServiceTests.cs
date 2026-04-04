@@ -32,7 +32,7 @@ public class SearchServiceTests : IDisposable
 
         _context = new TestApplicationDbContext(options);
 
-        _service = new SearchService(_context);
+        //_service = new SearchService(_context);
 
         // Bắt đầu transaction (để đảm bảo test không "ghi" gì vào DB)
         _transaction = _context.Database.BeginTransaction();

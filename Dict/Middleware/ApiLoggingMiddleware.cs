@@ -1,5 +1,5 @@
 ﻿using Dict.Models;
-using Dict.Service; // Đảm bảo đúng namespace của LogQueueService
+using Dict.Service;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -11,7 +11,7 @@ namespace Dict.Middleware
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<ApiLoggingMiddleware> _logger;
-        private readonly LogQueueService _logQueue; // Thêm hàng đợi vào đây
+        private readonly LogQueueService _logQueue;
 
         public ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddleware> logger, LogQueueService logQueue)
         {
@@ -20,7 +20,6 @@ namespace Dict.Middleware
             _logQueue = logQueue;
         }
 
-        // Xóa ApplicationDbContext dbContext khỏi tham số của InvokeAsync luôn
         public async Task InvokeAsync(HttpContext context)
         {
             if (!context.Request.Path.StartsWithSegments("/api"))
@@ -46,11 +45,10 @@ namespace Dict.Middleware
             }
 
             // --- GIAI ĐOẠN QUAN TRỌNG ---
-            await _next(context); // Chạy API (Trie tìm kiếm ở đây)
+            await _next(context); // Chạy API
             stopwatch.Stop();
             // ----------------------------
 
-            // Replace the incorrect usage of 'endpoint' with the correct value from context.Request.Path.ToString()
             var endpoint = context.Request.Path.ToString();
             var apiCall = new ApiCall
             {
@@ -64,8 +62,8 @@ namespace Dict.Middleware
             // THAY VÌ LƯU DB, TA NÉM VÀO HÀNG ĐỢI RỒI KẾT THÚC REQUEST LUÔN
             try
             {
-                _logQueue.QueueLogAsync(apiCall);
-                // Không dùng await ở đây cũng được vì nó chỉ là ném vào RAM, cực nhanh.
+                // Dùng `_ =` để bảo trình biên dịch "Tôi cố tình ném vào không đợi kết quả, đừng báo lỗi"
+                _ = _logQueue.QueueLogAsync(apiCall);
             }
             catch (Exception ex)
             {
@@ -76,7 +74,7 @@ namespace Dict.Middleware
         private async Task<string> GetRequestBodyAsync(HttpRequest request)
         {
             request.Body.Position = 0;
-            var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
+            using var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
             var body = await reader.ReadToEndAsync();
             request.Body.Position = 0;
             return body;

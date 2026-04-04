@@ -1,6 +1,7 @@
 ﻿using Dict.Data;
 using Dict.DTO;
 using Dict.Models;
+using Dict.Service;
 using Dict.Service.IService;
 using EllipticCurve.Utils;
 using Microsoft.Data.SqlClient;
@@ -20,24 +21,26 @@ public class KanjiService : IKanjiService
     private readonly IJsonBuilderService _jsonBuilderService;
     private readonly ILogger<KanjiService> _logger;
     private readonly string _sensitiveCollation = "Japanese_CS_AS_KS_WS";
-    private readonly IServiceScopeFactory _scopeFactory;
     private readonly KanjiCache _kanjiCache;
-    private readonly IMemoryCache _memoryCache; // L2 Cache
+    private readonly IMemoryCache _memoryCache;
+
+    // THÊM ỐNG NƯỚC VÀO ĐÂY
+    private readonly LogQueueService _logQueue;
 
     public KanjiService(
         ApplicationDbContext db,
         IJsonBuilderService jsonBuilderService,
         ILogger<KanjiService> logger,
-        IServiceScopeFactory scopeFactory,
         KanjiCache kanjiCache,
-        IMemoryCache memoryCache)
+        IMemoryCache memoryCache,
+        LogQueueService logQueue) // <-- Inject vào đây
     {
         _db = db;
         _jsonBuilderService = jsonBuilderService;
         _logger = logger;
-        _scopeFactory = scopeFactory;
         _kanjiCache = kanjiCache;
         _memoryCache = memoryCache;
+        _logQueue = logQueue;
     }
 
     public async Task<string?> GetKanjiJson(string label)
@@ -151,45 +154,12 @@ public class KanjiService : IKanjiService
 
     private void LogSearchHitAsync(int entryId)
     {
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                string sql = @"
-                    MERGE INTO stats_word_freq AS target
-                    USING (SELECT @id AS EntryId) AS source
-                    ON (target.EntryId = source.EntryId)
-                    WHEN MATCHED THEN UPDATE SET Occurrences = target.Occurrences + 1, LastSeenAt = GETUTCDATE()
-                    WHEN NOT MATCHED THEN INSERT (EntryId, Occurrences, LastSeenAt) VALUES (@id, 1, GETUTCDATE());";
-                await db.Database.ExecuteSqlRawAsync(sql, new SqlParameter("@id", entryId));
-            }
-            catch (Exception ex) { _logger.LogError(ex, "Lỗi Hit Log"); }
-        });
+        _ = _logQueue.QueueLogAsync(new SearchHitMessage(entryId));
     }
 
     private void LogSearchMissAsync(string term)
     {
         if (string.IsNullOrWhiteSpace(term)) return;
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                string sql = @"
-                    MERGE INTO SearchMisses AS target
-                    USING (SELECT @t AS SearchTerm, @n AS NormalizedTerm) AS source
-                    ON (target.NormalizedTerm = source.NormalizedTerm)
-                    WHEN MATCHED THEN UPDATE SET SearchCount = target.SearchCount + 1, LastSearchedAt = GETUTCDATE()
-                    WHEN NOT MATCHED THEN INSERT (SearchTerm, NormalizedTerm, SearchCount, LastSearchedAt) 
-                    VALUES (@t, @n, 1, GETUTCDATE());";
-                await db.Database.ExecuteSqlRawAsync(sql,
-                    new SqlParameter("@t", term),
-                    new SqlParameter("@n", term.Trim().ToLower()));
-            }
-            catch (Exception ex) { _logger.LogError(ex, "Lỗi Miss Log"); }
-        });
+        _ = _logQueue.QueueLogAsync(new SearchMissMessage(term));
     }
 }

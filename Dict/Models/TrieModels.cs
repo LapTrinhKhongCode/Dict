@@ -1,20 +1,28 @@
 ﻿using Dict.DTO;
+using System.Runtime.InteropServices;
 
 namespace Dict.Models
 {
-    public class TrieNode
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct FlatTrieNode
     {
-        // Dùng Dictionary để lưu các nhánh con (n, i, h, o, n...)
-        public Dictionary<char, TrieNode> Children { get; set; } = new Dictionary<char, TrieNode>();
-
-        // Lưu danh sách gợi ý ngay tại nút để đạt tốc độ O(L)
-        public List<AutocompleteSuggestionDto> Suggestions { get; set; } = new List<AutocompleteSuggestionDto>();
-    }
+        public char Character;        // 2 bytes
+        public int FirstChildIndex;   // 4 bytes: Index con đầu tiên
+        public int NextSiblingIndex;  // 4 bytes: Index thằng em kế bên
+        public int SuggestionOffset;  // 4 bytes: Vị trí bắt đầu trong mảng Suggestion lớn
+        public short SuggestionCount; // 2 bytes: Số lượng gợi ý tại nút này
+    } // Tổng cộng: 16 bytes/node (Cực nhẹ!)
 
     public class TrieAutocompleteCache
     {
-        public TrieNode Root { get; } = new TrieNode();
+        // Toàn bộ cây nằm trong mảng này
+        public FlatTrieNode[] NodePool { get; set; } = Array.Empty<FlatTrieNode>();
+
+        // Chứa tất cả các gợi ý để các Node trỏ vào
+        public AutocompleteSuggestionDto[] SuggestionPool { get; set; } = Array.Empty<AutocompleteSuggestionDto>();
+
         public bool IsLoaded { get; set; } = false;
+        public int RootIndex => 0;
     }
 
 }
