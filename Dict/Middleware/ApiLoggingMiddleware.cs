@@ -1,11 +1,9 @@
-﻿using Dict.Data;
-using Dict.Models;
+﻿using Dict.Models;
+using Dict.Service;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Dict.Middleware
 {
@@ -13,14 +11,16 @@ namespace Dict.Middleware
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<ApiLoggingMiddleware> _logger;
+        private readonly LogQueueService _logQueue;
 
-        public ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddleware> logger)
+        public ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddleware> logger, LogQueueService logQueue)
         {
             _next = next;
             _logger = logger;
+            _logQueue = logQueue;
         }
 
-        public async Task InvokeAsync(HttpContext context, ApplicationDbContext dbContext)
+        public async Task InvokeAsync(HttpContext context)
         {
             if (!context.Request.Path.StartsWithSegments("/api"))
             {
@@ -30,7 +30,6 @@ namespace Dict.Middleware
 
             var stopwatch = Stopwatch.StartNew();
 
-            // Skip đọc body nếu là file upload (multipart/form-data)
             string requestBody = "";
             var contentType = context.Request.ContentType ?? "";
             bool isFileUpload = contentType.Contains("multipart/form-data");
@@ -45,33 +44,37 @@ namespace Dict.Middleware
                 requestBody = "[file upload]";
             }
 
-            await _next(context);
+            // --- GIAI ĐOẠN QUAN TRỌNG ---
+            await _next(context); // Chạy API
             stopwatch.Stop();
+            // ----------------------------
 
+            var endpoint = context.Request.Path.ToString();
             var apiCall = new ApiCall
             {
-                Endpoint = context.Request.Path,
+                Endpoint = endpoint.Length > 500 ? endpoint.Substring(0, 500) : endpoint,
                 RequestJson = requestBody,
                 ResponseStatus = context.Response.StatusCode,
                 ResponseTimeMs = (int)stopwatch.ElapsedMilliseconds,
                 CreatedAt = DateTime.UtcNow
             };
 
+            // THAY VÌ LƯU DB, TA NÉM VÀO HÀNG ĐỢI RỒI KẾT THÚC REQUEST LUÔN
             try
             {
-                dbContext.ApiCalls.Add(apiCall);
-                await dbContext.SaveChangesAsync();
+                // Dùng `_ =` để bảo trình biên dịch "Tôi cố tình ném vào không đợi kết quả, đừng báo lỗi"
+                _ = _logQueue.QueueLogAsync(apiCall);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Không thể ghi log ApiCall xuống DB.");
+                _logger.LogError(ex, "Không thể đưa ApiCall vào hàng đợi.");
             }
         }
 
         private async Task<string> GetRequestBodyAsync(HttpRequest request)
         {
             request.Body.Position = 0;
-            var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
+            using var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
             var body = await reader.ReadToEndAsync();
             request.Body.Position = 0;
             return body;

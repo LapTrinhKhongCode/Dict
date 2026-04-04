@@ -9,18 +9,23 @@ namespace Dict.Service
     public class SearchService : ISearchService
     {
         private readonly ApplicationDbContext _db;
-        private readonly string sensitiveCollation = "Japanese_CS_AS_KS_WS"; // Collation phân biệt Kana
+        private readonly TrieAutocompleteCache _trieCache;
+
+        // ĐÃ XÓA: private readonly string sensitiveCollation = "..."; (Vì DB đã tự lo)
+
         // Tiêm (inject) DbContext vào constructor
-        public SearchService(ApplicationDbContext dbContext)
+        public SearchService(ApplicationDbContext dbContext, TrieAutocompleteCache trieCache)
         {
             _db = dbContext;
+            _trieCache = trieCache;
         }
 
         public Task<Entry?> FindExactLabelMatchAsync(string term)
         {
             return _db.Entries
                 .AsNoTracking()
-                .Where(e => EF.Functions.Collate(e.Label, sensitiveCollation) == term && e.Type == "word")
+                // BỎ EF.Functions.Collate, DÙNG == BÌNH THƯỜNG ĐỂ ĂN INDEX 1ms
+                .Where(e => e.Label == term && e.Type == "word")
                 .IncludeAllData() // Sử dụng extension method
                 .FirstOrDefaultAsync();
         }
@@ -29,8 +34,8 @@ namespace Dict.Service
         {
             return _db.Entries
                 .AsNoTracking()
-                // Dùng Collate để đảm bảo tìm đúng Hiragana/Katakana
-                .Where(e => e.Words.Any(w => EF.Functions.Collate(w.Phonetic, sensitiveCollation) == term) && e.Type == "word")
+                // BỎ EF.Functions.Collate, DÙNG == BÌNH THƯỜNG
+                .Where(e => e.Words.Any(w => w.Phonetic == term) && e.Type == "word")
                 .OrderBy(e => e.Words.FirstOrDefault().Weight)
                 .IncludeAllData()
                 .ToListAsync();
@@ -60,8 +65,9 @@ namespace Dict.Service
                 {
                     Entry = e,
                     WordInfo = e.Words.FirstOrDefault(),
-                    Score = (EF.Functions.Collate(e.Label, sensitiveCollation) == term ? 100 : 0) +
-                            (e.Words.FirstOrDefault() != null && EF.Functions.Collate(e.Words.FirstOrDefault().Phonetic, sensitiveCollation) == term ? 90 : 0) +
+                    // BỎ EF.Functions.Collate TRONG CÔNG THỨC TÍNH SCORE
+                    Score = (e.Label == term ? 100 : 0) +
+                            (e.Words.FirstOrDefault() != null && e.Words.FirstOrDefault().Phonetic == term ? 90 : 0) +
                             (e.Label.StartsWith(term) ? 50 : 0) +
                             (e.Phonetic.StartsWith(term) ? 40 : 0) +
                             (EF.Functions.Contains(e.Label, term) || EF.Functions.Contains(e.Phonetic, term) ? 10 : 0)
@@ -80,35 +86,79 @@ namespace Dict.Service
             return rankedSuggestions;
         }
 
-        // Triển khai phương thức lấy gợi ý
+        // Triển khai phương thức lấy gợi ý (PHIÊN BẢN MẢNG PHẲNG - KHÔNG ĐỔI)
         public async Task<List<AutocompleteSuggestionDto>> GetAutocompleteSuggestionsAsync(string term)
         {
+            if (string.IsNullOrEmpty(term) || term.Length > 100)
+            {
+                return new List<AutocompleteSuggestionDto>();
+            }
             if (string.IsNullOrWhiteSpace(term)) return new List<AutocompleteSuggestionDto>();
+            string cleanTerm = term.Trim().ToLower();
 
-            // 1. Chuẩn bị dữ liệu tìm kiếm (Chỉ cần LIKE là đủ cân hết)
-            string cleanTerm = term.Trim();
-            string startsWithTerm = cleanTerm + "%";
+            // 1. ƯU TIÊN: TÌM TRONG TRIE (RAM MẢNG PHẲNG) - Tốc độ < 1ms
+            if (_trieCache.IsLoaded)
+            {
+                int currIdx = _trieCache.RootIndex; // Bắt đầu từ Root (Index 0)
+                bool found = true;
 
-            // 2. Truy vấn - Tận dụng tối đa Covering Index (IX_entries_SmartSearch)
-            var suggestions = await _db.Entries
+                foreach (var c in cleanTerm)
+                {
+                    // Lấy thằng con đầu tiên của Node hiện tại
+                    int childIdx = _trieCache.NodePool[currIdx].FirstChildIndex;
+                    found = false;
+
+                    // Duyệt qua các thằng em (Siblings) để tìm ký tự khớp
+                    while (childIdx != -1)
+                    {
+                        if (_trieCache.NodePool[childIdx].Character == c)
+                        {
+                            currIdx = childIdx; // Tìm thấy, nhảy xuống Node này
+                            found = true;
+                            break;
+                        }
+                        childIdx = _trieCache.NodePool[childIdx].NextSiblingIndex; // Chuyển sang thằng em kế tiếp
+                    }
+
+                    // Nếu duyệt hết Siblings mà không thấy ký tự khớp -> Từ này không có trong Trie
+                    if (!found) break;
+                }
+
+                // Nếu tìm thấy đến ký tự cuối cùng của chuỗi tìm kiếm
+                if (found)
+                {
+                    var resultNode = _trieCache.NodePool[currIdx];
+
+                    // Nếu Node này có chứa gợi ý
+                    if (resultNode.SuggestionCount > 0)
+                    {
+                        // "Cắt" lấy đúng số lượng gợi ý từ SuggestionPool khổng lồ
+                        return _trieCache.SuggestionPool
+                            .Skip(resultNode.SuggestionOffset)
+                            .Take(resultNode.SuggestionCount)
+                            .ToList();
+                    }
+                }
+            }
+
+            // 2. DỰ PHÒNG (FALLBACK): TRUY VẤN SQL SERVER (Chạy khi Trie chưa load xong)
+            return await _db.Entries
                 .AsNoTracking()
                 .Where(e => e.Type == "word" &&
-                           (EF.Functions.Like(e.Label, startsWithTerm) || EF.Functions.Like(e.Phonetic, startsWithTerm)))
-                .Select(e => new
-                {
-                    // Lấy các cột nằm trong Index để EF Core không phải load toàn bộ bảng
+                           (EF.Functions.Like(e.Label, cleanTerm + "%") ||
+                            EF.Functions.Like(e.Phonetic, cleanTerm + "%")))
+                .Select(e => new {
                     e.Label,
                     e.Phonetic,
                     e.ShortMean,
                     e.Weight,
-                    // Tính điểm ưu tiên: Khớp chính xác > Khớp bắt đầu bằng
                     Score = (e.Label == cleanTerm ? 100 : 0) +
                             (e.Phonetic == cleanTerm ? 90 : 0) +
-                            (EF.Functions.Like(e.Label, startsWithTerm) ? 50 : 0)
+                            (EF.Functions.Like(e.Label, cleanTerm + "%") ? 50 : 0)
                 })
                 .OrderByDescending(x => x.Score)
-                .ThenByDescending(x => x.Weight) // Weight cao hiện lên trước
-                .Take(15) // Lấy nhiều hơn một chút để lọc
+                .ThenByDescending(x => x.Weight)
+                .Take(15)
                 .Select(x => new AutocompleteSuggestionDto
                 {
                     Word = x.Label,
@@ -116,8 +166,6 @@ namespace Dict.Service
                     Meaning = x.ShortMean
                 })
                 .ToListAsync();
-
-            return suggestions;
         }
     }
 }

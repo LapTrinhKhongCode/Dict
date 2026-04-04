@@ -8,3 +8,6 @@ Dict/TempOcr
 Dict/requirements.txt
 .env
 *.pyc
+/Dict/cache_kanji.json
+/Dict/cache_trie_nodes.bin
+/Dict/cache_trie_suggestions.json

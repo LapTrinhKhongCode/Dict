@@ -31,6 +31,10 @@ namespace Dict.Service
         /// </summary>
         public async Task<string> RebuildJsonForWordAsync(string term)
         {
+            if (term.Length > 10) // Thường người ta chỉ rebuild từng chữ hoặc từ ngắn
+            {
+                return JsonConvert.SerializeObject(new { status = 400, error = "Invalid word string" });
+            }
             var data = new Dict.Models.JsonModels.Data(); // Model JSON
             List<Entry> mainEntries = new List<Entry>();
             List<Entry> suggestionEntries;
@@ -177,6 +181,10 @@ namespace Dict.Service
         /// </summary>
         public async Task<string> RebuildJsonForKanjiAsync(string kanjiTerm)
         {
+            if (kanjiTerm.Length > 10) // Thường người ta chỉ rebuild từng chữ hoặc từ ngắn
+            {
+                return JsonConvert.SerializeObject(new { status = 400, error = "Invalid Kanji string" });
+            }
             var kanjiChars = ExtractKanji(kanjiTerm);
 
             if (!kanjiChars.Any())
