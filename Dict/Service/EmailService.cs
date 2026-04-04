@@ -1,58 +1,45 @@
 ﻿using Dict.Service.IService;
-using SendGrid.Helpers.Mail;
-using SendGrid;
-using Microsoft.Extensions.Logging; // ✨ 1. Thêm thư viện này
+using Microsoft.Extensions.Configuration;
+using System.Net;
+using System.Net.Mail;
+using System.Threading.Tasks;
 
 namespace Dict.Service
 {
     public class EmailService : IEmailService
     {
         private readonly IConfiguration _configuration;
-        private readonly ILogger<EmailService> _logger; // ✨ 2. Thêm ILogger
 
-        public EmailService(IConfiguration configuration, ILogger<EmailService> logger) // ✨ 3. Inject ILogger
+        public EmailService(IConfiguration configuration)
         {
             _configuration = configuration;
-            _logger = logger; // ✨ 4. Lưu lại
         }
 
-        public async Task SendEmailAsync(string toEmail, string subject, string body)
+        public async Task SendEmailAsync(string toEmail, string subject, string htmlBody)
         {
-            var apiKey = _configuration["SendGrid:ApiKey"];
-            var fromEmail = _configuration["SendGrid:FromEmail"];
-            var fromName = _configuration["SendGrid:FromName"];
+            var host = _configuration["SmtpSettings:Host"];
+            var port = int.Parse(_configuration["SmtpSettings:Port"]);
+            var senderEmail = _configuration["SmtpSettings:SenderEmail"];
+            var senderName = _configuration["SmtpSettings:SenderName"];
+            var username = _configuration["SmtpSettings:Username"];
+            var password = _configuration["SmtpSettings:Password"];
+            var enableSsl = bool.Parse(_configuration["SmtpSettings:EnableSSL"]);
 
-            if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(fromEmail))
-            {
-                _logger.LogError("SendGrid:ApiKey hoặc SendGrid:FromEmail chưa được cấu hình.");
-                throw new Exception("SendGrid is not configured.");
-            }
+            // 1. Cấu hình thông điệp (Message)
+            using var mailMessage = new MailMessage();
+            mailMessage.From = new MailAddress(senderEmail, senderName);
+            mailMessage.To.Add(toEmail);
+            mailMessage.Subject = subject;
+            mailMessage.Body = htmlBody;
+            mailMessage.IsBodyHtml = true; // Bật cờ này để hỗ trợ gửi HTML (ví dụ: thẻ <a>, <strong>)
 
-            var client = new SendGridClient(apiKey);
-            var from = new EmailAddress(fromEmail, fromName);
-            var to = new EmailAddress(toEmail);
-            var msg = MailHelper.CreateSingleEmail(from, to, subject, "", body);
+            // 2. Cấu hình Client (Máy chủ gửi)
+            using var smtpClient = new SmtpClient(host, port);
+            smtpClient.Credentials = new NetworkCredential(username, password);
+            smtpClient.EnableSsl = enableSsl;
 
-            var response = await client.SendEmailAsync(msg);
-
-            // ✨ 5. BẮT BUỘC KIỂM TRA RESPONSE
-            if (!response.IsSuccessStatusCode)
-            {
-                // Đọc nội dung lỗi mà SendGrid trả về
-                var errorBody = await response.Body.ReadAsStringAsync();
-
-                // Log lỗi chi tiết để bạn debug
-                _logger.LogError(
-                    "Gửi email SendGrid thất bại. StatusCode: {StatusCode}, Lý do: {ErrorBody}",
-                    response.StatusCode,
-                    errorBody
-                );
-
-                // Ném lỗi để AuthController bắt được và trả về IsSuccess = false
-                throw new Exception("Không thể gửi email xác thực. Vui lòng thử lại sau.");
-            }
-
-            _logger.LogInformation("Đã gửi email thành công tới {ToEmail} với subject {Subject}", toEmail, subject);
+            // 3. Gửi email bất đồng bộ
+            await smtpClient.SendMailAsync(mailMessage);
         }
     }
 }

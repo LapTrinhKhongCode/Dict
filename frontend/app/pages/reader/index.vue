@@ -1,7 +1,7 @@
 <template>
   <div class="app-shell flex flex-col h-screen overflow-hidden bg-[#0d1117] text-[#c9d1d9] font-sans">
     
-    <header class="h-14 flex items-center justify-between px-4 border-b border-[#30363d] bg-[#161b22] shrink-0">
+    <header class="h-14 flex items-center justify-between px-4 border-b border-[#30363d] bg-[#161b22] shrink-0 z-10">
       <button @click="goBack" class="flex items-center gap-2 px-3 py-1.5 bg-[#21262d] hover:bg-[#30363d] rounded-lg border border-[#30363d] text-sm transition">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
         Quay lại
@@ -15,17 +15,19 @@
     <main class="flex flex-1 overflow-hidden relative">
       
       <section class="flex flex-col relative h-full" :style="{ width: leftPanelWidth + '%' }">
-    <PdfViewer 
-  v-if="fileUrl || pdfData || jobId"
-  ref="pdfViewerRef"
-  :file-url="fileUrl" 
-  :file-data="pdfData" 
-  :job-id="jobId"
-  :api-key="apiKey" 
-  @rag-updated="(data) => ragIndex = data"
-  @text-selected="handleTextSelection"
-  @page-changed="handlePageChanged"
-  @media-id-loaded="(id) => fileId = id" />
+        <PdfViewer 
+          v-if="fileUrl || pdfData || jobId"
+          ref="pdfViewerRef"
+          :file-url="fileUrl" 
+          :file-data="pdfData" 
+          :job-id="jobId"
+          :api-key="apiKey" 
+          @rag-updated="(data) => ragIndex = data"
+          @text-selected="handleTextSelection"
+          @page-changed="handlePageChanged"
+          @media-id-loaded="(id) => fileId = id"
+          @access-denied="handleAccessDenied" 
+        /> 
         <div v-else class="flex flex-col items-center justify-center h-full text-gray-400">
           <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
           <p>Đang chờ nạp dữ liệu OCR/PDF...</p>
@@ -34,7 +36,16 @@
 
       <div class="w-1.5 bg-[#161b22] border-x border-[#30363d] cursor-col-resize hover:bg-[#5b8dee] transition-colors z-20" @mousedown="startResize"></div>
 
-      <section class="flex-1 flex flex-col bg-[#161b22]">
+      <section class="flex-1 flex flex-col bg-[#161b22] relative">
+        
+        <div v-if="isAccessDenied" class="absolute inset-0 z-50 bg-[#161b22]/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center border-l border-[#30363d]">
+          <div class="w-16 h-16 bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Chức năng bị khóa</h3>
+          <p class="text-sm text-gray-400">Bạn không có quyền truy cập vào công cụ hỗ trợ của dự án này.</p>
+        </div>
+
         <div class="flex border-b border-[#30363d] bg-[#0d1117] shrink-0 overflow-x-auto custom-scrollbar">
           <button @click="activeTab='chat'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='chat' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">💬 Trợ lý AI</button>
           <button @click="activeTab='vocab'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='vocab' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">📚 Từ vựng</button>
@@ -42,7 +53,12 @@
         </div>
 
         <div v-show="activeTab === 'chat'" class="flex-1 overflow-hidden">
-          <GeminiChat :api-key="apiKey" :pdf-name="pdfName" :rag-index="ragIndex" />
+          <GeminiChat 
+            :api-key="apiKey" 
+            :pdf-name="pdfName" 
+            :rag-index="ragIndex" 
+            :accessDenied="isAccessDenied"  
+          /> 
         </div>
 
         <div v-show="activeTab === 'vocab'" class="flex-1 overflow-hidden">
@@ -84,47 +100,70 @@
 <script setup>
 definePageMeta({ layout: 'reader', ssr: false })
 
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRuntimeConfig } from '#app'
 
 import PdfViewer from '~/components/PdfViewer.vue'
 import GeminiChat from '~/components/GeminiChat.vue'
 import VocabManager from '~/components/VocabManager.vue'
-import FileCommentTab from '~/components/FileCommentTab.vue' // Import Tab Thảo luận
+import FileCommentTab from '~/components/FileCommentTab.vue'
 
 const route = useRoute()
 const router = useRouter()
 const config = useRuntimeConfig()
 
-// --- STATES TRUYỀN DATA ---
-const fileUrl = ref('')
+// --- FIX LỖI DÁN LINK: SỬ DỤNG COMPUTED ĐỂ BIẾN LUÔN BÁM SÁT URL ---
+const fileUrl = computed(() => route.query.url || '')
+const jobId = computed(() => route.query.jobId ? Number(route.query.jobId) : null)
+const projectId = computed(() => route.query.projectId ? Number(route.query.projectId) : null)
+
+const pdfName = computed(() => {
+  if (!route.query.name) return 'Tài liệu'
+  try {
+    return decodeURIComponent(route.query.name)
+  } catch (e) {
+    return route.query.name // Fallback nếu decode lỗi
+  }
+})
+
+// Các state khác giữ nguyên
 const pdfData = ref(null) 
-const jobId = ref(null) 
-const fileId = ref(null) // Thêm ID của File để truyền vào FileCommentTab
-const pdfName = ref('')
-const projectId = ref(null)
+const fileId = ref(null) 
 const apiKey = ref('')
 const leftPanelWidth = ref(60)
+
+const isAccessDenied = ref(false)
 
 const activeTab = ref('chat')
 const ragIndex = ref([])
 const vocabMgrRef = ref(null)
 const vocabPopup = ref({ visible: false, word: '', meaning: '', x: 0, y: 0, loading: false })
 
-// --- STATES CHO BÌNH LUẬN & PDF VIEWER ---
 const pdfViewerRef = ref(null)
 const pdfCurrentPage = ref(1)
 
-// Cập nhật số trang khi người dùng cuộn PDF
+// --- Lắng nghe ID từ URL để khôi phục fileData (nếu có id) ---
+watch(() => route.query.id, (newId) => {
+  if (newId && !fileId.value) {
+    fileId.value = Number(newId)
+    // Load local sessionStorage (nếu user đi từ trang project vào)
+    const raw = sessionStorage.getItem(`pdf_${newId}`)
+    if (raw) pdfData.value = new Uint8Array(JSON.parse(raw)) 
+  }
+}, { immediate: true })
+
+// --- HÀM BẢO MẬT ---
+function handleAccessDenied() {
+  isAccessDenied.value = true
+}
+
 function handlePageChanged(page) {
   pdfCurrentPage.value = page
 }
 
-// Bắn lệnh nhảy trang vào PdfViewer khi click "Xem trang X" bên Comment Tab
 function triggerPdfJump(pageNum) {
   if (pdfViewerRef.value) {
-    // Ép Component PdfViewer nhảy trang
     pdfViewerRef.value.gotoPage = pageNum
     pdfViewerRef.value.jumpToPage()
   }
@@ -132,6 +171,8 @@ function triggerPdfJump(pageNum) {
 
 // --- LOGIC XỬ LÝ SỰ KIỆN TỪ PDF VIEWER ---
 function handleTextSelection(data) {
+  if (isAccessDenied.value) return; 
+
   const popupHeight = 220; 
   const popupWidth = 270;  
 
@@ -194,20 +235,6 @@ const goBack = () => router.back()
 
 onMounted(() => {
   apiKey.value = config.public.geminiApiKey || ''
- const { url, id, jobId: qJobId, projectId: pid, name } = route.query
-  
-  fileUrl.value = url || ''
-  pdfName.value = name ? decodeURIComponent(name) : 'Tài liệu'
-  projectId.value = pid
-  jobId.value = qJobId 
-  
-  // Dùng id từ URL làm fileId cho chức năng Comment.
- fileId.value = id ? Number(id) : null
-  
-  if (id) {
-    const raw = sessionStorage.getItem(`pdf_${id}`)
-    if (raw) pdfData.value = new Uint8Array(JSON.parse(raw)) 
-  }
 })
 </script>
 
@@ -223,47 +250,8 @@ onMounted(() => {
   background-color: #0d1117;
   color: #c9d1d9;
 }
-header {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  background-color: #161b22;
-  border-bottom: 1px solid #30363d;
-  flex-shrink: 0;
-}
-main {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-.pdf-panel {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  height: 100%;
-}
-.chat-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background-color: #161b22;
-  border-left: 1px solid #30363d;
-  min-width: 300px;
-}
-.resizer {
-  width: 6px;
-  background-color: #000;
-  cursor: col-resize;
-  z-index: 20;
-  transition: background-color 0.2s;
-}
-.resizer:hover {
-  background-color: #5b8dee;
-}
-/* Style custom scrollbar cho tabs */
+
+/* Scrollbar */
 .custom-scrollbar::-webkit-scrollbar { height: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }

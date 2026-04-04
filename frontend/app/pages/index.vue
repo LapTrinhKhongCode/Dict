@@ -1,5 +1,18 @@
 <template>
-  <div class="max-w-[1200px] mx-auto w-full font-sans text-gray-800 dark:text-[#c9d1d9] pb-10">
+  <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-900">
+    <div class="text-center bg-white dark:bg-[#161b22] p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-[#30363d] max-w-md w-full mx-4">
+      <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Phiên bản không khả dụng</h1>
+      <p class="text-gray-500 dark:text-[#8b949e] mb-6">Bạn đã đăng xuất hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.</p>
+      <button @click="$router.push('/login')" class="w-full px-4 py-2.5 bg-[#f0c040] text-black rounded-lg font-bold hover:bg-[#e3b330] transition-colors shadow-sm">
+        Đến trang đăng nhập
+      </button>
+    </div>
+  </div>
+
+  <div v-else class="max-w-[1200px] mx-auto w-full font-sans text-gray-800 dark:text-[#c9d1d9] pb-10">
     
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-4 border-b border-gray-200 dark:border-[#30363d] gap-4">
       <div>
@@ -270,28 +283,42 @@
 definePageMeta({ 
   layout: 'default', 
   ssr: false,
-  middleware: 'auth-client' // Đảm bảo có middleware bảo vệ route
+  middleware: 'auth-client'
 })
 
-import { ref, reactive, onMounted, watch } from 'vue' // 1. Import thêm watch
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWorkspace } from '~/composables/useWorkspace'
 import { useProject } from '~/composables/useProject'
 import { useRecentSearches } from '~/composables/useRecentSearches'
-import { useJwt } from '~/composables/useJwt' // 2. Import useJwt
+import { useJwt } from '~/composables/useJwt'
 
 const router = useRouter()
 const config = useRuntimeConfig()
 const { getMyWorkspaces } = useWorkspace()
 const { getProjects, createProject } = useProject()
-const { jwt, isAuthenticated } = useJwt() // 3. Lấy trạng thái Auth
-
-// Lịch sử tra từ vựng
-const { recentSearches, removeSearch, clearSearches } = useRecentSearches()
+const { jwt, isAuthenticated } = useJwt()
 
 const getToken = () => localStorage.getItem('jwt_token') || jwt.value || ''
 
-// 4. WATCHER: Bắt sự kiện đăng xuất (Token rỗng)
+// Hàm giải mã token để lấy userId (dùng làm chìa khóa lưu Lịch sử)
+const getUserIdFromToken = () => {
+  try {
+    const token = getToken();
+    if (!token) return 'guest';
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // Cố gắng đọc các thuộc tính thông dụng chứa ID/Email
+    return payload.nameid || payload.sub || payload.userId || payload.email || 'guest';
+  } catch (e) {
+    return 'guest';
+  }
+}
+
+// Truyền userId hiện tại vào composable để tách biệt lịch sử
+const currentUserId = getUserIdFromToken();
+const { recentSearches, removeSearch, clearSearches } = useRecentSearches(currentUserId)
+
+// WATCHER: Bắt sự kiện đăng xuất (Token rỗng)
 watch(isAuthenticated, (newVal) => {
   if (!newVal) {
     router.push('/login')
@@ -308,7 +335,7 @@ function showToast(msg, type = 'success') {
 // --- STATES CHÍNH ---
 const loadingWs = ref(true)
 const workspaces = ref([])
-const activeWsId = ref('') // Lưu id của workspace đang chọn từ dropdown
+const activeWsId = ref('')
 
 const loadingProjects = ref(false)
 const projects = ref([])
@@ -440,7 +467,6 @@ async function handleConfirmUpload() {
 
 // --- LOGIC LOAD DỮ LIỆU ---
 async function loadInitialData() {
-  // 5. Kiểm tra an toàn trước khi gọi API
   if (!isAuthenticated.value) return;
 
   loadingWs.value = true
@@ -452,7 +478,6 @@ async function loadInitialData() {
     }
   } catch (e) {
     console.error(e)
-    // Nếu token lỗi 401 từ Server, đá văng luôn
     if (e.response?.status === 401) {
       router.push('/login')
     }

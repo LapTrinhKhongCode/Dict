@@ -38,7 +38,7 @@
             </div>
             <span :class="[
               'text-xs font-semibold px-2.5 py-1 rounded-full',
-              ws.myRole === 'Admin'
+              ws.myRole === 'ADMIN'
                 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
                 : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
             ]">

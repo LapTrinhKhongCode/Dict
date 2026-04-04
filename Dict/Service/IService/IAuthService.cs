@@ -6,13 +6,13 @@ namespace Dict.Service.IService
 {
     public interface IAuthService
     {
-        // ✨ THAY ĐỔI: Trả về string (tin nhắn) thay vì User
         Task<string> RegisterAsync(RegistrationRequestDto request);
-
-        // ✨ THÊM MỚI: Trả về LoginResponseDto (token) sau khi xác thực thành công
-        //Task<LoginResponseDto> VerifyEmailAsync(VerifyEmailDto verifyDto);
+        Task<LoginResponseDto> ConfirmEmailAsync(string email, string token); // Đổi tên & thêm param email
         Task<LoginResponseDto> LoginAsync(LoginRequestDto request);
         Task LogoutAsync(int userId);
-        Task<LoginResponseDto> ConfirmRegistrationAsync(string token);
+
+        // Thêm 2 hàm cho Quên mật khẩu
+        Task<string> ForgotPasswordAsync(string email);
+        Task<string> ResetPasswordAsync(string email, string otp, string newPassword, string confirmPassword);
     }
 }

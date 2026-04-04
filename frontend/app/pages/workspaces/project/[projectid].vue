@@ -1,5 +1,25 @@
 <template>
-  <div
+  <div v-if="!isAuthenticated || accessDenied" class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div class="text-center bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-w-md w-full mx-4">
+      <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Không khả dụng</h1>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">
+        Bạn Không có quyền truy cập vào Dự án này.
+      </p>
+      <div class="flex gap-3">
+        <button @click="$router.push('/workspaces')" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-sm">
+          Trang chủ
+        </button>
+        <button v-if="!isAuthenticated" @click="$router.push('/login')" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-sm">
+          Đăng nhập
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div v-else
     class="bg-gray-50 dark:bg-gray-900 transition-colors min-h-screen"
     @dragover.prevent="isDragging = true"
     @dragleave.prevent="isDragging = false"
@@ -150,10 +170,12 @@ definePageMeta({ layout: 'default', ssr: false })
 
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useJwt } from '~/composables/useJwt'
 
 const route = useRoute()
 const router = useRouter()
 const config = useRuntimeConfig()
+const { userId: currentUserId, isAuthenticated } = useJwt()
 
 // --- STATES ---
 const projectId = route.params.projectid
@@ -163,6 +185,8 @@ const isLoading = ref(true)
 const uploading = ref(false)
 const isDragging = ref(false)
 const pendingFile = ref(null)
+
+const accessDenied = ref(false)
 
 // States cho Xóa Project
 const showDeleteConfirm = ref(false)
@@ -186,22 +210,70 @@ function showToast(message, type = 'success') {
 
 const getToken = () => localStorage.getItem('jwt_token') || ''
 
-async function fetchFiles() {
+// KIỂM TRA QUYỀN TRUY CẬP TRƯỚC KHI LOAD
+async function checkAccessAndLoad() {
   const token = getToken()
-  if (!token) return
+  if (!token || !isAuthenticated.value) {
+    accessDenied.value = true
+    isLoading.value = false
+    return
+  }
+
   isLoading.value = true
+  try {
+    // 1. Lấy thông tin Project để biết nó thuộc Workspace nào
+    const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (!projRes.ok) throw new Error('Dự án không tồn tại')
+    const projData = await projRes.json()
+    const project = projData.result || projData
+    
+    projectName.value = project.name
+    const wsId = project.workspaceId
+
+    // 2. Lấy danh sách thành viên của Workspace
+    const membersRes = await fetch(`${config.public.apiBaseUrl}/api/workspaces/${wsId}/members`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (!membersRes.ok) throw new Error('Không có quyền truy cập WS')
+    const membersData = await membersRes.json()
+    const members = membersData.result || membersData
+    
+    // 3. Kiểm tra user hiện tại có trong mảng members không
+    const isMember = members.some(m => m.userId === currentUserId.value)
+    if (!isMember) {
+      accessDenied.value = true
+      return
+    }
+
+    // 4. Đã qua kiểm tra -> Tải danh sách file
+    await fetchFiles(token)
+
+  } catch (e) {
+    console.error(e)
+    accessDenied.value = true
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function fetchFiles(token) {
   try {
     const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/files`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.ok) {
-      files.value = await res.json()
-      if (files.value.length > 0) projectName.value = files.value[0].projectName
+      const data = await res.json()
+      files.value = data.result || data
+      if (files.value.length > 0 && !projectName.value) {
+        projectName.value = files.value[0].projectName
+      }
     }
   } catch (e) {
-    console.error(e)
-  } finally {
-    isLoading.value = false
+    console.error("Lỗi lấy file:", e)
   }
 }
 
@@ -251,7 +323,7 @@ async function handleFileUpload(pickedFile) {
     if (!res.ok) throw new Error(await res.text() || "Lỗi upload")
     
     showToast("Tải lên thành công!")
-    await fetchFiles()
+    await fetchFiles(token)
   } catch (err) {
     showToast(err.message, "error")
   } finally {
@@ -278,8 +350,7 @@ const statusClass = (s) => {
   const map = {
     completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
     processing: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-    // failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-       failed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    failed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
   }
   return map[s?.toLowerCase()] || 'bg-gray-100 text-gray-800'
 }
@@ -291,7 +362,9 @@ const statusText = (s) => {
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') + ' ' + new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''
 
-onMounted(fetchFiles)
+onMounted(() => {
+  checkAccessAndLoad()
+})
 </script>
 
 <style scoped>

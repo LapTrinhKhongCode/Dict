@@ -1,102 +1,117 @@
 <template>
-  <div class="sensei-shell">
-    <!-- Background atmosphere -->
-    <div class="bg-grid"></div>
-    <div class="bg-glow"></div>
+  <div class="relative h-full font-sans bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors overflow-hidden flex flex-col">
+    <div class="absolute inset-0 z-0 pointer-events-none opacity-50 dark:opacity-20"
+         style="background-image: linear-gradient(rgba(150,150,150,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(150,150,150,0.1) 1px, transparent 1px); background-size: 40px 40px;">
+    </div>
+    <div class="absolute -top-24 -right-24 w-96 h-96 z-0 pointer-events-none rounded-full"
+         style="background: radial-gradient(circle, rgba(201,162,39,0.08) 0%, transparent 70%);">
+    </div>
 
-    <div class="sensei-layout">
-      <!-- ── Left: Context panel ── -->
-      <aside class="context-panel">
-        <div class="context-header">
-          <div class="sensei-logo">
-            <span class="logo-jp">先生</span>
-            <span class="logo-en">AI Sensei</span>
+    <div class="relative z-10 flex h-full flex-1 overflow-hidden">
+      <aside class="w-[260px] shrink-0 bg-gray-100 dark:bg-gray-800/80 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto custom-scrollbar transition-colors">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+          <div class="flex flex-col">
+            <span class="font-serif text-[28px] font-bold text-yellow-600 dark:text-yellow-400 leading-none">先生</span>
+            <span class="text-[11px] tracking-widest uppercase text-gray-500 dark:text-gray-400 mt-0.5">AI Sensei</span>
           </div>
         </div>
 
-        <!-- Mode switch -->
-        <div class="mode-switch">
-          <button :class="['mode-btn', mode === 'tutor' ? 'active' : '']"
+        <div class="p-3 flex flex-col gap-1.5 border-b border-gray-200 dark:border-gray-700">
+          <button :class="[
+              'flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all w-full',
+              mode === 'tutor' 
+                ? 'bg-yellow-100/50 dark:bg-yellow-900/20 border-yellow-300/50 dark:border-yellow-700/50 text-gray-900 dark:text-white shadow-sm' 
+                : 'border-transparent bg-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+            ]"
             @click="switchMode('tutor')">
-            <span class="mode-icon">📖</span>
+            <span class="text-xl shrink-0">📖</span>
             <div>
-              <p class="mode-name">Tutor</p>
-              <p class="mode-desc">Hỏi đáp tự do</p>
+              <p class="text-[13px] font-semibold leading-none">Tutor</p>
+              <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Hỏi đáp tự do</p>
             </div>
           </button>
-          <button :class="['mode-btn', mode === 'practice' ? 'active' : '']"
+          <button :class="[
+              'flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all w-full',
+              mode === 'practice' 
+                ? 'bg-blue-100/50 dark:bg-blue-900/20 border-blue-300/50 dark:border-blue-700/50 text-gray-900 dark:text-white shadow-sm' 
+                : 'border-transparent bg-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+            ]"
             @click="switchMode('practice')">
-            <span class="mode-icon">💬</span>
+            <span class="text-xl shrink-0">💬</span>
             <div>
-              <p class="mode-name">Practice</p>
-              <p class="mode-desc">Hội thoại roleplay</p>
+              <p class="text-[13px] font-semibold leading-none">Practice</p>
+              <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Hội thoại roleplay</p>
             </div>
           </button>
         </div>
 
-        <!-- Practice: scenario picker -->
-        <div v-if="mode === 'practice'" class="scenario-section">
-          <p class="section-label">Chọn tình huống</p>
-          <div class="scenario-list">
+        <div v-if="mode === 'practice'" class="p-3 border-b border-gray-200 dark:border-gray-700">
+          <p class="text-[10px] font-bold tracking-widest uppercase text-gray-500 dark:text-gray-400 mb-2">Chọn tình huống</p>
+          <div class="flex flex-col gap-1">
             <button v-for="s in scenarios" :key="s.id"
-              :class="['scenario-btn', selectedScenario?.id === s.id ? 'active' : '']"
+              :class="[
+                'flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left transition-all w-full',
+                selectedScenario?.id === s.id 
+                  ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50 text-blue-700 dark:text-blue-400 font-medium' 
+                  : 'border-transparent bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+              ]"
               @click="selectScenario(s)">
-              <span class="scenario-icon">{{ s.icon }}</span>
-              <span class="scenario-name">{{ s.name }}</span>
+              <span class="text-base">{{ s.icon }}</span>
+              <span class="text-[13px]">{{ s.name }}</span>
             </button>
           </div>
         </div>
 
-        <!-- Context: user vocab + deck stats -->
-        <div class="user-context">
-          <p class="section-label">Ngữ cảnh của bạn</p>
+        <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+          <p class="text-[10px] font-bold tracking-widest uppercase text-gray-500 dark:text-gray-400 mb-2">Ngữ cảnh của bạn</p>
 
-          <div class="context-stat" v-if="contextLoaded">
-            <div class="stat-row">
-              <span class="stat-icon">📚</span>
-              <span class="stat-text">{{ totalVocabCount }} từ vựng đã lưu</span>
+          <div class="flex flex-col gap-1.5 mb-2.5" v-if="contextLoaded">
+            <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <span class="text-sm">📚</span>
+              <span>{{ totalVocabCount }} từ vựng đã lưu</span>
             </div>
-            <div class="stat-row">
-              <span class="stat-icon">🃏</span>
-              <span class="stat-text">{{ totalCardCount }} flashcard</span>
+            <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <span class="text-sm">🃏</span>
+              <span>{{ totalCardCount }} flashcard</span>
             </div>
-            <div class="stat-row" v-if="detectedLevel">
-              <span class="stat-icon">🎯</span>
-              <span class="stat-text">AI phát hiện: ~{{ detectedLevel }}</span>
+            <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400" v-if="detectedLevel">
+              <span class="text-sm">🎯</span>
+              <span>AI phát hiện: ~{{ detectedLevel }}</span>
             </div>
           </div>
-          <div v-else class="context-loading">
+          <div v-else class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <div class="mini-dots"><span></span><span></span><span></span></div>
             <span>Đang tải ngữ cảnh...</span>
           </div>
 
-          <!-- Sample vocab chips -->
-          <div v-if="sampleVocabs.length" class="vocab-chips">
-            <span v-for="v in sampleVocabs" :key="v" class="vocab-chip">{{ v }}</span>
+          <div v-if="sampleVocabs.length" class="flex flex-wrap gap-1 mt-2">
+            <span v-for="v in sampleVocabs" :key="v" 
+              class="font-serif text-[11px] px-2 py-0.5 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-full text-gray-600 dark:text-gray-300">
+              {{ v }}
+            </span>
           </div>
         </div>
 
-        <!-- Quick prompts -->
-        <div class="quick-prompts">
-          <p class="section-label">Gợi ý</p>
+        <div class="p-3">
+          <p class="text-[10px] font-bold tracking-widest uppercase text-gray-500 dark:text-gray-400 mb-2">Gợi ý</p>
           <button v-for="q in currentQuickPrompts" :key="q"
-            class="quick-prompt-btn" @click="sendQuick(q)">
+            class="block w-full text-left px-2.5 py-1.5 bg-transparent border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400 text-xs mb-1.5 hover:border-blue-400 dark:hover:border-blue-500 hover:text-gray-900 dark:hover:text-gray-200 transition-all"
+            @click="sendQuick(q)">
             {{ q }}
           </button>
         </div>
       </aside>
 
-      <!-- ── Right: Chat area ── -->
-      <main class="chat-area">
-        <!-- Chat header -->
-        <div class="chat-topbar">
-          <div class="chat-status">
-            <div class="status-dot" :class="apiKey ? 'online' : 'offline'"></div>
+      <main class="flex-1 flex flex-col bg-white dark:bg-[#111827] overflow-hidden transition-colors">
+        <div class="flex items-center justify-between px-5 py-3 bg-white dark:bg-[#1f2937] border-b border-gray-200 dark:border-gray-700 shrink-0 transition-colors">
+          <div class="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-300 font-medium">
+            <div :class="['w-2 h-2 rounded-full', apiKey ? 'bg-green-500 shadow-[0_0_6px_#22c55e]' : 'bg-red-500']"></div>
             <span>{{ mode === 'tutor' ? 'Tutor Mode' : `Practice: ${selectedScenario?.name || 'Chọn tình huống'}` }}</span>
           </div>
-          <div class="topbar-actions">
-            <button class="topbar-btn" @click="clearChat" title="Xóa chat">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <div class="flex gap-1.5">
+            <button @click="clearChat" title="Xóa chat"
+              class="w-8 h-8 rounded-lg bg-transparent border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 flex items-center justify-center hover:border-gray-400 dark:hover:border-gray-400 hover:text-gray-900 dark:hover:text-white transition-all">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
                 <polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/>
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
               </svg>
@@ -104,116 +119,139 @@
           </div>
         </div>
 
-        <!-- Messages -->
-        <div class="messages-wrap" ref="messagesEl">
-          <!-- Welcome state -->
-          <div v-if="messages.length === 0" class="welcome-state">
-            <div class="welcome-kanji">{{ mode === 'tutor' ? '質問' : '会話' }}</div>
-            <h2 class="welcome-title">
+        <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6 custom-scrollbar" ref="messagesEl">
+          <div v-if="messages.length === 0" class="flex-1 flex flex-col items-center justify-center text-center gap-3 p-10">
+            <div class="font-serif text-6xl font-bold text-yellow-500/40 dark:text-yellow-400/30 leading-none">
+              {{ mode === 'tutor' ? '質問' : '会話' }}
+            </div>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mt-2">
               {{ mode === 'tutor' ? 'Hỏi bất cứ điều gì về tiếng Nhật' : 'Luyện hội thoại với AI' }}
             </h2>
-            <p class="welcome-sub">
+            <p class="text-sm text-gray-500 dark:text-gray-400 max-w-[360px] leading-relaxed">
               {{ mode === 'tutor'
-                ? 'AI sẽ giải thích ngữ pháp, từ vựng dựa trên level và vocab của bạn'
-                : 'Chọn tình huống bên trái rồi bắt đầu hội thoại' }}
+                ? 'AI sẽ giải thích ngữ pháp, từ vựng dựa trên trình độ và flashcard của bạn'
+                : 'Chọn tình huống ở menu bên trái rồi bắt đầu luyện tập' }}
             </p>
-            <div v-if="mode === 'practice' && selectedScenario" class="scenario-preview">
-              <span class="scenario-preview-icon">{{ selectedScenario.icon }}</span>
-              <div>
-                <p class="scenario-preview-name">{{ selectedScenario.name }}</p>
-                <p class="scenario-preview-desc">{{ selectedScenario.description }}</p>
+            <div v-if="mode === 'practice' && selectedScenario" 
+              class="flex items-center gap-3.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-5 py-4 mt-3">
+              <span class="text-3xl">{{ selectedScenario.icon }}</span>
+              <div class="text-left">
+                <p class="text-[15px] font-semibold text-gray-900 dark:text-white">{{ selectedScenario.name }}</p>
+                <p class="text-[13px] text-gray-500 dark:text-gray-400">{{ selectedScenario.description }}</p>
               </div>
-              <button class="btn-start-practice" @click="startPractice">
+              <button @click="startPractice"
+                class="ml-4 bg-yellow-500 hover:bg-yellow-600 text-gray-900 border-none rounded-xl px-5 py-2.5 text-sm font-bold transition-all hover:-translate-y-0.5">
                 Bắt đầu →
               </button>
             </div>
           </div>
 
-          <!-- Messages -->
           <div v-for="(msg, i) in messages" :key="i"
-            :class="['msg', msg.role]">
-            <div class="msg-avatar">
+            :class="['flex gap-3 items-start msg-enter', msg.role === 'user' ? 'flex-row-reverse' : '']">
+            <div :class="[
+              'w-8 h-8 rounded-xl flex items-center justify-center text-[13px] font-bold shrink-0',
+              msg.role === 'user' 
+                ? 'bg-yellow-500 text-gray-900' 
+                : 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-serif text-yellow-600 dark:text-yellow-400'
+            ]">
               {{ msg.role === 'user' ? (username?.[0]?.toUpperCase() || 'U') : '先' }}
             </div>
-            <div class="msg-content">
-              <!-- Japanese analysis card -->
-              <div v-if="msg.analysisData" class="analysis-card">
-                <div class="analysis-sentence">{{ msg.analysisData.sentence }}</div>
-                <div v-if="msg.analysisData.translation" class="analysis-translation">
+
+            <div :class="['max-w-[78%] flex flex-col gap-2', msg.role === 'user' ? 'items-end' : '']">
+              
+              <div v-if="!msg.analysisData" 
+                :class="[
+                  'rounded-2xl px-4 py-3 text-[14px] leading-[1.7]',
+                  msg.role === 'user' 
+                    ? 'bg-yellow-500 text-gray-900' 
+                    : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100'
+                ]" 
+                v-html="formatText(msg.content)">
+              </div>
+
+              <div v-if="msg.analysisData" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
+                <div class="font-serif text-lg font-bold text-gray-900 dark:text-white px-3 py-2 border-l-[3px] border-yellow-500 leading-relaxed bg-gray-50 dark:bg-gray-900/50 rounded-r-lg">
+                  {{ msg.analysisData.sentence }}
+                </div>
+                
+                <div v-if="msg.analysisData.translation" class="text-sm text-gray-800 dark:text-gray-200 bg-blue-50 dark:bg-blue-900/30 rounded-xl px-3.5 py-2.5 border border-blue-100 dark:border-blue-800/50">
                   🇻🇳 {{ msg.analysisData.translation }}
                 </div>
-                <div v-if="msg.analysisData.explanation" class="analysis-explanation">
+                
+                <div v-if="msg.analysisData.explanation" class="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed">
                   {{ msg.analysisData.explanation }}
                 </div>
-                <div v-if="msg.analysisData.grammar?.length" class="analysis-section">
-                  <p class="analysis-section-title">📐 Ngữ pháp</p>
-                  <div v-for="g in msg.analysisData.grammar" :key="g.pattern" class="grammar-item">
-                    <div class="grammar-header">
-                      <span class="grammar-pattern">{{ g.pattern }}</span>
-                      <span class="jlpt-badge" :style="jlptStyle(g.jlpt)">{{ g.jlpt }}</span>
+
+                <div v-if="msg.analysisData.grammar?.length" class="flex flex-col gap-1.5 mt-1">
+                  <p class="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">📐 Ngữ pháp</p>
+                  <div v-for="g in msg.analysisData.grammar" :key="g.pattern" class="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl p-3">
+                    <div class="flex items-center gap-2 mb-1.5">
+                      <span class="text-[15px] font-bold text-yellow-600 dark:text-yellow-400">{{ g.pattern }}</span>
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" :style="jlptStyle(g.jlpt)">{{ g.jlpt }}</span>
                     </div>
-                    <p class="grammar-meaning">{{ g.meaning }}</p>
-                    <p v-if="g.example" class="grammar-example">例: {{ g.example }}</p>
+                    <p class="text-[13px] text-gray-800 dark:text-gray-200">{{ g.meaning }}</p>
+                    <p v-if="g.example" class="text-[12px] text-gray-500 dark:text-gray-400 italic mt-1.5">例: {{ g.example }}</p>
                   </div>
                 </div>
-                <div v-if="msg.analysisData.vocabulary?.length" class="analysis-section">
-                  <p class="analysis-section-title">📚 Từ vựng</p>
-                  <div class="vocab-row" v-for="v in msg.analysisData.vocabulary" :key="v.word">
-                    <span class="vocab-word">{{ v.word }}</span>
-                    <span v-if="v.reading" class="vocab-reading">【{{ v.reading }}】</span>
-                    <span class="vocab-meaning">{{ v.meaning }}</span>
-                    <span class="jlpt-badge" :style="jlptStyle(v.jlpt)">{{ v.jlpt }}</span>
+
+                <div v-if="msg.analysisData.vocabulary?.length" class="flex flex-col gap-1.5 mt-1">
+                  <p class="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">📚 Từ vựng</p>
+                  <div v-for="v in msg.analysisData.vocabulary" :key="v.word" 
+                    class="flex items-center gap-2 flex-wrap bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
+                    <span class="font-serif text-[15px] font-bold text-gray-900 dark:text-white">{{ v.word }}</span>
+                    <span v-if="v.reading" class="text-[12px] text-gray-500 dark:text-gray-400">【{{ v.reading }}】</span>
+                    <span class="text-[13px] text-gray-800 dark:text-gray-200 flex-1">{{ v.meaning }}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" :style="jlptStyle(v.jlpt)">{{ v.jlpt }}</span>
                   </div>
                 </div>
-                <!-- Correction card for practice mode -->
-                <div v-if="msg.analysisData.correction" class="correction-card">
-                  <p class="correction-title">✏️ Góp ý</p>
-                  <p class="correction-text">{{ msg.analysisData.correction }}</p>
+
+                <div v-if="msg.analysisData.correction" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl p-3 mt-1">
+                  <p class="text-[12px] font-bold text-red-600 dark:text-red-400 mb-1">✏️ Góp ý</p>
+                  <p class="text-[13px] text-gray-800 dark:text-gray-200">{{ msg.analysisData.correction }}</p>
                 </div>
               </div>
 
-              <!-- Normal text -->
-              <div v-else class="msg-text" v-html="formatText(msg.content)"></div>
-
-              <!-- Practice: natural Japanese response -->
-              <div v-if="msg.jpResponse" class="jp-response">
-                <span class="jp-response-label">AI trả lời:</span>
-                <span class="jp-response-text">{{ msg.jpResponse }}</span>
+              <div v-if="msg.jpResponse" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl p-3 mt-1">
+                <span class="block text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1.5">AI trả lời:</span>
+                <span class="font-serif text-[16px] text-gray-900 dark:text-white leading-relaxed">{{ msg.jpResponse }}</span>
               </div>
+
             </div>
           </div>
 
-          <!-- Typing indicator -->
-          <div v-if="loading" class="msg model">
-            <div class="msg-avatar">先</div>
-            <div class="msg-content">
-              <div class="typing-dots"><span></span><span></span><span></span></div>
+          <div v-if="loading" class="flex gap-3 items-start msg-enter">
+            <div class="w-8 h-8 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center font-serif text-[13px] font-bold text-yellow-600 dark:text-yellow-400 shrink-0">
+              先
+            </div>
+            <div class="bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3">
+              <div class="mini-dots"><span></span><span></span><span></span></div>
             </div>
           </div>
         </div>
 
-        <!-- Input area -->
-        <div class="input-area">
+        <div class="px-5 py-4 bg-white dark:bg-[#1f2937] border-t border-gray-200 dark:border-gray-700 shrink-0 transition-colors">
           <div v-if="mode === 'practice' && !practiceStarted && !selectedScenario"
-            class="input-hint">← Chọn tình huống để bắt đầu luyện tập</div>
-          <div v-else class="input-wrap">
+            class="text-center text-[13px] text-gray-500 dark:text-gray-400 py-2">
+            ← Chọn tình huống ở menu bên trái để bắt đầu luyện tập
+          </div>
+          <div v-else class="flex gap-2.5 items-end">
             <textarea
               v-model="userInput"
-              class="chat-input"
+              class="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-[14px] resize-none max-h-[140px] overflow-y-auto outline-none focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 transition-all placeholder-gray-400 dark:placeholder-gray-500 custom-scrollbar leading-[1.5]"
               :placeholder="inputPlaceholder"
               rows="1"
               @keydown.enter.exact.prevent="send"
               @input="autoResize"
               ref="inputEl"
             ></textarea>
-            <button class="send-btn" @click="send"
-              :disabled="!userInput.trim() || loading || !apiKey">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+            <button @click="send" :disabled="!userInput.trim() || loading || !apiKey"
+              class="w-11 h-11 shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-500 text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-0.5">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
               </svg>
             </button>
           </div>
-          <p v-if="!apiKey" class="no-key-warn">⚠ Chưa có Gemini API Key</p>
+          <p v-if="!apiKey" class="text-center text-[12px] text-yellow-600 dark:text-yellow-500 mt-2">⚠ Chưa có Gemini API Key. Hãy cấu hình trong .env</p>
         </div>
       </main>
     </div>
@@ -246,7 +284,7 @@ const contextLoaded = ref(false)
 const totalVocabCount = ref(0)
 const totalCardCount = ref(0)
 const sampleVocabs = ref<string[]>([])
-const userVocabContext = ref('') // inject vào prompt
+const userVocabContext = ref('')
 
 async function loadUserContext() {
   if (!jwt.value) return
@@ -254,14 +292,12 @@ async function loadUserContext() {
   const base = config.public.apiBaseUrl
 
   try {
-    // Load decks → lấy cards count + sample words
     const decksRes = await fetch(`${base}/api/decks/my-decks`, { headers })
     if (decksRes.ok) {
       const data = await decksRes.json()
       const decks = data.result || data
       totalCardCount.value = decks.reduce((s: number, d: any) => s + (d.cardCount || 0), 0)
 
-      // Lấy sample từ deck đầu tiên
       if (decks.length > 0) {
         const detailRes = await fetch(`${base}/api/decks/${decks[0].id}`, { headers })
         if (detailRes.ok) {
@@ -269,8 +305,6 @@ async function loadUserContext() {
           const cards = detail.result?.cards || detail.cards || []
           const samples = cards.slice(0, 8).map((c: any) => c.charBig || c.frontText || '')
           sampleVocabs.value = samples.filter(Boolean)
-
-          // Build context string
           userVocabContext.value = `Flashcard của user (${totalCardCount.value} thẻ). Mẫu: ${samples.slice(0, 10).join(', ')}`
         }
       }
@@ -345,13 +379,10 @@ function jlptStyle(level: string) {
 
 // ── Build system prompt ───────────────────────────────────────────
 function buildSystemPrompt(isPractice = false) {
-  const vocabCtx = userVocabContext.value
-    ? `\n\nNgữ cảnh người học: ${userVocabContext.value}`
-    : ''
+  const vocabCtx = userVocabContext.value ? `\n\nNgữ cảnh người học: ${userVocabContext.value}` : ''
 
   if (isPractice && selectedScenario.value) {
     return `Bạn là AI luyện hội thoại tiếng Nhật. ${selectedScenario.value.prompt}
-
 Quy tắc QUAN TRỌNG:
 - Luôn trả lời bằng JSON với format:
 {
@@ -367,7 +398,6 @@ Quy tắc QUAN TRỌNG:
   }
 
   return `Bạn là AI Sensei — gia sư tiếng Nhật thông minh.
-
 Khi phân tích câu/ngữ pháp tiếng Nhật, trả về JSON:
 {
   "type": "japanese_analysis",
@@ -377,7 +407,6 @@ Khi phân tích câu/ngữ pháp tiếng Nhật, trả về JSON:
   "grammar": [{"pattern":"mẫu ngữ pháp","jlpt":"N?","meaning":"ý nghĩa","example":"ví dụ"}],
   "vocabulary": [{"word":"từ","reading":"cách đọc","meaning":"nghĩa","jlpt":"N?"}]
 }
-
 Khi hỏi bình thường, trả lời text thông thường bằng tiếng Việt.
 Tự động phát hiện JLPT level từ từ vựng và câu hỏi của user, điều chỉnh độ khó giải thích phù hợp.${vocabCtx}`
 }
@@ -418,7 +447,6 @@ function parseResponse(raw: string, isPractice: boolean) {
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[0])
       if (data.type === 'japanese_analysis') {
-        // Detect level từ grammar
         const levels = data.grammar?.map((g: any) => g.jlpt).filter(Boolean) || []
         if (levels.length && !detectedLevel.value) {
           detectedLevel.value = levels[0]
@@ -450,9 +478,7 @@ async function sendToGemini(text: string, isStart = false) {
     parts: [{ text: m.jpResponse || m.content }]
   }))
 
-  const prompt = isStart
-    ? `[BẮT ĐẦU TÌNH HUỐNG: ${selectedScenario.value?.name}]`
-    : text
+  const prompt = isStart ? `[BẮT ĐẦU TÌNH HUỐNG: ${selectedScenario.value?.name}]` : text
 
   loading.value = true
   await scrollBottom()
@@ -460,7 +486,6 @@ async function sendToGemini(text: string, isStart = false) {
   try {
     const raw = await callGemini(systemPrompt, history, prompt)
     const parsed = parseResponse(raw, isPractice)
-
     messages.value.push({ role: 'model', ...parsed })
   } catch (e: any) {
     messages.value.push({ role: 'model', content: `❌ Lỗi: ${e.message || e}` })
@@ -500,7 +525,7 @@ function formatText(text: string) {
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
     .replace(/\n/g, '<br />')
 }
 
@@ -530,370 +555,44 @@ onMounted(() => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap');
 
-.sensei-shell {
-  /* Dark mode default — app.vue default theme là "dark" */
-  --accent: #e8c84a;
-  --accent2: #5b8dee;
-  --red: #f87171;
-  --green: #4ade80;
-  --bg: #121212;
-  --surface: #1e1e1e;
-  --surface2: #2a2a2a;
-  --border: #333333;
-  --text: #f5f5f5;
-  --text-muted: #9ca3af;
-
-  height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  position: relative;
-}
-
-/* Light mode — khi html KHÔNG có class "dark" */
-:global(html:not(.dark)) .sensei-shell {
-  --accent: #c9a227;
-  --accent2: #3b73d4;
-  --red: #ef4444;
-  --green: #22c55e;
-  --bg: #f9f9f9;
-  --surface: #ffffff;
-  --surface2: #f3f4f6;
-  --border: #e5e7eb;
-  --text: #222222;
-  --text-muted: #6b7280;
-}
-
-/* Subtle grid chỉ trong content area */
-.bg-grid {
-  position: absolute; inset: 0; z-index: 0;
-  background-image:
-    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none;
-}
-.bg-glow {
-  position: absolute; top: -100px; right: -100px;
-  width: 400px; height: 400px; z-index: 0;
-  background: radial-gradient(circle, rgba(201,162,39,0.08) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.sensei-layout {
-  position: relative; z-index: 1;
-  display: flex;
-  height: 100%;
-}
-
-/* ── Context panel ── */
-.context-panel {
-  width: 260px;
-  flex-shrink: 0;
-  background: var(--surface2);
-  border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  overflow-y: auto; overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-.context-header {
-  padding: 20px;
-  border-bottom: 1px solid var(--border);
-}
-.sensei-logo {
-  display: flex; flex-direction: column;
-}
-.logo-jp {
-  font-family: 'Noto Serif JP', serif;
-  font-size: 28px; font-weight: 700;
-  color: var(--accent);
-  line-height: 1;
-}
-.logo-en {
-  font-size: 11px; letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-/* Mode switch */
-.mode-switch {
-  padding: 12px;
-  display: flex; flex-direction: column; gap: 6px;
-  border-bottom: 1px solid var(--border);
-}
-.mode-btn {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 10px;
-  border: 1px solid transparent;
-  background: transparent; cursor: pointer;
-  text-align: left; transition: all 0.15s;
-  color: var(--text-muted); font-family: inherit; width: 100%;
-}
-.mode-btn:hover { background: var(--surface2); color: var(--text); }
-.mode-btn.active {
-  background: rgba(232,200,74,0.08);
-  border-color: rgba(232,200,74,0.3);
-  color: var(--text);
-}
-.mode-icon { font-size: 20px; flex-shrink: 0; }
-.mode-name { font-size: 13px; font-weight: 600; line-height: 1; }
-.mode-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-/* Scenarios */
-.scenario-section { padding: 12px; border-bottom: 1px solid var(--border); }
-.section-label {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--text-muted);
-  margin-bottom: 8px;
-}
-.scenario-list { display: flex; flex-direction: column; gap: 4px; }
-.scenario-btn {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-radius: 8px;
-  border: 1px solid transparent; background: transparent;
-  cursor: pointer; text-align: left; transition: all 0.15s;
-  color: var(--text-muted); font-family: inherit; width: 100%;
-}
-.scenario-btn:hover { background: var(--surface2); color: var(--text); }
-.scenario-btn.active {
-  background: rgba(91,141,238,0.1);
-  border-color: rgba(91,141,238,0.3);
-  color: var(--accent2);
-}
-.scenario-icon { font-size: 16px; }
-.scenario-name { font-size: 13px; font-weight: 500; }
-
-/* User context */
-.user-context { padding: 12px; border-bottom: 1px solid var(--border); }
-.context-stat { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.stat-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
-.stat-icon { font-size: 14px; }
-.context-loading {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 12px; color: var(--text-muted);
-}
-.mini-dots { display: flex; gap: 3px; }
+/* Hiệu ứng gõ chữ (Dấu 3 chấm) */
+.mini-dots { display: flex; gap: 3px; align-items: center; }
 .mini-dots span {
-  width: 4px; height: 4px; border-radius: 50%;
-  background: var(--text-muted); animation: dot-bounce 1.2s infinite;
+  width: 5px; height: 5px; border-radius: 50%;
+  background-color: currentColor;
+  animation: dot-bounce 1.2s infinite;
 }
 .mini-dots span:nth-child(2) { animation-delay: 0.2s; }
 .mini-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes dot-bounce { 0%,80%,100% { transform:translateY(0) } 40% { transform:translateY(-4px) } }
 
-.vocab-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-.vocab-chip {
-  font-family: 'Noto Serif JP', serif;
-  font-size: 12px; padding: 2px 8px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 20px; color: var(--text-muted);
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.6; }
+  40% { transform: translateY(-4px); opacity: 1; }
 }
 
-/* Quick prompts */
-.quick-prompts { padding: 12px; }
-.quick-prompt-btn {
-  display: block; width: 100%;
-  text-align: left; padding: 7px 10px;
-  background: transparent; border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text-muted);
-  font-size: 12px; cursor: pointer; margin-bottom: 5px;
-  transition: all 0.15s; font-family: inherit;
+/* Hiệu ứng trượt tin nhắn lên */
+.msg-enter {
+  animation: fadeUp 0.3s ease-out forwards;
 }
-.quick-prompt-btn:hover { border-color: var(--accent2); color: var(--text); }
-
-/* ── Chat area ── */
-.chat-area {
-  flex: 1; display: flex; flex-direction: column; overflow: hidden;
-  background: var(--bg);
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.chat-topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+/* Custom thanh cuộn */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
-.chat-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; }
-.status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.status-dot.offline { background: var(--red); }
-.topbar-actions { display: flex; gap: 6px; }
-.topbar-btn {
-  width: 30px; height: 30px; border-radius: 8px;
-  background: transparent; border: 1px solid var(--border);
-  color: var(--text-muted); cursor: pointer; display: flex;
-  align-items: center; justify-content: center; transition: all 0.15s;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-.topbar-btn:hover { border-color: var(--text-muted); color: var(--text); }
-
-/* Messages */
-.messages-wrap {
-  flex: 1; overflow-y: auto; padding: 24px;
-  display: flex; flex-direction: column; gap: 20px;
-  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
-  background: var(--bg);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1; /* Tailwind gray-300 */
+  border-radius: 10px;
 }
-
-/* Welcome */
-.welcome-state {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  text-align: center; gap: 12px; padding: 40px;
+:global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* Tailwind gray-600 */
 }
-.welcome-kanji {
-  font-family: 'Noto Serif JP', serif;
-  font-size: 64px; font-weight: 700;
-  color: var(--accent); opacity: 0.5;
-  line-height: 1;
-}
-.welcome-title { font-size: 20px; font-weight: 600; color: var(--text); }
-.welcome-sub { font-size: 14px; color: var(--text-muted); max-width: 360px; line-height: 1.6; }
-.scenario-preview {
-  display: flex; align-items: center; gap: 14px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 16px 20px;
-  margin-top: 10px;
-}
-.scenario-preview-icon { font-size: 28px; }
-.scenario-preview-name { font-size: 15px; font-weight: 600; }
-.scenario-preview-desc { font-size: 13px; color: var(--text-muted); }
-.btn-start-practice {
-  background: var(--accent); color: #111;
-  border: none; border-radius: 10px;
-  padding: 10px 20px; font-size: 14px; font-weight: 700;
-  cursor: pointer; transition: opacity 0.2s; font-family: inherit;
-  white-space: nowrap; margin-left: auto;
-}
-.btn-start-practice:hover { opacity: 0.85; }
-
-/* Messages */
-.msg {
-  display: flex; gap: 12px; align-items: flex-start;
-  animation: fadeUp 0.2s ease;
-}
-@keyframes fadeUp { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
-.msg.user { flex-direction: row-reverse; }
-.msg-avatar {
-  width: 32px; height: 32px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; flex-shrink: 0;
-}
-.user .msg-avatar { background: var(--accent); color: #111; }
-.model .msg-avatar {
-  background: var(--surface2); border: 1px solid var(--border);
-  font-family: 'Noto Serif JP', serif; color: var(--accent);
-}
-.msg-content { max-width: 78%; display: flex; flex-direction: column; gap: 8px; }
-.user .msg-content { align-items: flex-end; }
-
-.msg-text {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 12px 16px;
-  font-size: 14px; line-height: 1.7;
-}
-.user .msg-text { background: var(--accent); color: #111; border-color: var(--accent); }
-.msg-text code { background: rgba(0,0,0,0.3); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
-
-/* JP response bubble */
-.jp-response {
-  background: rgba(91,141,238,0.08); border: 1px solid rgba(91,141,238,0.2);
-  border-radius: 12px; padding: 10px 14px; font-size: 14px;
-}
-.jp-response-label { font-size: 10px; color: var(--accent2); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 4px; }
-.jp-response-text { font-family: 'Noto Serif JP', serif; font-size: 16px; color: var(--text); }
-
-/* Analysis card */
-.analysis-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
-}
-.analysis-sentence {
-  font-family: 'Noto Serif JP', serif;
-  font-size: 18px; font-weight: 700; color: var(--text);
-  padding: 10px 12px; border-left: 3px solid var(--accent);
-  line-height: 1.6;
-}
-.analysis-translation {
-  font-size: 14px; color: var(--text);
-  background: rgba(91,141,238,0.06); border-radius: 8px;
-  padding: 8px 12px;
-}
-.analysis-explanation { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
-.analysis-section { display: flex; flex-direction: column; gap: 6px; }
-.analysis-section-title {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.1em; color: var(--text-muted);
-}
-.grammar-item {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px 12px;
-}
-.grammar-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.grammar-pattern { font-size: 15px; font-weight: 700; color: var(--accent); }
-.jlpt-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
-.grammar-meaning { font-size: 13px; color: var(--text); }
-.grammar-example { font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
-
-.vocab-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 7px; padding: 6px 10px;
-}
-.vocab-word { font-family: 'Noto Serif JP', serif; font-size: 15px; font-weight: 700; color: var(--text); }
-.vocab-reading { font-size: 12px; color: var(--text-muted); }
-.vocab-meaning { font-size: 13px; color: var(--text); flex: 1; }
-
-.correction-card {
-  background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2);
-  border-radius: 8px; padding: 10px 12px;
-}
-.correction-title { font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
-.correction-text { font-size: 13px; color: var(--text); }
-
-/* Typing */
-.typing-dots {
-  display: flex; gap: 5px; align-items: center;
-  padding: 12px 16px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 14px;
-}
-.typing-dots span {
-  width: 7px; height: 7px; background: var(--text-muted);
-  border-radius: 50%; animation: bounce 1.2s infinite;
-}
-.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
-
-/* Input */
-.input-area {
-  padding: 16px 20px;
-  background: var(--surface); border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.input-hint { text-align: center; font-size: 13px; color: var(--text-muted); padding: 8px; }
-.input-wrap { display: flex; gap: 10px; align-items: flex-end; }
-.chat-input {
-  flex: 1; background: var(--surface); border: 1px solid var(--border);
-  color: var(--text); border-radius: 12px; padding: 10px 14px;
-  font-size: 14px; resize: none; max-height: 140px; overflow-y: auto;
-  font-family: inherit; line-height: 1.5; outline: none;
-  transition: border-color 0.2s;
-}
-.chat-input:focus { border-color: var(--accent2); }
-.chat-input::placeholder { color: var(--text-muted); }
-.send-btn {
-  width: 42px; height: 42px; background: var(--accent2);
-  border: none; border-radius: 12px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: all 0.2s; color: white;
-}
-.send-btn:hover:not(:disabled) { background: #4a7de0; transform: translateY(-1px); }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.no-key-warn { text-align: center; font-size: 12px; color: #f59e0b; margin-top: 6px; }
 </style>

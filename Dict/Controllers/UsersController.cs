@@ -1,8 +1,11 @@
 ﻿using Dict.DTO;
 using Dict.DTO.User;
+using Dict.Models;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Dict.Controllers
 {
@@ -13,11 +16,16 @@ namespace Dict.Controllers
     {
         private readonly IUserService _userService;
         private readonly ResponseDTO _response;
-
-        public UsersController(IUserService userService)
+        private readonly IMemoryCache _cache;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IEmailService _emailService;
+        public UsersController(IUserService userService, IMemoryCache cache, UserManager<ApplicationUser> userManager, IEmailService emailService)
         {
             _userService = userService;
             _response = new ResponseDTO();
+             _cache = cache;
+            _userManager = userManager;
+            _emailService = emailService;
         }
 
         // GET: api/users
@@ -279,6 +287,56 @@ namespace Dict.Controllers
                 _response.Message = ex.Message;
                 return StatusCode(500, _response);
             }
+        }
+        [HttpPost("send-email-otp")]
+        public async Task<IActionResult> SendEmailOtp([FromBody] SendEmailOtpDto dto)
+        {
+            var currentUserId = User.FindFirst("userId")?.Value;
+            if (string.IsNullOrEmpty(currentUserId)) return Unauthorized();
+
+            // 1. Kiểm tra email mới đã có ai dùng chưa
+            var existingUser = await _userManager.FindByEmailAsync(dto.NewEmail);
+            if (existingUser != null)
+            {
+                return BadRequest(new { isSuccess = false, message = "Email này đã được sử dụng bởi người khác." });
+            }
+
+            // 2. Tạo mã OTP 6 số
+            string otpCode = new Random().Next(100000, 999999).ToString();
+
+            // 3. Lưu OTP vào Cache với thời hạn 5 phút (Key: OTP_UserId_NewEmail)
+            string cacheKey = $"OTP_{currentUserId}_{dto.NewEmail}";
+            _cache.Set(cacheKey, otpCode, TimeSpan.FromMinutes(5));
+
+            // 4. Gửi Email (Bạn thay bằng hàm gửi mail thực tế của dự án nhé)
+            await _emailService.SendEmailAsync(dto.NewEmail, "Mã xác nhận đổi Email", $"Mã OTP của bạn là: {otpCode}. Mã có hiệu lực trong 5 phút.");
+            Console.WriteLine($"[DEBUG] OTP cho {dto.NewEmail} là: {otpCode}");
+
+            return Ok(new { isSuccess = true, message = "Đã gửi mã OTP." });
+        }
+
+        [HttpPost("verify-email-otp")]
+        public IActionResult VerifyEmailOtp([FromBody] VerifyEmailOtpDto dto)
+        {
+            var currentUserId = User.FindFirst("userId")?.Value;
+            if (string.IsNullOrEmpty(currentUserId)) return Unauthorized();
+
+            string cacheKey = $"OTP_{currentUserId}_{dto.NewEmail}";
+
+            // 1. Kiểm tra OTP trong Cache
+            if (_cache.TryGetValue(cacheKey, out string? savedOtp))
+            {
+                if (savedOtp == dto.Otp)
+                {
+                    // 2. Nếu đúng -> Xóa OTP cũ, cấp 1 cờ "Đã xác thực" lưu trong 15 phút
+                    _cache.Remove(cacheKey);
+                    _cache.Set($"VerifiedEmail_{currentUserId}", dto.NewEmail, TimeSpan.FromMinutes(15));
+
+                    return Ok(new { isSuccess = true, message = "Xác nhận OTP thành công." });
+                }
+            }
+
+            return BadRequest(new { isSuccess = false, message = "Mã OTP không chính xác hoặc đã hết hạn." });
         }
     }
 }
