@@ -8,35 +8,39 @@ export interface RecentSearchEntry {
     searchedAt: number; // timestamp
 }
 
-const STORAGE_KEY = 'miyo_recent_searches';
 const MAX_ENTRIES = 10;
 
 // Shared state across components
 const recentSearches = ref<RecentSearchEntry[]>([]);
-let isInitialized = false;
+let currentUserId = ''; // Theo dõi dữ liệu của user nào đang được nạp
 
-// Load from localStorage (runs once)
-const initializeFromStorage = () => {
-    if (isInitialized) return;
+// Hàm tạo key động dựa trên userId
+const getStorageKey = (userId: string) => `miyo_recent_searches_${userId}`;
+
+// Load from localStorage
+const loadFromStorage = (userId: string) => {
     if (typeof window === 'undefined') return;
 
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = localStorage.getItem(getStorageKey(userId));
         if (stored) {
             recentSearches.value = JSON.parse(stored);
+        } else {
+            recentSearches.value = []; // Xóa trắng nếu user chưa có dữ liệu
         }
-        isInitialized = true;
+        currentUserId = userId; // Cập nhật id user hiện tại
     } catch (e) {
         console.error('Failed to load recent searches:', e);
         recentSearches.value = [];
-        isInitialized = true;
+        currentUserId = userId;
     }
 };
 
-export function useRecentSearches() {
-    // Initialize on first use (client-side only)
-    if (typeof window !== 'undefined') {
-        initializeFromStorage();
+// Nhận thêm tham số userId (mặc định là 'guest' nếu chưa đăng nhập)
+export function useRecentSearches(userId: string = 'guest') {
+    // Nếu chưa khởi tạo hoặc người dùng đã đổi tài khoản -> Nạp lại dữ liệu mới
+    if (typeof window !== 'undefined' && currentUserId !== userId) {
+        loadFromStorage(userId);
     }
 
     // Save to localStorage
@@ -44,7 +48,7 @@ export function useRecentSearches() {
         if (typeof window === 'undefined') return;
 
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(recentSearches.value));
+            localStorage.setItem(getStorageKey(userId), JSON.stringify(recentSearches.value));
         } catch (e) {
             console.error('Failed to save recent searches:', e);
         }
@@ -55,8 +59,10 @@ export function useRecentSearches() {
         // Skip if no word
         if (!entry.word) return;
 
-        // Ensure we have latest data
-        initializeFromStorage();
+        // Đảm bảo đang thao tác trên đúng dữ liệu của user
+        if (currentUserId !== userId) {
+            loadFromStorage(userId);
+        }
 
         // Remove existing entry with same word (to avoid duplicates)
         recentSearches.value = recentSearches.value.filter(
@@ -91,17 +97,11 @@ export function useRecentSearches() {
         saveToStorage();
     };
 
-    // Force reload from storage
-    const loadFromStorage = () => {
-        isInitialized = false;
-        initializeFromStorage();
-    };
-
     return {
         recentSearches,
         addRecentSearch,
         clearRecentSearches,
         removeRecentSearch,
-        loadFromStorage,
+        loadFromStorage: () => loadFromStorage(userId),
     };
 }

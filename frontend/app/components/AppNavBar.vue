@@ -179,10 +179,10 @@ onUnmounted(() => {
 });
 
 function handleLogin() { router.push("/login"); }
-function handleLogout() {
-  if (route.path === "/account") router.push("/");
-  logout();
+async function handleLogout() {
+  await logout();
   showToast("Logout successful!", "success");
+  router.replace("/login");
 }
 </script>
 

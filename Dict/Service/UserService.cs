@@ -10,7 +10,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.IO; // Thêm cho Path
+using System.IO;
+using Microsoft.Extensions.Caching.Memory; // Thêm cho Path
 
 namespace Dict.Service
 {
@@ -24,6 +25,7 @@ namespace Dict.Service
         private const string DefaultAvatarUrl = "/images/default_ava.jpg";
         private readonly IBlobService _blobService;
         private readonly string _containerName;
+        private readonly IMemoryCache _cache;
 
         // 2. CẬP NHẬT CONSTRUCTOR
         public UserService(
@@ -31,13 +33,15 @@ namespace Dict.Service
             UserManager<ApplicationUser> userManager, // <-- THÊM
             RoleManager<ApplicationRole> roleManager, // <-- THÊM
             IBlobService blobService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IMemoryCache cache)
         {
             // _context = context; // <-- XÓA
             _userManager = userManager;
             _roleManager = roleManager;
             _blobService = blobService;
             _containerName = configuration.GetValue<string>("AzureBlob:ContainerName") ?? "avatars";
+            _cache = cache;
         }
 
         // 3. CẬP NHẬT HÀM MAP (PHẢI LÀ ASYNC VÀ LẤY ROLE)
@@ -155,6 +159,27 @@ namespace Dict.Service
             var user = await _userManager.FindByNameAsync(username);
             if (user == null) return null;
 
+            // --- KIỂM TRA BẢO MẬT ĐỔI EMAIL ---
+            if (!string.IsNullOrEmpty(dto.Email) && dto.Email != user.Email)
+            {
+                string verifiedCacheKey = $"VerifiedEmail_{user.Id}";
+
+                // Rút cờ xác thực từ Cache ra kiểm tra
+                if (_cache.TryGetValue(verifiedCacheKey, out string? verifiedEmail) && verifiedEmail == dto.Email)
+                {
+                    // Hợp lệ -> Cho phép đổi email và xóa cờ
+                    user.Email = dto.Email;
+                    user.NormalizedEmail = dto.Email.ToUpper();
+
+                    // Xóa cờ để không bị lạm dụng (1 lần xác thực chỉ dùng cho 1 lần update)
+                    _cache.Remove(verifiedCacheKey);
+                }
+                else
+                {
+                    // BẮT LỖI NGAY LẬP TỨC: Ngăn chặn hack qua Postman/Swagger
+                    throw new InvalidOperationException("Email mới chưa được xác thực OTP hoặc phiên xác thực đã hết hạn.");
+                }
+            }
             return await UpdateUserInternalAsync(user, dto);
         }
 

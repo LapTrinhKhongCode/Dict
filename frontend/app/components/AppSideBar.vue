@@ -43,13 +43,13 @@
       <span>Flashcard</span>
     </NuxtLink>
 
-    <NuxtLink
+    <!-- <NuxtLink
       to="/ocr"
       class="flex items-center space-x-3 px-2 py-2 rounded-lg transition-colors hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-neutral-700 dark:hover:text-white [&.router-link-exact-active]:bg-primary-100 [&.router-link-exact-active]:text-primary-700 [&.router-link-exact-active]:font-semibold dark:[&.router-link-exact-active]:bg-neutral-700 dark:[&.router-link-exact-active]:text-primary-400"
     >
       <UIcon name="i-lucide-scan-text" class="w-6 h-6" />
       <span>Nhận dạng văn bản</span>
-    </NuxtLink>
+    </NuxtLink> -->
  <!-- <NuxtLink
       to="/workspaces"
       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-neutral-700 dark:hover:text-white [&.router-link-exact-active]:bg-primary-100 [&.router-link-exact-active]:text-primary-700 [&.router-link-exact-active]:font-semibold dark:[&.router-link-exact-active]:bg-neutral-700 dark:[&.router-link-exact-active]:text-primary-400"
@@ -72,7 +72,7 @@
       <span>Luyện đọc</span>
     </NuxtLink>
 
-    <div
+    <div      v-if="isAuthenticated && role === 'ADMIN'"
       class="px-3 pt-6 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
     >
       Settings
@@ -86,13 +86,13 @@
       <span>Trang Admin</span>
     </NuxtLink>
 
-    <NuxtLink
+    <!-- <NuxtLink
       to="/premium"
       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-neutral-700 dark:hover:text-white [&.router-link-exact-active]:bg-primary-100 [&.router-link-exact-active]:text-primary-700 [&.router-link-exact-active]:font-semibold dark:[&.router-link-exact-active]:bg-neutral-700 dark:[&.router-link-exact-active]:text-primary-400"
     >
       <UIcon name="i-lucide-credit-card" class="w-6 h-6" />
       <span>Premium</span>
-    </NuxtLink>
+    </NuxtLink> -->
   </nav>
 </template>
 

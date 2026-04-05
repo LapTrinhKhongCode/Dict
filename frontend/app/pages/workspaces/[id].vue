@@ -1,5 +1,25 @@
 <template>
-  <div class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
+  <div v-if="!isAuthenticated || accessDenied" class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div class="text-center bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-w-md w-full mx-4">
+      <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Không khả dụng</h1>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">
+        Bạn Không có quyền truy cập vào Workspace này.
+      </p>
+      <div class="flex gap-3">
+        <button @click="router.push('/workspaces')" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-sm">
+          Trang chủ
+        </button>
+        <button v-if="!isAuthenticated" @click="router.push('/login')" class="flex-1 px-4 py-2.5 bg-[#f0c040] text-black rounded-lg font-bold hover:bg-[#e3b330] transition-colors shadow-sm">
+          Đăng nhập
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div v-else class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
     <div class="max-w-4xl mx-auto px-6 py-10">
 
       <div v-if="!workspace" class="flex justify-center items-center py-20">
@@ -287,11 +307,12 @@
 </template>
 
 <script setup lang="ts">
+// Bỏ qua middleware để tự kiểm soát luồng
 definePageMeta({
-  middleware: 'auth-client'
+  // middleware: 'auth-client' // <-- XÓA DÒNG NÀY ĐỂ KHÔNG BỊ VĂNG
 })
 
-import { ref, computed, onMounted, watch } from 'vue' // <-- 1. Import watch
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspace } from '~/composables/useWorkspace'
 import { useJwt } from '~/composables/useJwt'
@@ -306,14 +327,10 @@ const id = parseInt(route.params.id as string)
 const { getWorkspace, updateWorkspace, deleteWorkspace,
         getMembers, inviteMember, updateMemberRole, removeMember, leaveWorkspace } = useWorkspace()
 
-const { userId: currentUserId, isAuthenticated } = useJwt() // <-- 2. Lấy isAuthenticated từ useJwt
+const { userId: currentUserId, isAuthenticated } = useJwt()
 
-// <-- 3. Thêm watcher theo dõi isAuthenticated -->
-watch(isAuthenticated, (newVal) => {
-  if (!newVal) {
-    router.push('/login')
-  }
-}, { immediate: true })
+// --- THÊM STATE TRUY CẬP ---
+const accessDenied = ref(false)
 
 const workspace = ref<any>(null)
 const members = ref<any[]>([])
@@ -357,8 +374,11 @@ function openLeaveModal() {
 }
 
 async function load() {
-  // <-- Kiểm tra thêm một lớp bảo vệ trong hàm load
-  if (!isAuthenticated.value) return; 
+  // Nếu chưa đăng nhập => Bật ngay cờ từ chối
+  if (!isAuthenticated.value) {
+    accessDenied.value = true;
+    return;
+  }
 
   try {
      const [ws, mb] = await Promise.all([getWorkspace(id), getMembers(id)])
@@ -366,6 +386,8 @@ async function load() {
      members.value = mb
   } catch(error) {
      console.error(error)
+     // Bất kỳ lỗi nào (như 403 Forbidden, 404 Not Found) đều kích hoạt cờ từ chối
+     accessDenied.value = true;
   }
 }
 

@@ -494,7 +494,102 @@ namespace Dict.Controllers
                 _response.IsSuccess = false; _response.Message = ex.Message; return StatusCode(500, _response);
             }
         }
-    }
+
+        // GET: api/Admin/workspaces
+        [HttpGet("workspaces")]
+        public async Task<IActionResult> GetAllWorkspaces()
+        {
+            try
+            {
+                var workspaces = await _adminService.GetAllWorkspacesAsync();
+                _response.Result = workspaces;
+                _response.IsSuccess = true;
+                _response.Message = "Lấy danh sách workspace thành công.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi Admin lấy danh sách Workspace");
+                _response.IsSuccess = false;
+                _response.Message = "Đã xảy ra lỗi hệ thống.";
+                return StatusCode(500, _response);
+            }
+        }
+
+        // GET: api/Admin/workspaces/{wsId}/projects
+        [HttpGet("workspaces/{wsId}/projects")]
+        public async Task<IActionResult> GetProjectsByWorkspace(int wsId)
+        {
+            try
+            {
+                var projects = await _adminService.GetProjectsByWorkspaceIdAsync(wsId);
+                _response.Result = projects;
+                _response.IsSuccess = true;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi Admin lấy projects của Workspace {wsId}");
+                _response.IsSuccess = false;
+                _response.Message = "Đã xảy ra lỗi hệ thống.";
+                return StatusCode(500, _response);
+            }
+        }
+
+        // DELETE: api/Admin/workspaces/{id}
+        [HttpDelete("workspaces/{id}")]
+        public async Task<IActionResult> DeleteWorkspace(int id)
+        {
+            try
+            {
+                var isDeleted = await _adminService.DeleteWorkspaceAsync(id);
+                if (!isDeleted)
+                {
+                    _response.IsSuccess = false;
+                    _response.Message = "Không tìm thấy Workspace để xóa.";
+                    return NotFound(_response);
+                }
+
+                _response.IsSuccess = true;
+                _response.Message = "Đã xóa Workspace và toàn bộ dữ liệu liên quan.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi Admin xóa Workspace {id}");
+                _response.IsSuccess = false;
+                _response.Message = "Đã xảy ra lỗi khi xóa Workspace.";
+                return StatusCode(500, _response);
+            }
+        }
+
+        // DELETE: api/Admin/projects/{id}
+        [HttpDelete("projects/{id}")]
+        public async Task<IActionResult> DeleteProject(int id)
+        {
+            try
+            {
+                var isDeleted = await _adminService.DeleteProjectAsync(id);
+                if (!isDeleted)
+                {
+                    _response.IsSuccess = false;
+                    _response.Message = "Không tìm thấy Project để xóa.";
+                    return NotFound(_response);
+                }
+
+                _response.IsSuccess = true;
+                _response.Message = "Đã xóa Project thành công.";
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Lỗi khi Admin xóa Project {id}");
+                _response.IsSuccess = false;
+                _response.Message = "Đã xảy ra lỗi khi xóa Project.";
+                return StatusCode(500, _response);
+            }
+        }
+    } 
 
     // Bạn cần một DTO mới cho việc cập nhật nhiều Role
     public class AdminUpdateUserRolesDto

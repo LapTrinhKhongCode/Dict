@@ -389,21 +389,120 @@ namespace Dict.Service
                 return false;
             }
 
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
             try
             {
-                // BƯỚC 1: Xóa thủ công các dependencies (OK)
+                // ==========================================
+                // BƯỚC 1: XỬ LÝ WORKSPACE & PROJECT KÈM ĐIỀU KIỆN
+                // ==========================================
+
+                var workspacesToDeleteIds = new List<int>();
+
+                var adminWorkspaceIds = await _context.WorkspaceMembers
+                    .Where(wm => wm.UserId == userId && wm.Role == "ADMIN")
+                    .Select(wm => wm.WorkspaceId)
+                    .ToListAsync();
+
+                if (adminWorkspaceIds.Any())
+                {
+                    var adminCounts = await _context.WorkspaceMembers
+                        .Where(wm => adminWorkspaceIds.Contains(wm.WorkspaceId) && wm.Role == "ADMIN")
+                        .GroupBy(wm => wm.WorkspaceId)
+                        .Select(g => new { WorkspaceId = g.Key, AdminCount = g.Count() })
+                        .ToListAsync();
+
+                    workspacesToDeleteIds = adminCounts
+                        .Where(x => x.AdminCount == 1)
+                        .Select(x => x.WorkspaceId)
+                        .ToList();
+
+                    if (workspacesToDeleteIds.Any())
+                    {
+                        // A1. Lấy danh sách Project thuộc các Workspace sẽ bị xóa
+                        var projects = await _context.Projects
+                            .Where(p => workspacesToDeleteIds.Contains(p.WorkspaceId))
+                            .ToListAsync();
+
+                        if (projects.Any())
+                        {
+                            var projectIds = projects.Select(p => p.Id).ToList();
+
+                            // 🚀 FIX LỖI TẠI ĐÂY: Xóa toàn bộ file Media thuộc về các Project này trước
+                            var projectMedia = await _context.MediaStore
+                                .Where(m => m.ProjectId != null && projectIds.Contains(m.ProjectId.Value))
+                                .ToListAsync();
+                            if (projectMedia.Any()) _context.MediaStore.RemoveRange(projectMedia);
+
+                            // (Tùy chọn) Nếu bảng OcrJobs của bạn CÓ liên kết khóa ngoại với ProjectId, hãy mở comment 2 dòng dưới:
+                            // var projectOcrJobs = await _context.OcrJobs.Where(j => j.ProjectId != null && projectIds.Contains(j.ProjectId.Value)).ToListAsync();
+                            // if (projectOcrJobs.Any()) _context.OcrJobs.RemoveRange(projectOcrJobs);
+
+                            // A2. Sau khi dọn sạch file con, mới được xóa Project
+                            _context.Projects.RemoveRange(projects);
+                        }
+
+                        // B. Xóa lời mời của Workspace mồ côi
+                        var wsInvitations = await _context.WorkspaceInvitations
+                            .Where(wi => workspacesToDeleteIds.Contains(wi.WorkspaceId))
+                            .ToListAsync();
+                        if (wsInvitations.Any()) _context.WorkspaceInvitations.RemoveRange(wsInvitations);
+
+                        // C. Xóa TẤT CẢ thành viên của Workspace mồ côi
+                        var allMembersInTheseWs = await _context.WorkspaceMembers
+                            .Where(wm => workspacesToDeleteIds.Contains(wm.WorkspaceId))
+                            .ToListAsync();
+                        if (allMembersInTheseWs.Any()) _context.WorkspaceMembers.RemoveRange(allMembersInTheseWs);
+
+                        // D. Cuối cùng mới xóa Workspaces
+                        var workspacesToDelete = await _context.Workspaces
+                            .Where(w => workspacesToDeleteIds.Contains(w.Id))
+                            .ToListAsync();
+                        if (workspacesToDelete.Any()) _context.Workspaces.RemoveRange(workspacesToDelete);
+                    }
+                }
+
+                var remainingMemberships = await _context.WorkspaceMembers
+                    .Where(wm => wm.UserId == userId && !workspacesToDeleteIds.Contains(wm.WorkspaceId))
+                    .ToListAsync();
+
+                if (remainingMemberships.Any()) _context.WorkspaceMembers.RemoveRange(remainingMemberships);
+
+
+                // ==========================================
+                // BƯỚC 2: XÓA CÁC DEPENDENCIES CÁ NHÂN KHÁC
+                // ==========================================
+
+                // 🚀 FIX LỖI KHÓA NGOẠI TẠI ĐÂY: Xóa các lời mời liên quan đến User này
+                var userInvitations = await _context.WorkspaceInvitations
+                    .Where(wi => wi.InviteeId == userId || wi.InviterId == userId) // Xóa cả những lời họ mời người khác và người khác mời họ
+                    .ToListAsync();
+                if (userInvitations.Any()) _context.WorkspaceInvitations.RemoveRange(userInvitations);
+
                 var decks = await _context.Decks.Where(d => d.UserId == userId).ToListAsync();
-                foreach (var deck in decks) { await AdminDeleteDeckAsync(deck.Id); }
+                foreach (var deck in decks)
+                {
+                    await AdminDeleteDeckAsync(deck.Id);
+                }
 
-                var ocrJobs = await _context.OcrJobs.Where(j => j.UserId == userId).ToListAsync(); if (ocrJobs.Any()) _context.OcrJobs.RemoveRange(ocrJobs);
-                var media = await _context.MediaStore.Where(m => m.OwnerId == userId).ToListAsync(); if (media.Any()) _context.MediaStore.RemoveRange(media);
-                var otherCardStates = await _context.CardStates.Where(cs => cs.UserId == userId).ToListAsync(); if (otherCardStates.Any()) _context.CardStates.RemoveRange(otherCardStates);
-                var otherReviewLogs = await _context.ReviewLogs.Where(rl => rl.UserId == userId).ToListAsync(); if (otherReviewLogs.Any()) _context.ReviewLogs.RemoveRange(otherReviewLogs);
+                var ocrJobs = await _context.OcrJobs.Where(j => j.UserId == userId).ToListAsync();
+                if (ocrJobs.Any()) _context.OcrJobs.RemoveRange(ocrJobs);
 
-                // (Lưu các thay đổi xóa phụ thuộc)
+                var media = await _context.MediaStore.Where(m => m.OwnerId == userId).ToListAsync();
+                if (media.Any()) _context.MediaStore.RemoveRange(media);
+
+                var otherCardStates = await _context.CardStates.Where(cs => cs.UserId == userId).ToListAsync();
+                if (otherCardStates.Any()) _context.CardStates.RemoveRange(otherCardStates);
+
+                var otherReviewLogs = await _context.ReviewLogs.Where(rl => rl.UserId == userId).ToListAsync();
+                if (otherReviewLogs.Any()) _context.ReviewLogs.RemoveRange(otherReviewLogs);
+
+                // Lưu toàn bộ lệnh dọn dẹp phụ thuộc vào DB trước
                 await _context.SaveChangesAsync();
 
-                // BƯỚC 2: Xóa User bằng UserManager (OK)
+                // ==========================================
+                // BƯỚC 3: XÓA USER TRONG BẢNG ASPNETUSERS
+                // ==========================================
                 var deleteResult = await _userManager.DeleteAsync(user);
 
                 if (!deleteResult.Succeeded)
@@ -411,17 +510,19 @@ namespace Dict.Service
                     throw new Exception(string.Join(", ", deleteResult.Errors.Select(e => e.Description)));
                 }
 
-                _logger.LogInformation("Admin {AdminId} successfully deleted user {UserId}", GetAdminId(), userId);
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Admin {AdminId} successfully deleted user {UserId}, handled shared/sole workspaces and invitations.", GetAdminId(), userId);
                 return true;
             }
-            catch (Exception ex) // Bắt lỗi chung
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "AdminDeleteUserAsync: FAILED. User {UserId}", userId);
+                await transaction.RollbackAsync();
+
+                _logger.LogError(ex, "AdminDeleteUserAsync: FAILED. User {UserId}. Transaction rolled back.", userId);
                 return false;
             }
         }
-
-
         // --- CÁC HÀM THỐNG KÊ NÂNG CAO (ĐÃ SỬA) ---
 
         /// <summary>
@@ -560,12 +661,80 @@ namespace Dict.Service
                 Decks = user.Decks?.Select(d => new DeckSummaryDto { Id = d.Id, Name = d.Name, Description = d.Description ?? "", IsPublic = d.IsPublic ?? false, CardCount = d.Cards?.Count() ?? 0, AuthorName = user.UserName }).ToList() ?? new List<DeckSummaryDto>()
             };
         }
+        public async Task<IEnumerable<AdminWorkspaceDto>> GetAllWorkspacesAsync()
+        {
+            var workspaces = await _context.Workspaces
+                // Join qua bảng trung gian WorkspaceMember để lấy thông tin User
+                .Include(w => w.Members)
+                    .ThenInclude(m => m.User)
+                .Include(w => w.Projects)
+                .OrderByDescending(w => w.CreatedAt)
+                .Select(w => new AdminWorkspaceDto
+                {
+                    Id = w.Id,
+                    Name = w.Name,
+                    // Tìm Member có Role "Admin", lấy tên. Nếu không có thì lấy đại người đầu tiên, không có nữa thì ghi "Không rõ"
+                    OwnerName = w.Members.Where(m => m.Role == "Admin").Select(m => m.User.UserName).FirstOrDefault()
+                                ?? w.Members.Select(m => m.User.UserName).FirstOrDefault()
+                                ?? "Không rõ",
+                    MemberCount = w.Members.Count(),
+                    ProjectCount = w.Projects.Count(),
+                    CreatedAt = w.CreatedAt
+                })
+                .ToListAsync();
 
+            return workspaces;
+        }
+
+        public async Task<IEnumerable<AdminProjectDto>> GetProjectsByWorkspaceIdAsync(int workspaceId)
+        {
+            var projects = await _context.Projects
+                .Where(p => p.WorkspaceId == workspaceId)
+                .OrderByDescending(p => p.CreatedAt)
+                .Select(p => new AdminProjectDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Description = p.Description,
+                    WorkspaceId = p.WorkspaceId,
+                    CreatedAt = p.CreatedAt
+                })
+                .ToListAsync();
+
+            return projects;
+        }
+
+        public async Task<bool> DeleteWorkspaceAsync(int workspaceId)
+        {
+            var workspace = await _context.Workspaces.FindAsync(workspaceId);
+            if (workspace == null)
+                return false;
+
+            // Xóa workspace. (EF Core sẽ tự động gửi lệnh DELETE CASCADE tới WorkspaceMember, Project, MediaFiles nếu bạn config Foreign Key chặt chẽ)
+            _context.Workspaces.Remove(workspace);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> DeleteProjectAsync(int projectId)
+        {
+            var project = await _context.Projects.FindAsync(projectId);
+            if (project == null)
+                return false;
+
+            _context.Projects.Remove(project);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+    
         private string GetAdminId()
         {
             var user = _httpContextAccessor.HttpContext?.User;
             if (user == null) return "UnknownAdmin (No HttpContext)";
             return user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "UnknownAdmin (No Claim)";
         }
+
     }
 }

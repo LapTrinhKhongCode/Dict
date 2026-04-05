@@ -24,5 +24,9 @@ namespace Dict.Service.IService
         Task<List<ApiStatItemDto>> GetApiPerformanceStatsAsync();
         Task<List<FailedJobItemDto>> GetFailedSystemJobsAsync();
         Task<PagedResult<DeckAdminDto>> SearchAllDecksAsync(string? searchTerm, int page, int pageSize);
+        Task<IEnumerable<AdminWorkspaceDto>> GetAllWorkspacesAsync();
+        Task<IEnumerable<AdminProjectDto>> GetProjectsByWorkspaceIdAsync(int workspaceId);
+        Task<bool> DeleteWorkspaceAsync(int workspaceId);
+        Task<bool> DeleteProjectAsync(int projectId);
     }
 }

@@ -3,7 +3,6 @@
     <div
       class="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md text-center space-y-4 border border-gray-100"
     >
-      <!-- Loading -->
       <div v-if="loading" class="animate-pulse">
         <div class="flex flex-col items-center space-y-3">
           <svg
@@ -31,7 +30,6 @@
         </div>
       </div>
 
-      <!-- Kết quả -->
       <div v-else>
         <h2
           class="text-xl font-semibold transition-all duration-300"
@@ -57,6 +55,11 @@ import { ref, onMounted } from 'vue'
 import { useJwt } from '~/composables/useJwt'
 import { useRuntimeConfig, useRoute, useRouter } from '#imports'
 
+// Vô hiệu hóa layout mặc định (chứa navbar, sidebar) để trang này đứng độc lập
+definePageMeta({
+  layout: false
+})
+
 const config = useRuntimeConfig()
 const route = useRoute()
 const router = useRouter()
@@ -70,21 +73,29 @@ onMounted(async () => {
   // 🧹 1. Logout mọi user hiện tại
   logout()
 
+  // Lấy cả token và email từ URL (VD: ?email=abc@gmail.com&token=xyz)
   const confirmationToken = route.query.token
-  if (!confirmationToken) {
+  const userEmail = route.query.email
+
+  if (!confirmationToken || !userEmail) {
     loading.value = false
-    error.value = 'Link xác nhận không hợp lệ.'
+    error.value = 'Link xác nhận không hợp lệ hoặc thiếu thông tin.'
     return
   }
 
   try {
-    // 📨 2. Gọi API xác nhận đăng ký
-    const url = `${config.public.apiBaseUrl}/api/Auth/confirm-registration`
+    // 📨 2. Gọi API xác nhận email mới
+    const url = `${config.public.apiBaseUrl}/api/Auth/confirm-email`
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: confirmationToken }),
+      // Truyền cả email và token xuống backend
+      body: JSON.stringify({ 
+        email: userEmail, 
+        token: confirmationToken 
+      }),
     })
+    
     const data = await res.json()
 
     if (!res.ok || !data.isSuccess) {

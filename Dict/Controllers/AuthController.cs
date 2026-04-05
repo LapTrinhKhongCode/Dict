@@ -5,6 +5,8 @@ using System;
 using System.Threading.Tasks;
 using Dict.DTO;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace Dict.Controllers
 {
@@ -28,8 +30,6 @@ namespace Dict.Controllers
             var userIdClaim = User.FindFirst("userId");
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
             {
-                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
-                // mặc dù [Authorize] thường sẽ chặn các request này trước.
                 throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
             }
             return userId;
@@ -41,24 +41,21 @@ namespace Dict.Controllers
             if (!ModelState.IsValid)
             {
                 _response.IsSuccess = false;
-                _response.Message = "Invalid registration data.";
-                _response.Result = ModelState;
+                _response.Message = "Dữ liệu đăng ký không hợp lệ.";
                 return BadRequest(_response);
             }
 
             try
             {
-                // Giả sử RegisterAsync trả về một đối tượng UserDto hoặc User
                 var message = await _authService.RegisterAsync(request);
                 _response.Message = message;
                 _response.IsSuccess = true;
-                return Ok(_response); // Trả về 200 OK với tin nhắn
+                return Ok(_response);
             }
             catch (Exception ex)
             {
                 _response.IsSuccess = false;
-                _response.Message = ex.Message; // Ví dụ: "Username already exists."
-                // Sử dụng 400 Bad Request hoặc 409 Conflict cho lỗi đăng ký
+                _response.Message = ex.Message;
                 return BadRequest(_response);
             }
         }
@@ -69,85 +66,132 @@ namespace Dict.Controllers
             if (!ModelState.IsValid)
             {
                 _response.IsSuccess = false;
-                _response.Message = "Invalid login data.";
+                _response.Message = "Dữ liệu đăng nhập không hợp lệ.";
                 return BadRequest(_response);
             }
 
             try
             {
-                // Giả sử LoginAsync trả về một LoginResponseDto (chứa token và thông tin user)
                 var loginResponse = await _authService.LoginAsync(request);
-
                 _response.Result = loginResponse;
-                _response.Message = "Login successful.";
+                _response.Message = "Đăng nhập thành công.";
+                _response.IsSuccess = true;
                 return Ok(_response);
             }
             catch (Exception ex)
             {
                 _response.IsSuccess = false;
-                _response.Message = ex.Message; // Ví dụ: "Invalid username or password."
-                // Sử dụng 401 Unauthorized cho lỗi đăng nhập sai
+                _response.Message = ex.Message;
                 return Unauthorized(_response);
             }
         }
+
         [HttpPost("logout")]
-        [Authorize] // User must be logged in to log out
+        [Authorize]
         public async Task<IActionResult> Logout()
         {
             try
             {
                 var userId = GetUserId();
                 await _authService.LogoutAsync(userId);
-
                 _response.IsSuccess = true;
-                _response.Message = "Logout successful. Please clear your token.";
+                _response.Message = "Đăng xuất thành công.";
                 return Ok(_response);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                _response.IsSuccess = false;
-                _response.Message = ex.Message;
-                return Unauthorized(_response);
             }
             catch (Exception ex)
             {
-                // Log the error
-                _logger.LogError(ex, "Error during logout for user {UserId}", GetUserId()); // Use GetUserId carefully in catch block if it can fail
-
+                _logger.LogError(ex, "Error during logout for user {UserId}", GetUserId());
                 _response.IsSuccess = false;
-                _response.Message = "An error occurred during logout.";
+                _response.Message = "Đã xảy ra lỗi khi đăng xuất.";
                 return StatusCode(StatusCodes.Status500InternalServerError, _response);
             }
         }
-        [HttpPost("confirm-registration")]
-        public async Task<IActionResult> ConfirmRegistration(ConfirmRegistrationDto dto)
+
+        [HttpPost("confirm-email")]
+        public async Task<IActionResult> ConfirmEmail(ConfirmEmailDto dto)
         {
-            if (string.IsNullOrEmpty(dto.Token))
+            if (string.IsNullOrEmpty(dto.Token) || string.IsNullOrEmpty(dto.Email))
             {
                 _response.IsSuccess = false;
-                _response.Message = "Token is required.";
+                _response.Message = "Email và Token là bắt buộc.";
                 return BadRequest(_response);
             }
 
             try
             {
-                // Gọi hàm service mới
-                var loginResponse = await _authService.ConfirmRegistrationAsync(dto.Token);
-
-                _response.Result = loginResponse; // Trả về token đăng nhập
-                _response.Message = "Tạo tài khoản thành công và đã đăng nhập.";
+                var loginResponse = await _authService.ConfirmEmailAsync(dto.Email, dto.Token);
+                _response.Result = loginResponse;
+                _response.Message = "Xác nhận email thành công. Bạn đã được đăng nhập.";
                 _response.IsSuccess = true;
                 return Ok(_response);
             }
-            catch (InvalidOperationException opEx) // Lỗi do token hết hạn/sai
+            catch (InvalidOperationException opEx)
             {
                 _response.IsSuccess = false;
                 _response.Message = opEx.Message;
                 return BadRequest(_response);
             }
-            catch (Exception ex) // Lỗi hệ thống
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi xác nhận đăng ký với token {Token}", dto.Token);
+                _logger.LogError(ex, "Lỗi hệ thống khi xác nhận email {Email}", dto.Email);
+                _response.IsSuccess = false;
+                _response.Message = "Đã xảy ra lỗi hệ thống.";
+                return StatusCode(500, _response);
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
+        {
+            if (string.IsNullOrEmpty(dto.Email))
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Email là bắt buộc.";
+                return BadRequest(_response);
+            }
+
+            try
+            {
+                var message = await _authService.ForgotPasswordAsync(dto.Email);
+                _response.Message = message;
+                _response.IsSuccess = true;
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xử lý quên mật khẩu cho email {Email}", dto.Email);
+                _response.IsSuccess = false;
+                _response.Message = "Đã xảy ra lỗi hệ thống.";
+                return StatusCode(500, _response);
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Dữ liệu không hợp lệ.";
+                return BadRequest(_response);
+            }
+
+            try
+            {
+                var message = await _authService.ResetPasswordAsync(dto.Email, dto.Otp, dto.NewPassword, dto.ConfirmPassword);
+                _response.Message = message;
+                _response.IsSuccess = true;
+                return Ok(_response);
+            }
+            catch (InvalidOperationException opEx)
+            {
+                _response.IsSuccess = false;
+                _response.Message = opEx.Message;
+                return BadRequest(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi reset mật khẩu cho email {Email}", dto.Email);
                 _response.IsSuccess = false;
                 _response.Message = "Đã xảy ra lỗi hệ thống.";
                 return StatusCode(500, _response);
