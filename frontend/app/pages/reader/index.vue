@@ -74,25 +74,6 @@
           />
         </div>
       </section>
-
-      <Transition name="fade">
-        <div v-if="vocabPopup.visible" class="fixed z-[9999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1c2128] border border-[#f0c040] p-5 rounded-xl shadow-2xl w-[400px] max-w-[90vw]">
-          <h4 class="text-lg font-bold text-[#f0c040] mb-3 line-clamp-4 overflow-hidden break-words leading-tight">
-            {{ vocabPopup.word }}
-          </h4>
-          <div v-if="vocabPopup.loading" class="text-sm text-gray-400 flex items-center gap-2 py-2">
-            <span class="w-4 h-4 border-2 border-gray-400 border-t-[#f0c040] rounded-full animate-spin"></span> Đang dịch...
-          </div>
-          <div v-else>
-            <input v-model="vocabPopup.meaning" @keyup.enter="saveVocab" class="w-full bg-[#0d1117] border border-[#30363d] p-2.5 rounded text-sm mb-4 outline-none text-white focus:border-[#f0c040] transition-colors" placeholder="Nhập nghĩa..." ref="vocabInput" />
-            <div class="flex justify-end gap-2">
-              <button @click="vocabPopup.visible = false" class="px-4 py-1.5 bg-[#30363d] text-[#c9d1d9] rounded-lg text-sm hover:bg-[#444c56] transition">Đóng</button>
-              <button @click="saveVocab" class="px-4 py-1.5 bg-[#f0c040] text-black font-bold rounded-lg text-sm hover:bg-[#d4a017] transition shadow-lg">Lưu từ</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-
     </main>
   </div>
 </template>
