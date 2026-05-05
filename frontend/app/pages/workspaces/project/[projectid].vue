@@ -5,9 +5,7 @@
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
       </div>
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Không khả dụng</h1>
-      <p class="text-gray-500 dark:text-gray-400 mb-6">
-        Bạn Không có quyền truy cập vào Dự án này.
-      </p>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">Bạn Không có quyền truy cập vào Dự án này.</p>
       <div class="flex gap-3">
         <button @click="$router.push('/workspaces')" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-sm">
           Trang chủ
@@ -49,7 +47,7 @@
           <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {{ projectName || 'Chi tiết Dự án' }}
           </h1>
-          <button @click="showDeleteConfirm = true" 
+          <button @click="showDeleteProjectConfirm = true" 
             class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
             title="Xóa toàn bộ dự án">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,7 +88,7 @@
             <th class="px-6 py-5 font-bold">Định dạng</th>
             <th class="px-6 py-5 font-bold">Trạng thái AI</th>
             <th class="px-6 py-5 font-bold">Ngày tải lên</th>
-            <th class="px-8 py-5 font-bold text-center">Mở</th>
+            <th class="px-8 py-5 font-bold text-center">Thao tác</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50 dark:divide-gray-700/50">
@@ -117,11 +115,28 @@
             </td>
             <td class="px-6 py-5 text-gray-500">{{ formatDate(file.createdAt) }}</td>
             <td class="px-8 py-5 text-center">
-               <button @click.stop="openFile(file)" class="p-2.5 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 transition-all">
+              <div class="flex items-center justify-center gap-1">
+                <!-- Nút Xem (Mở file) -->
+                <button @click.stop="openFile(file)" class="p-2 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 transition-all" title="Mở file">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                   </svg>
-               </button>
+                </button>
+                
+                <!-- Nút Sửa Tên -->
+                <button   v-if="isAdmin" @click.stop="promptRenameFile(file)" class="p-2 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/30 text-amber-600 transition-all" title="Đổi tên file">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
+
+                <!-- Nút Xóa File -->
+                <button   v-if="isAdmin" @click.stop="promptDeleteFile(file)" class="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 transition-all" title="Xóa file">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -130,8 +145,9 @@
   </div>
 </main>
 
+    <!-- MODAL XÁC NHẬN XÓA PROJECT -->
     <Transition name="fade">
-      <div v-if="showDeleteConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
+      <div v-if="showDeleteProjectConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
         <div class="bg-[#1c2128] border border-red-500/30 p-8 rounded-[2rem] shadow-2xl w-full max-w-md text-center">
           <div class="w-20 h-20 bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
             <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -139,10 +155,50 @@
           <h3 class="text-2xl font-black text-white mb-3">Xóa vĩnh viễn dự án?</h3>
           <p class="text-gray-400 text-sm leading-relaxed mb-8">Bạn đang thực hiện xóa <b>{{ projectName }}</b>. Tất cả dữ liệu dự án sẽ biến mất vĩnh viễn.</p>
           <div class="flex gap-4">
-            <button @click="showDeleteConfirm = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy bỏ</button>
+            <button   v-if="isAdmin" @click="showDeleteProjectConfirm = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy bỏ</button>
             <button @click="handleDeleteProject" :disabled="isDeleting" class="flex-1 px-6 py-3 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 flex items-center justify-center gap-2">
               <span v-if="isDeleting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               Xác nhận xóa
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- MODAL XÁC NHẬN XÓA FILE -->
+    <Transition name="fade">
+      <div v-if="showDeleteFileConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
+        <div class="bg-[#1c2128] border border-red-500/30 p-8 rounded-[2rem] shadow-2xl w-full max-w-md text-center">
+          <div class="w-20 h-20 bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </div>
+          <h3 class="text-2xl font-black text-white mb-3">Xóa tài liệu này?</h3>
+          <p class="text-gray-400 text-sm leading-relaxed mb-8">Bạn có chắc chắn muốn xóa file <br/><b class="text-white">{{ fileToDelete?.name }}</b> không?</p>
+          <div class="flex gap-4">
+            <button @click="showDeleteFileConfirm = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy</button>
+            <button @click="handleDeleteFile" :disabled="isDeletingFile" class="flex-1 px-6 py-3 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 flex items-center justify-center gap-2">
+              <span v-if="isDeletingFile" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              Xóa ngay
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- MODAL ĐỔI TÊN FILE -->
+    <Transition name="fade">
+      <div v-if="showRenameModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
+        <div class="bg-[#1c2128] border border-gray-700 p-8 rounded-[2rem] shadow-2xl w-full max-w-md">
+          <h3 class="text-xl font-bold text-white mb-4">Đổi tên tài liệu</h3>
+          <div class="mb-6">
+            <label class="block text-sm text-gray-400 mb-2">Tên file mới</label>
+            <input v-model="newFileName" type="text" class="w-full bg-gray-900 border border-gray-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Nhập tên tài liệu..." @keyup.enter="handleRenameFile">
+          </div>
+          <div class="flex gap-4">
+            <button @click="showRenameModal = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy</button>
+            <button @click="handleRenameFile" :disabled="!newFileName || isRenaming" class="flex-1 px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+              <span v-if="isRenaming" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              Lưu thay đổi
             </button>
           </div>
         </div>
@@ -189,8 +245,19 @@ const pendingFile = ref(null)
 const accessDenied = ref(false)
 
 // States cho Xóa Project
-const showDeleteConfirm = ref(false)
+const showDeleteProjectConfirm = ref(false)
 const isDeleting = ref(false)
+
+// States cho Xóa File
+const showDeleteFileConfirm = ref(false)
+const fileToDelete = ref(null)
+const isDeletingFile = ref(false)
+const isAdmin = ref(false)
+// States cho Đổi Tên File
+const showRenameModal = ref(false)
+const fileToRename = ref(null)
+const newFileName = ref('')
+const isRenaming = ref(false)
 
 // State cho Toast UI
 const toast = reactive({
@@ -221,7 +288,6 @@ async function checkAccessAndLoad() {
 
   isLoading.value = true
   try {
-    // 1. Lấy thông tin Project để biết nó thuộc Workspace nào
     const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -233,7 +299,6 @@ async function checkAccessAndLoad() {
     projectName.value = project.name
     const wsId = project.workspaceId
 
-    // 2. Lấy danh sách thành viên của Workspace
     const membersRes = await fetch(`${config.public.apiBaseUrl}/api/workspaces/${wsId}/members`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -242,14 +307,16 @@ async function checkAccessAndLoad() {
     const membersData = await membersRes.json()
     const members = membersData.result || membersData
     
-    // 3. Kiểm tra user hiện tại có trong mảng members không
-    const isMember = members.some(m => m.userId === currentUserId.value)
-    if (!isMember) {
-      accessDenied.value = true
-      return
-    }
+   const currentMember = members.find(m => m.userId === currentUserId.value)
 
-    // 4. Đã qua kiểm tra -> Tải danh sách file
+if (!currentMember) {
+  accessDenied.value = true
+  return
+}
+
+// check role
+isAdmin.value = currentMember.role === 'Admin' // hoặc 'admin' tùy backend
+
     await fetchFiles(token)
 
   } catch (e) {
@@ -292,14 +359,83 @@ async function handleDeleteProject() {
       showToast("Đã xóa dự án thành công!")
       setTimeout(() => { router.push('/projects') }, 1000)
     } else {
-      const err = await res.text()
-      showToast(err || "Không có quyền xóa dự án này", "error")
+      const err = await res.json()
+      showToast(err.message || "Không có quyền xóa dự án này", "error")
     }
   } catch (e) {
     showToast("Lỗi kết nối máy chủ", "error")
   } finally {
     isDeleting.value = false
-    showDeleteConfirm.value = false
+    showDeleteProjectConfirm.value = false
+  }
+}
+
+// ---- LOGIC ĐỔI TÊN FILE ----
+function promptRenameFile(file) {
+  fileToRename.value = file
+  newFileName.value = file.name
+  showRenameModal.value = true
+}
+
+async function handleRenameFile() {
+  const token = getToken()
+  if (!token || !newFileName.value.trim()) return
+
+  isRenaming.value = true
+  try {
+    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/files/${fileToRename.value.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ fileName: newFileName.value.trim() })
+    })
+
+    if (res.ok) {
+      showToast("Đã đổi tên file thành công!")
+      await fetchFiles(token) // Refresh danh sách
+      showRenameModal.value = false
+    } else {
+      const err = await res.json()
+      showToast(err.message || "Bạn không có quyền sửa file này", "error")
+    }
+  } catch (e) {
+    showToast("Lỗi kết nối máy chủ", "error")
+  } finally {
+    isRenaming.value = false
+  }
+}
+
+// ---- LOGIC XÓA FILE ----
+function promptDeleteFile(file) {
+  fileToDelete.value = file
+  showDeleteFileConfirm.value = true
+}
+
+async function handleDeleteFile() {
+  const token = getToken()
+  if (!token) return
+
+  isDeletingFile.value = true
+  try {
+    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/files/${fileToDelete.value.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (res.ok) {
+      showToast("Đã xóa file thành công!")
+      await fetchFiles(token) // Refresh danh sách
+      showDeleteFileConfirm.value = false
+    } else {
+      const err = await res.json()
+      showToast(err.message || "Bạn không có quyền xóa file này", "error")
+    }
+  } catch (e) {
+    showToast("Lỗi kết nối máy chủ", "error")
+  } finally {
+    isDeletingFile.value = false
   }
 }
 
@@ -350,17 +486,24 @@ const statusClass = (s) => {
   const map = {
     completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
     processing: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-    failed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
   }
   return map[s?.toLowerCase()] || 'bg-gray-100 text-gray-800'
 }
 
 const statusText = (s) => {
-  const map = { completed: 'Hoàn thành', processing: 'Đang quét', failed: 'Hoàn thành' }
+  const map = { completed: 'Hoàn thành', processing: 'Đang quét', failed: 'Lỗi xử lý' }
   return map[s?.toLowerCase()] || 'Chờ xử lý'
 }
 
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') + ' ' + new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const utcString = dateString.endsWith('Z') ? dateString : `${dateString}Z`;
+  const date = new Date(utcString);
+  return date.toLocaleString('vi-VN', {
+    hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
+  });
+}
 
 onMounted(() => {
   checkAccessAndLoad()

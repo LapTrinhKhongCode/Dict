@@ -134,16 +134,15 @@ namespace Dict.Service
                 UserId = userId,
                 MediaId = originalMediaId,
                 ProjectId = projectId,
-                Status = "processing", // Đánh dấu đang chờ AI quét
+                Status = "pending", // <--- BẮT BUỘC LÀ "pending" (Đang chờ)
                 DetectedText = string.Empty
             };
             var jobDto = await _ocrJobService.CreateAsync(createJobDto);
 
-            // TRẢ VỀ NGAY LẬP TỨC CHO FRONTEND ĐỂ HIỆN ẢNH (CHƯA CÓ CHỮ)
             return new OcrProcessingResultDto
             {
                 JobId = jobDto.Id,
-                Status = "processing",
+                Status = "pending", // <--- Đổi thành "pending"
                 MediaId = originalMediaId,
                 ImageUrl = uploadedUrl,
                 Results = new List<CreateOcrResultDto>()
@@ -154,6 +153,7 @@ namespace Dict.Service
         // --- HÀM 2: GỌI GOOGLE VISION KHI FRONTEND YÊU CẦU ---
         public async Task<OcrProcessingResultDto> ProcessOcrLazyAsync(int jobId)
         {
+            // 1. Lấy thông tin Job kèm kết quả (nếu đã có)
             var ocrJob = await _db.OcrJobs
                 .Include(j => j.Media)
                 .Include(j => j.Results)
@@ -161,118 +161,99 @@ namespace Dict.Service
 
             if (ocrJob == null) return null;
 
-            // ✅ FIX: Chỉ gọi Google khi THỰC SỰ chưa có kết quả
-            // Status completed + có Results → trả về luôn, không đụng Google
-            bool alreadyDone = ocrJob.Status == "completed" && ocrJob.Results.Any();
-
-            if (!alreadyDone)
+            // 2. KIỂM TRA THỰC SỰ ĐÃ XONG CHƯA
+            // Nếu status là 'completed' và đã có results trong DB thì trả về ngay (Cache HIT)
+            if (ocrJob.Status == "completed" && ocrJob.Results != null && ocrJob.Results.Any())
             {
-                // Tránh chạy 2 request song song cùng jobId (race condition)
-                if (ocrJob.Status == "processing")
+                _logger.LogInformation("✅ Cache HIT — Trả về từ DB cho Job {JobId}", jobId);
+                return MapToResultDto(ocrJob);
+            }
+
+            // 3. NẾU CHƯA XONG (Bất kể là pending hay đang processing mà chưa có kết quả)
+            // Thực hiện khóa (Lock) đơn giản bằng cách kiểm tra thời gian Update gần nhất hoặc cho phép ghi đè
+            _logger.LogInformation("🚀 Bắt đầu gọi Google Vision cho Job {JobId}", jobId);
+
+            // Cập nhật trạng thái sang processing ngay lập tức để đánh dấu
+            ocrJob.Status = "processing";
+            await _db.SaveChangesAsync();
+
+            try
+            {
+                using var httpClient = new HttpClient();
+                byte[] imageBytes = await httpClient.GetByteArrayAsync(ocrJob.Media.StorageUrl);
+
+                var client = await ImageAnnotatorClient.CreateAsync();
+                var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(imageBytes);
+                var response = await client.DetectDocumentTextAsync(googleImage);
+
+                var createResults = new List<CreateOcrResultDto>();
+                var fullTextBuilder = new StringBuilder();
+
+                if (response?.Text != null)
                 {
-                    _logger.LogInformation("Job {JobId} đang được xử lý bởi request khác, chờ...", jobId);
-                    // Trả về trạng thái hiện tại, FE tự poll lại
-                    return new OcrProcessingResultDto
-                    {
-                        JobId = ocrJob.Id,
-                        Status = ocrJob.Status,
-                        ImageUrl = ocrJob.Media?.StorageUrl,
-                        MediaId = (int)(ocrJob.MediaId ?? 0),
-                        Results = new List<CreateOcrResultDto>()
-                    };
+                    foreach (var page in response.Pages)
+                        foreach (var block in page.Blocks)
+                            foreach (var paragraph in block.Paragraphs)
+                                foreach (var word in paragraph.Words)
+                                {
+                                    string wordText = string.Join("", word.Symbols.Select(s => s.Text));
+                                    fullTextBuilder.Append(wordText).Append(" ");
+                                    var bboxList = word.BoundingBox.Vertices.Select(v => new[] { v.X, v.Y }).ToList();
+
+                                    createResults.Add(new CreateOcrResultDto
+                                    {
+                                        PageNumber = 1,
+                                        WordText = wordText,
+                                        BoundingBox = JsonSerializer.Serialize(bboxList)
+                                    });
+                                }
                 }
 
-                _logger.LogInformation("Cache MISS — Gọi Google Vision cho Job {JobId}", jobId);
-
-                // Đánh dấu đang xử lý TRƯỚC khi gọi Google
-                // → Tránh 2 request cùng lúc đều gọi Google
-                await _ocrJobService.UpdateStatusAsync(jobId, new OcrJobUpdateStatusDto
+                // Lưu kết quả vào DB
+                if (createResults.Any())
                 {
-                    Status = "processing",
-                    DetectedText = ocrJob.DetectedText
-                });
+                    await _ocrJobService.AppendResultsAsync(jobId, createResults);
 
-                try
-                {
-                    using var httpClient = new HttpClient();
-                    byte[] imageBytes = await httpClient.GetByteArrayAsync(ocrJob.Media.StorageUrl);
-
-                    var client = await ImageAnnotatorClient.CreateAsync();
-                    var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(imageBytes);
-                    var response = await client.DetectDocumentTextAsync(googleImage);
-
-                    var createResults = new List<CreateOcrResultDto>();
-                    var fullTextBuilder = new StringBuilder();
-
-                    if (response?.Text != null)
-                    {
-                        foreach (var page in response.Pages)
-                            foreach (var block in page.Blocks)
-                                foreach (var paragraph in block.Paragraphs)
-                                    foreach (var word in paragraph.Words)
-                                    {
-                                        string wordText = string.Join("", word.Symbols.Select(s => s.Text));
-                                        fullTextBuilder.Append(wordText).Append(" ");
-                                        var bboxList = word.BoundingBox.Vertices
-                                            .Select(v => new[] { v.X, v.Y }).ToList();
-                                        createResults.Add(new CreateOcrResultDto
-                                        {
-                                            PageNumber = 1,
-                                            WordText = wordText,
-                                            BoundingBox = JsonSerializer.Serialize(bboxList)
-                                        });
-                                    }
-                    }
-
-                    if (createResults.Any())
-                        await _ocrJobService.AppendResultsAsync(jobId, createResults);
-
-                    string finalText = fullTextBuilder.ToString().Trim();
-                    await _ocrJobService.UpdateStatusAsync(jobId, new OcrJobUpdateStatusDto
-                    {
-                        Status = "completed",
-                        DetectedText = finalText
-                    });
-
-                    // Gán lại để trả về ngay mà không query DB thêm lần nữa
-                    ocrJob.Status = "completed";
-                    ocrJob.DetectedText = finalText;
+                    // Gán ngược lại vào object hiện tại để trả về FE luôn
                     ocrJob.Results = createResults.Select(r => new OcrResult
                     {
                         PageNumber = r.PageNumber,
                         WordText = r.WordText,
                         BoundingBox = r.BoundingBox
                     }).ToList();
+                }
 
-                    _logger.LogInformation("✅ Đã lưu cache Google Vision cho Job {JobId} ({Count} words)",
-                        jobId, createResults.Count);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Lỗi Google API cho Job {JobId}", jobId);
-                    await _ocrJobService.UpdateStatusAsync(jobId, new OcrJobUpdateStatusDto
-                    {
-                        Status = "failed",
-                        DetectedText = "Lỗi Google API: " + ex.Message
-                    });
-                    ocrJob.Status = "failed";
-                }
+                string finalText = fullTextBuilder.ToString().Trim();
+                ocrJob.Status = "completed";
+                ocrJob.DetectedText = finalText;
+
+                await _db.SaveChangesAsync();
+                _logger.LogInformation("✅ OCR hoàn tất cho Job {JobId}", jobId);
+
             }
-            else
+            catch (Exception ex)
             {
-                _logger.LogInformation("✅ Cache HIT — Trả về từ DB cho Job {JobId}", jobId);
+                _logger.LogError(ex, "❌ Lỗi khi gọi Google API cho Job {JobId}", jobId);
+                ocrJob.Status = "failed";
+                await _db.SaveChangesAsync();
             }
 
+            return MapToResultDto(ocrJob);
+        }
+
+        // Hàm phụ để map dữ liệu đồng nhất
+        private OcrProcessingResultDto MapToResultDto(OcrJob job)
+        {
             return new OcrProcessingResultDto
             {
-                JobId = ocrJob.Id,
-                Status = ocrJob.Status,
-                DetectedText = ocrJob.DetectedText,
-                MediaId = (int)(ocrJob.MediaId ?? 0),
-                ImageUrl = ocrJob.Media?.StorageUrl,
-                Results = ocrJob.Results?.Select(r => new CreateOcrResultDto
+                JobId = job.Id,
+                Status = job.Status,
+                DetectedText = job.DetectedText,
+                MediaId = (int)(job.MediaId ?? 0),
+                ImageUrl = job.Media?.StorageUrl,
+                Results = job.Results?.Select(r => new CreateOcrResultDto
                 {
-                    PageNumber = r.PageNumber ?? 1, // ✅ Handle nullable
+                    PageNumber = r.PageNumber ?? 1,
                     WordText = r.WordText,
                     BoundingBox = r.BoundingBox
                 }).ToList() ?? new List<CreateOcrResultDto>()
@@ -317,10 +298,16 @@ namespace Dict.Service
             bool alreadyDone = await _db.OcrResults
                 .AnyAsync(r => r.OcrJobId == jobId && r.PageNumber == pageNumber);
 
+            // TÌM ĐOẠN NÀY:
             if (alreadyDone)
             {
                 _logger.LogInformation("✅ Cache HIT trang {Page} Job {JobId} — bỏ qua", pageNumber, jobId);
-                return new { jobId, pageNumber, status = "cached" };
+                // Thay đổi return ở đây
+                var cachedResults = await _db.OcrResults
+                    .Where(r => r.OcrJobId == jobId && r.PageNumber == pageNumber)
+                    .ToListAsync();
+
+                return new { jobId, pageNumber, status = "cached", results = cachedResults };
             }
 
             // ── 2. Đọc bytes ảnh ─────────────────────────────────────────────────
@@ -383,7 +370,7 @@ namespace Dict.Service
             _logger.LogInformation("✅ OCR xong trang {Page} Job {JobId} — {Count} từ",
                 pageNumber, jobId, createResults.Count);
 
-            return new { jobId, pageNumber, status = "completed", wordCount = createResults.Count };
+            return new { jobId, pageNumber, status = "completed", results = createResults };
         }
 
         public async Task<OcrProcessingResultDto> ProcessImageAsync(IFormFile image, int userId, int workspaceId, int? projectId, bool saveAnnotated)
