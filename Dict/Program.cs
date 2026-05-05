@@ -167,6 +167,7 @@ builder.Services.AddSingleton<TrieAutocompleteCache>();
 builder.Services.AddHostedService<TrieLoaderService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddSingleton<IUserIdProvider, EmailBasedUserIdProvider>();
+builder.Services.AddSingleton<IRagSearchService, RagSearchService>();
 // Program.cs
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 builder.Services.AddMemoryCache(); // Thêm dòng này nếu chưa có

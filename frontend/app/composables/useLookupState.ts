@@ -12,3 +12,5 @@ export const useLookupHighlightedWord = () => useState<string>('lookupHighlighte
 
 // State TRA CỨU: "Bắn" lệnh tra cứu cho cả 2 modal (CŨ)
 export const useLookupSelectedWord = () => useState<string>('lookupSelectedWord', () => '')
+
+export const useOcrResultsState = () => useState<any[]>('ocrResults', () => [])

@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dict.Tests", "..\Dict.Tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dict.Indexer", "..\Dict.Indexer\Dict.Indexer.csproj", "{5411F851-AB05-4035-A7E8-2B6DA58EADD5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataEnricher", "..\DataEnricher\DataEnricher.csproj", "{D6DD861F-6FC3-4B9E-B803-95098A480FB6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{5411F851-AB05-4035-A7E8-2B6DA58EADD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5411F851-AB05-4035-A7E8-2B6DA58EADD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5411F851-AB05-4035-A7E8-2B6DA58EADD5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6DD861F-6FC3-4B9E-B803-95098A480FB6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6DD861F-6FC3-4B9E-B803-95098A480FB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6DD861F-6FC3-4B9E-B803-95098A480FB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6DD861F-6FC3-4B9E-B803-95098A480FB6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

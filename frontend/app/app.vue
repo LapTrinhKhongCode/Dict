@@ -12,7 +12,7 @@
     @close="isLookupModalVisible = false"
   />
 
-  <TranslationModal
+  <TranslationModal 
     v-if="isTranslateModalVisible"
     :is-open="isTranslateModalVisible"
     :search-word="selectedWord"

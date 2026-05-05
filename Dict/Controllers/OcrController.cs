@@ -135,7 +135,78 @@ public class InferController : ControllerBase
         }
         return userId;
     }
+    // InferController.cs — Thêm endpoint mới
 
+    public class CreatePdfJobForm
+    {
+        [FromForm(Name = "projectId")]
+        public int? ProjectId { get; set; }
+
+        [FromForm(Name = "fileName")]
+        public string FileName { get; set; }
+
+        [FromForm(Name = "totalPages")]
+        public int TotalPages { get; set; }
+    }
+
+    /// <summary>
+    /// Bước 1: FE gọi 1 lần khi mở PDF → tạo Job trống, nhận jobId
+    /// </summary>
+    [HttpPost("create-pdf-job")]
+    [Authorize]
+    public async Task<IActionResult> CreatePdfJob([FromForm] CreatePdfJobForm form)
+    {
+        try
+        {
+            int userId = _currentUserService.UserId;
+            int workspaceId = _currentUserService.WorkspaceId;
+
+            var result = await _ocrProcessingService.CreatePdfJobAsync(
+                userId, workspaceId, form.ProjectId, form.FileName, form.TotalPages
+            );
+            return Ok(result);
+        }
+        catch (Exception e)
+        {
+            return Problem(detail: e.Message, statusCode: 500);
+        }
+    }
+
+    /// <summary>
+    /// Bước 2: FE gọi từng trang → upload ảnh PNG, gắn vào jobId + pageNumber
+    /// </summary>
+    public class UploadPageForm
+    {
+        [FromForm(Name = "image")]
+        public IFormFile Image { get; set; }
+
+        [FromForm(Name = "jobId")]
+        public int JobId { get; set; }
+
+        [FromForm(Name = "pageNumber")]
+        public int PageNumber { get; set; }
+    }
+
+    [HttpPost("upload-pdf-page")]
+    [Authorize]
+    public async Task<IActionResult> UploadPdfPage([FromForm] UploadPageForm form)
+    {
+        try
+        {
+            if (form.Image == null || form.Image.Length == 0)
+                return BadRequest("Không có ảnh.");
+
+            var result = await _ocrProcessingService.UploadAndOcrPageAsync(
+                form.JobId, form.PageNumber, form.Image
+            );
+            return Ok(result);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Lỗi upload page {Page} cho Job {Job}", form.PageNumber, form.JobId);
+            return Problem(detail: e.Message, statusCode: 500);
+        }
+    }
     [HttpPost("stream")]
     [Authorize] // 1. BẮT BUỘC [Authorize] để lấy GetUserId()
     public async Task StreamOcr(IFormFile file)
