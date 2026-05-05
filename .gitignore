@@ -11,3 +11,5 @@ Dict/requirements.txt
 /Dict/cache_kanji.json
 /Dict/cache_trie_nodes.bin
 /Dict/cache_trie_suggestions.json
+/Dict/multilingual-e5-small.onnx
+/Dict/tokenizer.json

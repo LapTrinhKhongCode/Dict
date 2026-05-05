@@ -2,6 +2,7 @@
 using Dict.DTO.OCR;
 using Dict.Models;
 using Dict.Service.IService;
+using Microsoft.EntityFrameworkCore;
 
 namespace Dict.Service
 {
@@ -9,18 +10,13 @@ namespace Dict.Service
     {
         private readonly ApplicationDbContext _db;
 
-        // Inject DbContext của bạn vào
         public OcrJobService(ApplicationDbContext db)
         {
             _db = db;
         }
 
-        /// <summary>
-        /// Tạo một OcrJob mới và trả về DTO của nó.
-        /// </summary>
         public async Task<OcrJobDto> CreateAsync(OcrJobCreateDto createDto)
         {
-            // 1. Chuyển đổi DTO sang Entity
             var newJob = new OcrJob
             {
                 UserId = createDto.UserId,
@@ -31,12 +27,9 @@ namespace Dict.Service
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-
-            // 2. Thêm vào DbContext và Lưu
             _db.OcrJobs.Add(newJob);
             await _db.SaveChangesAsync();
 
-            // 3. Chuyển đổi Entity đã lưu (đã có Id) sang DTO để trả về
             return new OcrJobDto
             {
                 Id = newJob.Id,
@@ -48,64 +41,85 @@ namespace Dict.Service
             };
         }
 
-        /// <summary>
-        // Thêm một danh sách các kết quả (từ/dòng) vào một OcrJob đã có.
-        /// </summary>
         public async Task AppendResultsAsync(int jobId, List<CreateOcrResultDto> results)
         {
-            if (results == null || !results.Any())
-            {
-                return; // Không có gì để thêm
-            }
+            if (results == null || !results.Any()) return;
 
-            // Kiểm tra xem Job có tồn tại không
             var job = await _db.OcrJobs.FindAsync(jobId);
             if (job == null)
-            {
                 throw new KeyNotFoundException($"Không tìm thấy OcrJob với ID: {jobId}");
-            }
 
-            // Chuyển đổi danh sách DTO sang danh sách Entity
             var newResultEntities = results.Select(dto => new OcrResult
             {
-                OcrJobId = jobId, // Gán khóa ngoại
+                OcrJobId = jobId,
                 PageNumber = dto.PageNumber,
                 WordText = dto.WordText,
                 BoundingBox = dto.BoundingBox,
-                Confidence = null, // Giả sử DTO không có
-                LinkWordId = null  // Giả sử DTO không có
+                Confidence = null,
+                LinkWordId = null
             }).ToList();
 
-            // Thêm hàng loạt (hiệu quả hơn)
             await _db.OcrResults.AddRangeAsync(newResultEntities);
             await _db.SaveChangesAsync();
         }
 
-        /// <summary>
-        /// Cập nhật trạng thái và/hoặc văn bản đã phát hiện của một job.
-        /// </summary>
         public async Task UpdateStatusAsync(int jobId, OcrJobUpdateStatusDto updateDto)
         {
             var job = await _db.OcrJobs.FindAsync(jobId);
-
             if (job == null)
-            {
                 throw new KeyNotFoundException($"Không tìm thấy OcrJob với ID: {jobId}");
-            }
 
-            // Cập nhật các trường
             job.Status = updateDto.Status;
-
-            // Chỉ cập nhật DetectedText nếu nó được cung cấp (không phải null)
-            // Code trong OcrProcessingService có truyền null, nên cần kiểm tra
             if (updateDto.DetectedText != null)
-            {
                 job.DetectedText = updateDto.DetectedText;
-            }
 
             job.UpdatedAt = DateTime.UtcNow;
-
             await _db.SaveChangesAsync();
+        }
+
+        // 🆕 Append text từng trang vào DetectedText — không ghi đè toàn bộ
+        public async Task AppendDetectedTextAsync(int jobId, string newText)
+        {
+            if (string.IsNullOrEmpty(newText)) return;
+
+            // Dùng ExecuteUpdateAsync để tránh race condition khi nhiều trang
+            // upload song song cùng lúc (tránh lost update)
+            var affected = await _db.OcrJobs
+                .Where(j => j.Id == jobId)
+                .ExecuteUpdateAsync(setter => setter
+                    .SetProperty(j => j.DetectedText,
+                        j => (j.DetectedText ?? "") + newText)
+                    .SetProperty(j => j.UpdatedAt,
+                        _ => DateTime.UtcNow)
+                );
+
+            if (affected == 0)
+                throw new KeyNotFoundException($"Không tìm thấy OcrJob với ID: {jobId}");
+        }
+
+        // 🆕 Cập nhật status thành "completed" chỉ khi TẤT CẢ trang đã xong
+        // Gọi sau mỗi lần upload trang để check xem đã đủ chưa
+        public async Task TryCompleteJobAsync(int jobId, int totalPages)
+        {
+            // Đếm số trang DISTINCT đã có trong DB
+            var completedPages = await _db.OcrResults
+                .Where(r => r.OcrJobId == jobId)
+                .Select(r => r.PageNumber)
+                .Distinct()
+                .CountAsync();
+
+            if (completedPages >= totalPages)
+            {
+                await _db.OcrJobs
+                    .Where(j => j.Id == jobId)
+                    .ExecuteUpdateAsync(setter => setter
+                        .SetProperty(j => j.Status, "completed")
+                        .SetProperty(j => j.UpdatedAt, DateTime.UtcNow)
+                    );
+
+                // Không cần log ở đây vì service không có ILogger
+                // Controller/OcrProcessingService sẽ log
+            }
         }
     }
 }
