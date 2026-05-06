@@ -543,15 +543,32 @@ function searchWord(word) {
 }
 
 function formatDate(d) {
-  if (!d) return ''
-  const date = new Date(d)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  if (diff < 1000 * 60 * 60) return `${Math.floor(diff / 60000)} phút trước`
-  if (diff < 1000 * 60 * 60 * 24) return `${Math.floor(diff / 3600000)} giờ trước`
-  return date.toLocaleDateString('vi-VN')
-}
+  if (!d) return '';
 
+  // 1. Khắc phục lỗi thiếu 'Z' (UTC) từ API
+  const utcString = d.endsWith('Z') ? d : `${d}Z`;
+  
+  // 2. Tạo object Date với giờ đã được chuẩn hóa
+  const date = new Date(utcString);
+  const now = new Date();
+  
+  // 3. Tính chênh lệch (đảm bảo không bị âm do độ trễ mạng/server)
+  let diff = now.getTime() - date.getTime();
+  if (diff < 0) diff = 0; 
+
+  // 4. Hiển thị tương đối
+  if (diff < 1000 * 60 * 60) {
+    const mins = Math.floor(diff / 60000);
+    return mins === 0 ? 'Vừa xong' : `${mins} phút trước`;
+  }
+  
+  if (diff < 1000 * 60 * 60 * 24) {
+    return `${Math.floor(diff / 3600000)} giờ trước`;
+  }
+  
+  // 5. Nếu quá 24h thì hiển thị ngày tháng
+  return date.toLocaleDateString('vi-VN');
+}
 onMounted(loadInitialData)
 </script>
 
