@@ -32,7 +32,7 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           Upload tài liệu
         </button>
-        <button @click="openCreateProjectModal" class="flex items-center gap-2 px-4 py-2 bg-[#f0c040] text-black rounded-lg text-sm font-bold hover:bg-[#e3b330] shadow-sm transition-colors">
+        <button @click="openCreateProjectModal" class="flex items-center gap-2 px-4 py-2 bg-blue-400 text-black rounded-lg text-sm font-bold hover:bg-blue-500 shadow-sm transition-colors">
           <span>+</span> Dự án mới
         </button>
       </div>

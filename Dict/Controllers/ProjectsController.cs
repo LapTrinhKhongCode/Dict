@@ -30,28 +30,47 @@ public class ProjectsController : ControllerBase
     [HttpGet("{projectId}/files")]
     public async Task<IActionResult> GetProjectFiles(int projectId)
     {
-        // Kiểm tra xem Project có tồn tại không
-        var projectExists = await _context.Projects.AnyAsync(p => p.Id == projectId);
+        // Kiểm tra Project tồn tại
+        var projectExists = await _context.Projects
+            .AnyAsync(p => p.Id == projectId);
+
         if (!projectExists)
         {
-            return NotFound(new { message = "Không tìm thấy dự án này!" });
+            return NotFound(new
+            {
+                message = "Không tìm thấy dự án này!"
+            });
         }
 
-        // Lấy danh sách Job thuộc Project này, join với bảng Media để lấy Tên file
+        // Lấy danh sách file
         var files = await _context.OcrJobs
-            .Include(j => j.Media) // Phải có Navigation Property trong Entity Framework
+            .Include(j => j.Media)
             .Where(j => j.ProjectId == projectId)
-            .OrderByDescending(j => j.CreatedAt) // File mới nhất lên đầu
+            .OrderByDescending(j => j.CreatedAt)
             .Select(j => new ProjectFileDto
             {
-                Id = j.Id, // ID của Job (Frontend dùng cái này để chuyển trang)
-                Name = j.Media.FileName ?? "Tài liệu không tên",
-                // Lấy đuôi file (ví dụ ".jpg" -> "jpg")
-                Type = !string.IsNullOrEmpty(j.Media.FileName)
-                        ? Path.GetExtension(j.Media.FileName).Replace(".", "").ToLower()
-                        : "unknown",
-                Status = j.Status, // "pending", "processing", "completed", "failed"
-                CreatedAt = (DateTime)j.CreatedAt
+                Id = j.Id,
+
+                Name = j.Media != null &&
+                       !string.IsNullOrEmpty(j.Media.FileName)
+                    ? j.Media.FileName
+                    : "Tài liệu không tên",
+
+                Type = j.Media != null &&
+                       !string.IsNullOrEmpty(j.Media.FileName)
+                    ? Path.GetExtension(j.Media.FileName)
+                        .Replace(".", "")
+                        .ToLower()
+                    : "unknown",
+
+                Status = j.Status,
+
+                CreatedAt = (DateTime)j.CreatedAt,
+
+                // QUAN TRỌNG
+                ImageUrl = j.Media != null
+                    ? j.Media.StorageUrl
+                    : null
             })
             .ToListAsync();
 

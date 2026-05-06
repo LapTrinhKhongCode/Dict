@@ -15,7 +15,7 @@
           :class="[
             'relative w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-150 flex-shrink-0',
             activeWs?.id === ws.id
-              ? 'bg-yellow-400 text-gray-900 rounded-2xl shadow-md scale-105'
+              ? 'bg-blue-500 text-gray-900 rounded-2xl shadow-md scale-105'
               : 'bg-gray-400 dark:bg-neutral-600 text-white hover:bg-blue-500 dark:hover:bg-blue-600 hover:rounded-2xl'
           ]"
         >

@@ -142,11 +142,11 @@
               />
 
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <p class="text-xl font-medium text-gray-900 dark:text-white truncate">
                   {{ m.userName }}
                   <span v-if="m.userId === currentUserId" class="text-xs text-gray-400 dark:text-gray-500 font-normal ml-1">(bạn)</span>
                 </p>
-                <p class="text-xs text-gray-400 dark:text-gray-500 truncate">{{ m.email }}</p>
+                <p class="text-x text-gray-400 dark:text-gray-500 truncate">{{ m.email }}</p>
               </div>
 
               <div class="flex items-center gap-2">
@@ -161,7 +161,7 @@
                 </select>
 
                 <span v-else :class="[
-                  'text-xs font-semibold px-2.5 py-1 rounded-full',
+                  'text-x font-semibold px-2.5 py-1 rounded-full',
                   m.role?.toUpperCase() === 'ADMIN'
                     ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
                     : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
