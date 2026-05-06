@@ -33,7 +33,14 @@ namespace Dict.Service
             _session = new InferenceSession(modelPath, sessionOptions);
 
             // 3. Khởi tạo Client
-            _qdrantClient = new QdrantClient("localhost", 6334);
+            string qdrantUrl = _config["QdrantCloud:Url"];
+            string qdrantApiKey = _config["QdrantCloud:ApiKey"];
+
+            _qdrantClient = new QdrantClient(
+                host: qdrantUrl,
+                https: true,        // Bắt buộc true khi lên mây
+                apiKey: qdrantApiKey
+            );
             _httpClient = new HttpClient();
         }
 

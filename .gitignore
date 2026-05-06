@@ -13,3 +13,4 @@ Dict/requirements.txt
 /Dict/cache_trie_suggestions.json
 /Dict/multilingual-e5-small.onnx
 /Dict/tokenizer.json
+/Dict/appsettings.json
