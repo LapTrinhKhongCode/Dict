@@ -1,45 +1,55 @@
 ﻿using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
-using Tokenizers.DotNet; // THƯ VIỆN "CHÂN ÁI" MỚI
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
 using System.Text;
+using Tokenizers.DotNet; // THƯ VIỆN "CHÂN ÁI" MỚI
 
 class Program
 {
-    // --- CẤU HÌNH HỆ THỐNG ---
-    private const string ConnectionString = @"Data Source=tuf-dash-f15\sqlserver;Initial Catalog=Dict;Integrated Security=True;Trust Server Certificate=True";
-    private const string QdrantHost = "localhost";
-    private const int QdrantPort = 6334;
-    private const string CollectionName = "dictionary_vectors";
-    private const string ModelPath = "multilingual-e5-small.onnx";
-
-    // FILE JSON VỪA TẢI VỀ
-    private const string TokenizerPath = "tokenizer.json";
+    private static string ConnectionString = "";
+    private static string QdrantHost = "";
+    private static string QdrantApiKey = "";
+    private static string CollectionName = "";
+    private static string ModelPath = "";
+    private static string TokenizerPath = "";
 
     private static InferenceSession _session = null!;
     private static QdrantClient _qdrantClient = null!;
-    private static Tokenizer _tokenizer = null!; // SỬ DỤNG CLASS CỦA TOKENIZERS.DOTNET
+    private static Tokenizer _tokenizer = null!;
 
     static async Task Main()
     {
         Console.OutputEncoding = Encoding.UTF8;
         Console.WriteLine("🚀 --- KHỞI CHẠY VECTOR INDEXER (RTX 3050 GPU) ---");
+        var config = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .Build();
 
+        ConnectionString = config.GetConnectionString("DefaultConnection") ?? "";
+        QdrantHost = config["QdrantCloud:Url"] ?? "";
+        QdrantApiKey = config["QdrantCloud:ApiKey"] ?? "";
+
+        CollectionName = config["ModelSettings:CollectionName"] ?? "dictionary_vectors";
+        ModelPath = config["ModelSettings:ModelPath"] ?? "multilingual-e5-small.onnx";
+        TokenizerPath = config["ModelSettings:TokenizerPath"] ?? "tokenizer.json";
         try
         {
-            // 1. Khởi tạo Tokenizer siêu đơn giản với thư viện mới (Chỉ cần 1 dòng)
+            // 2. Khởi tạo Tokenizer
             Console.WriteLine("⏳ Đang nạp Tokenizer...");
             _tokenizer = new Tokenizer(vocabPath: TokenizerPath);
 
-            // 2. Khởi tạo AI Session (CUDA)
-            Console.WriteLine("⏳ Đang khởi tạo ONNX Runtime (CUDA)...");
+            // 3. Khởi tạo AI Session (CUDA/CPU)
+            Console.WriteLine("⏳ Đang khởi tạo ONNX Runtime...");
             var sessionOptions = new SessionOptions();
-            //sessionOptions.AppendExecutionProvider_CUDA(0);
+            // sessionOptions.AppendExecutionProvider_CUDA(0); // Mở ra nếu ông dùng GPU
             _session = new InferenceSession(ModelPath, sessionOptions);
 
-            _qdrantClient = new QdrantClient(QdrantHost, QdrantPort);
+            // 4. Khởi tạo Qdrant Client (HTTPS cho Cloud)
+            _qdrantClient = new QdrantClient(host: QdrantHost, https: true, apiKey: QdrantApiKey);
             await PrepareQdrantCollection();
 
             int batchSize = 100;
@@ -278,6 +288,17 @@ class Program
             await _qdrantClient.CreateCollectionAsync(CollectionName,
                 new VectorParams { Size = 384, Distance = Distance.Cosine });
         }
+
+        // --- THÊM 2 DÒNG NÀY VÀO ĐÂY ---
+        Console.WriteLine("⏳ Đang thiết lập Index cho label và phonetic...");
+
+        // Tạo index cho trường "label" kiểu Keyword
+        await _qdrantClient.CreatePayloadIndexAsync(CollectionName, "label", PayloadSchemaType.Keyword);
+
+        // Tạo index cho trường "phonetic" kiểu Keyword
+        await _qdrantClient.CreatePayloadIndexAsync(CollectionName, "phonetic", PayloadSchemaType.Keyword);
+
+        Console.WriteLine("✅ Thiết lập Index hoàn tất!");
     }
 
     // Thêm tham số string domain vào List
