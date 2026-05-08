@@ -39,72 +39,75 @@
     </div>
 
     <!-- MAIN CONTENT -->
-    <div v-if="!accessDenied" class="flex-1 flex flex-col items-center relative pdf-scroll-area overflow-auto p-4" ref="pdfScrollAllEl" @mouseup="handleTextSelection">
-      <!-- LOADING -->
-      <div v-if="!pdfDoc && !ocrMode" class="flex flex-col items-center justify-center h-full text-gray-400 w-full mt-20">
-        <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
-        <p>Đang tải tài liệu PDF...</p>
-      </div>
+    <!-- Đã bỏ 'flex', 'flex-col', 'items-center' để tránh xung đột cắt mất góc màn hình -->
+    <div v-if="!accessDenied" class="flex-1 overflow-auto relative pdf-scroll-area p-4" ref="pdfScrollAllEl" @mouseup="handleTextSelection">
+      
+      <!-- WRAPPER MỚI: Ép chiều ngang nở to tự do (w-max) và tự căn ra giữa (mx-auto) -->
+      <div class="min-w-full w-max mx-auto flex flex-col items-center gap-6 pb-12">
 
-      <!-- OCR IMAGE MODE (Chỉ file ảnh) -->
-      <div v-else-if="ocrMode" class="w-full flex justify-center">
-        <div v-if="ocrLoading" class="flex flex-col items-center justify-center h-full text-gray-400 mt-20">
+        <!-- LOADING -->
+        <div v-if="!pdfDoc && !ocrMode" class="flex flex-col items-center justify-center h-full text-gray-400 mt-20">
           <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
-          <p>AI đang đọc tài liệu OCR...</p>
+          <p>Đang tải tài liệu PDF...</p>
         </div>
-        
-        <!-- FIX 1: Loại bỏ transform scale để tránh lỗi tọa độ ảo, chuyển sang dùng CSS width % -->
-        <div v-else-if="ocrImageUrl" class="relative no-drag inline-block leading-none" :style="{ width: Math.round(scale * 100) + '%' }">
-          
-          <!-- FIX 2: Ép thẻ img không được bắt sự kiện chuột (pointer-events: none) -->
-          <img 
-            :src="ocrImageUrl" 
-            ref="ocrImgEl" 
-            @load="onOcrImageLoad" 
-            draggable="false" 
-            class="block shadow-2xl max-w-full" 
-            style="pointer-events: none; user-select: none;"
-          />
-          
-          <!-- FIX 3: Tăng z-index và đảm bảo nhận chuột -->
-          <div v-if="ocrResults && ocrDisplayW > 0" class="absolute inset-0 overflow-hidden ocr-text-layer z-20">
-            <span 
-              v-for="(r, i) in ocrResults" 
-              :key="i" 
-              class="absolute cursor-text pointer-events-auto select-text ocr-word" 
-              :style="getOcrTextStyle(r)"
-            >
-              {{ r.wordText }}
-            </span>
+
+        <!-- OCR IMAGE MODE (Chỉ file ảnh) -->
+        <template v-else-if="ocrMode">
+          <div v-if="ocrLoading" class="flex flex-col items-center justify-center text-gray-400 mt-20">
+            <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
+            <p>AI đang đọc tài liệu OCR...</p>
           </div>
-        </div>
-      </div>
-
-      <!-- PDF PAGES -->
-      <div v-else class="flex flex-col gap-6 w-full items-center">
-        <template v-for="n in totalPages" :key="n">
-          <div v-if="viewMode === 'scroll' || n === currentPage" :data-page="n" :ref="(el) => { if (el) pageRefs[n] = el; }" class="w-full flex justify-center relative" :style="{ minHeight: defaultPageHeight + 'px' }">
-            
-            <div v-if="pageRendered[n] || viewMode === 'single'" class="relative shadow-2xl bg-white leading-none" style="overflow: hidden;">
-              <!-- 1. Canvas render hình ảnh PDF -->
-              <canvas :ref="(el) => { if (el) pageCanvases[n] = el; else delete pageCanvases[n]; }" class="block relative z-0"></canvas>
-
-              <!-- 2. TextLayer gốc của PDFJS (Cho file PDF thường) -->
-              <div :ref="(el) => { if (el) textLayerRefs[n] = el; else delete textLayerRefs[n]; }" class="absolute inset-0 z-10 textLayer"></div>
-
-              <!-- 3. TextLayer của OCR Vision (Cho file PDF ảnh/scan) -->
-              <div v-if="pageOcrResults[n] && pageOcrResults[n].length > 0" class="absolute inset-0 z-20 ocr-text-layer">
-                <span v-for="(r, i) in pageOcrResults[n]" :key="'ocr-'+n+'-'+i" class="absolute cursor-text pointer-events-auto select-text ocr-word" :style="getOcrTextStyleForPdf(r, n)">
-                  {{ r.wordText }}
-                </span>
-              </div>
-            </div>
-
-            <div v-else-if="viewMode === 'scroll'" class="w-full max-w-4xl bg-white/5 border border-dashed border-gray-700 flex items-center justify-center rounded" :style="{ height: defaultPageHeight + 'px' }">
-              <span class="text-gray-500 text-sm">Trang {{ n }}</span>
+          
+          <div v-else-if="ocrImageUrl" class="relative no-drag inline-block leading-none" :style="{ width: Math.round(scale * 100) + '%' }">
+            <img 
+              :src="ocrImageUrl" 
+              ref="ocrImgEl" 
+              @load="onOcrImageLoad" 
+              draggable="false" 
+              class="block shadow-2xl w-full" 
+              style="pointer-events: none; user-select: none;"
+            />
+            <div v-if="ocrResults && ocrDisplayW > 0" class="absolute inset-0 overflow-hidden ocr-text-layer z-20">
+              <span 
+                v-for="(r, i) in ocrResults" 
+                :key="i" 
+                class="absolute cursor-text pointer-events-auto select-text ocr-word" 
+                :style="getOcrTextStyle(r)"
+              >
+                {{ r.wordText }}
+              </span>
             </div>
           </div>
         </template>
+
+        <!-- PDF PAGES -->
+        <template v-else>
+          <template v-for="n in totalPages" :key="n">
+            <div v-if="viewMode === 'scroll' || n === currentPage" :data-page="n" :ref="(el) => { if (el) pageRefs[n] = el; }" class="flex justify-center relative" :style="{ minHeight: defaultPageHeight + 'px' }">
+              
+              <div v-if="pageRendered[n] || viewMode === 'single'" class="relative shadow-2xl bg-white leading-none" style="overflow: hidden;">
+                <!-- 1. Canvas render hình ảnh PDF -->
+                <canvas :ref="(el) => { if (el) pageCanvases[n] = el; else delete pageCanvases[n]; }" class="block relative z-0"></canvas>
+
+                <!-- 2. TextLayer gốc của PDFJS (Cho file PDF thường) -->
+                <div :ref="(el) => { if (el) textLayerRefs[n] = el; else delete textLayerRefs[n]; }" class="absolute inset-0 z-10 textLayer"></div>
+
+                <!-- 3. TextLayer của OCR Vision (Cho file PDF ảnh/scan) -->
+                <div v-if="pageOcrResults[n] && pageOcrResults[n].length > 0" class="absolute inset-0 z-20 ocr-text-layer">
+                  <span v-for="(r, i) in pageOcrResults[n]" :key="'ocr-'+n+'-'+i" class="absolute cursor-text pointer-events-auto select-text ocr-word" :style="getOcrTextStyleForPdf(r, n)">
+                    {{ r.wordText }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-else-if="viewMode === 'scroll'" class="w-[800px] max-w-full bg-white/5 border border-dashed border-gray-700 flex items-center justify-center rounded" :style="{ height: defaultPageHeight + 'px' }">
+                <span class="text-gray-500 text-sm">Trang {{ n }}</span>
+              </div>
+
+            </div>
+          </template>
+        </template>
+
       </div>
     </div>
   </div>

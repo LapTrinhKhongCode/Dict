@@ -212,7 +212,7 @@
               </div>
 
               <div v-if="msg.jpResponse" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl p-3 mt-1">
-                <span class="block text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1.5">AI trả lời:</span>
+                <!-- <span class="block text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1.5">AI trả lời:</span> -->
                 <span class="font-serif text-[16px] text-gray-900 dark:text-white leading-relaxed">{{ msg.jpResponse }}</span>
               </div>
 

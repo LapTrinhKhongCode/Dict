@@ -74,6 +74,23 @@
           />
         </div>
       </section>
+      <Transition name="fade">
+        <div v-if="vocabPopup.visible" class="fixed z-[9999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1c2128] border border-[#f0c040] p-5 rounded-xl shadow-2xl w-[400px] max-w-[90vw]">
+          <h4 class="text-lg font-bold text-[#f0c040] mb-3 line-clamp-4 overflow-hidden break-words leading-tight">
+            {{ vocabPopup.word }}
+          </h4>
+          <div v-if="vocabPopup.loading" class="text-sm text-gray-400 flex items-center gap-2 py-2">
+            <span class="w-4 h-4 border-2 border-gray-400 border-t-[#f0c040] rounded-full animate-spin"></span> Đang dịch...
+          </div>
+          <div v-else>
+            <input v-model="vocabPopup.meaning" @keyup.enter="saveVocab" class="w-full bg-[#0d1117] border border-[#30363d] p-2.5 rounded text-sm mb-4 outline-none text-white focus:border-[#f0c040] transition-colors" placeholder="Nhập nghĩa..." ref="vocabInput" />
+            <div class="flex justify-end gap-2">
+              <button @click="vocabPopup.visible = false" class="px-4 py-1.5 bg-[#30363d] text-[#c9d1d9] rounded-lg text-sm hover:bg-[#444c56] transition">Đóng</button>
+              <button @click="saveVocab" class="px-4 py-1.5 bg-[#f0c040] text-black font-bold rounded-lg text-sm hover:bg-[#d4a017] transition shadow-lg">Lưu từ</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </main>
   </div>
 </template>
@@ -81,7 +98,7 @@
 <script setup>
 definePageMeta({ layout: 'reader', ssr: false })
 
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRuntimeConfig } from '#app'
 
@@ -149,33 +166,43 @@ function triggerPdfJump(pageNum) {
     pdfViewerRef.value.jumpToPage()
   }
 }
-
+function handleOpenVocabPopup(event) {
+  const { word, meaning } = event.detail;
+  
+  // Mở popup vàng lên và điền sẵn từ + nghĩa lấy từ RAG
+  vocabPopup.value = { 
+    visible: true, 
+    word: word, 
+    meaning: meaning, // Gắn nghĩa lấy từ menu đen vào đây
+    loading: false 
+  };
+}
 // --- LOGIC XỬ LÝ SỰ KIỆN TỪ PDF VIEWER ---
 function handleTextSelection(data) {
   if (isAccessDenied.value) return; 
 
-  const popupHeight = 220; 
-  const popupWidth = 270;  
+  // const popupHeight = 220; 
+  // const popupWidth = 270;  
 
-  let posX = data.x + 10;
-  let posY = data.y + 15; 
+  // let posX = data.x + 10;
+  // let posY = data.y + 15; 
 
-  if (posY + popupHeight > window.innerHeight) {
-    posY = data.y - popupHeight - 15;
-  }
-  posY = Math.max(10, posY);
-  posX = Math.min(posX, window.innerWidth - popupWidth - 10);
+  // if (posY + popupHeight > window.innerHeight) {
+  //   posY = data.y - popupHeight - 15;
+  // }
+  // posY = Math.max(10, posY);
+  // posX = Math.min(posX, window.innerWidth - popupWidth - 10);
 
-  vocabPopup.value = { 
-    visible: true, 
-    word: data.text, 
-    meaning: '', 
-    x: posX, 
-    y: posY, 
-    loading: true 
-  }
+  // vocabPopup.value = { 
+  //   visible: true, 
+  //   word: data.text, 
+  //   meaning: '', 
+  //   x: posX, 
+  //   y: posY, 
+  //   loading: true 
+  // }
   
-  fetchWordMeaning(data.text)
+  // fetchWordMeaning(data.text)
 }
 
 async function fetchWordMeaning(word) {
@@ -216,6 +243,11 @@ const goBack = () => router.back()
 
 onMounted(() => {
   apiKey.value = config.public.geminiApiKey || ''
+  window.addEventListener('open-vocab-popup', handleOpenVocabPopup)
+})
+onUnmounted(() => {
+  // Gỡ bỏ lắng nghe khi rời trang để tránh rò rỉ bộ nhớ (memory leak)
+  window.removeEventListener('open-vocab-popup', handleOpenVocabPopup)
 })
 </script>
 

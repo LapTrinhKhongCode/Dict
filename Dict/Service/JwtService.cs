@@ -53,7 +53,7 @@ namespace Dict.Service
                 {
                     WorkspaceId = personalWorkspace.Id,
                     UserId = user.Id,
-                    Role = "Admin"
+                    Role = WorkspaceRole.ADMIN
                 };
 
                 _db.WorkspaceMembers.Add(member);

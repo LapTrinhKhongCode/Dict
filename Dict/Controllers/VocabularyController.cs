@@ -112,27 +112,70 @@ namespace Dict.Controllers
             });
         }
 
-        // DELETE /api/projects/{projectId}/vocabularies/{vocabId}
-        [HttpDelete("api/projects/{projectId}/vocabularies/{vocabId}")]
-        public async Task<IActionResult> DeleteVocab(int projectId, int vocabId)
+        // PUT /api/projects/{projectId}/vocabularies/{vocabId} (CẬP NHẬT NGHĨA TỪ VỰNG)
+        [HttpPut("api/projects/{projectId}/vocabularies/{vocabId}")]
+        public async Task<IActionResult> UpdateVocab(int projectId, int vocabId, [FromBody] string ContextMeaning )
         {
             var userId = GetUserId();
 
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound("Project không tồn tại.");
+
+            var isMember = await _db.WorkspaceMembers
+                .AnyAsync(m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId);
+            if (!isMember) return Forbid();
+
             var vocab = await _db.ProjectVocabularies
                 .FirstOrDefaultAsync(v => v.Id == vocabId && v.ProjectId == projectId);
-            if (vocab == null) return NotFound();
 
-            if (vocab.AddedBy != userId)
+            if (vocab == null) return NotFound("Không tìm thấy từ vựng.");
+
+            // Cho phép người dùng cập nhật lại nghĩa của từ
+            vocab.ContextMeaning = ContextMeaning;
+            await _db.SaveChangesAsync();
+
+            return Ok(new VocabDto
             {
-                // Kiểm tra có phải Admin workspace không
-                var project = await _db.Projects.FindAsync(projectId);
-                var isAdmin = await _db.WorkspaceMembers
-                    .AnyAsync(m => m.WorkspaceId == project.WorkspaceId
-                        && m.UserId == userId && m.Role == Models.Enum.Role.ADMIN);
-                if (!isAdmin) return Forbid();
+                Id = vocab.Id,
+                WordText = vocab.WordText,
+                ContextMeaning = vocab.ContextMeaning,
+                AddedBy = vocab.AddedBy,
+                CreatedAt = vocab.CreatedAt,
+            });
+        }
+
+        // DELETE /api/projects/{projectId}/vocabularies (XÓA NHIỀU TỪ VỰNG CÙNG LÚC)
+        [HttpDelete("api/projects/{projectId}/vocabularies")]
+        public async Task<IActionResult> DeleteVocabs(int projectId, [FromQuery] List<int> vocabIds)
+        {
+            var userId = GetUserId();
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound("Project không tồn tại.");
+
+            // Lấy thông tin thành viên và Role trong Workspace
+            var member = await _db.WorkspaceMembers
+                .FirstOrDefaultAsync(m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId);
+
+            if (member == null) return Forbid();
+            var isAdmin = member.Role == Models.Enum.Role.ADMIN;
+
+            // Tìm danh sách từ vựng cần xóa
+            var vocabsToDelete = await _db.ProjectVocabularies
+                .Where(v => v.ProjectId == projectId && vocabIds.Contains(v.Id))
+                .ToListAsync();
+
+            if (!vocabsToDelete.Any()) return NoContent();
+
+            foreach (var vocab in vocabsToDelete)
+            {
+                // Chỉ người tạo ra từ đó hoặc Admin mới có quyền xóa
+                if (vocab.AddedBy == userId || isAdmin)
+                {
+                    _db.ProjectVocabularies.Remove(vocab);
+                }
             }
 
-            _db.ProjectVocabularies.Remove(vocab);
             await _db.SaveChangesAsync();
             return NoContent();
         }

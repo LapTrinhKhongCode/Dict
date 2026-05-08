@@ -77,20 +77,26 @@ export default defineNuxtPlugin((nuxtApp) => {
       <path d="m22 22-5-10-5 10"/>
       <path d="M14 18h6"/>
     </svg>`
-
+const svgSave = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" 
+         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" 
+         style="display:block;margin:0 auto">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+    </svg>`
   const svgAI = `
     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
          fill="currentColor" stroke="none" style="display:block">
       <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
     </svg>`
 
-  // ── Tạo popup container ───────────────────────────────────────────────
+// ── Tạo popup container ───────────────────────────────────────────────
   const popupContainer = document.createElement('div')
   popupContainer.id = 'global-lookup-container'
   popupContainer.innerHTML = `
     <div id="glc-icons">
       <span id="global-lookup-icon"    title="Tra cứu">🔍</span>
       <span id="global-translate-icon" title="Dịch">${svgTranslate}</span>
+      <span id="global-save-icon"      title="Lưu từ vựng">${svgSave} <span style="margin-left:4px">Lưu</span></span>
       <span id="global-ai-icon"        title="AI giải thích">
         <span id="ai-icon-inner">${svgAI}</span>
         <span id="ai-btn-label">AI</span>
@@ -124,8 +130,23 @@ export default defineNuxtPlugin((nuxtApp) => {
       display: flex;
       align-items: stretch;
       background: #1e2436;
+      justify-content: flex-start;
       border-bottom: 1px solid #2d3448;
     }
+      /* Trong phần tiêm CSS */
+    #global-save-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 14px;
+      cursor: pointer;
+      color: #cbd5e1;
+      border-right: 1px solid #2d3448;
+      transition: background 0.15s, color 0.15s;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+    #global-save-icon:hover { background: #d97706; color: #fff; }
 
     #global-lookup-icon,
     #global-translate-icon,
@@ -279,6 +300,8 @@ export default defineNuxtPlugin((nuxtApp) => {
   const aiLoading     = document.getElementById('ai-loading')!
   const ragResultBox  = document.getElementById('rag-result-box')!
   const aiExplainBox  = document.getElementById('ai-explain-box')!
+  const saveIcon = document.getElementById('global-save-icon')!
+  
 
   // ── Click: Tra cứu (giữ nguyên) ───────────────────────────────────────
   lookupIcon.addEventListener('click', () => {
@@ -297,7 +320,27 @@ export default defineNuxtPlugin((nuxtApp) => {
     isTranslateModalVisible.value = true
     console.log('Translate icon clicked: ' + selectedWord.value + isTranslateModalVisible.value)
   })
+saveIcon.addEventListener('click', () => {
+    // 1. Lấy từ đang bôi đen
+    const wordToSave = ragKeyword; 
+    
+    // 2. Lấy nghĩa tốt nhất hiện có (từ RAG kết quả đầu tiên)
+    let meaningToSave = '';
+    if (ragContexts && ragContexts.length > 0) {
+      meaningToSave = ragContexts[0].meaning || '';
+    }
 
+    // 3. Ẩn popup bôi đen hiện tại
+    popupContainer.style.display = 'none';
+
+    // 4. Bắn sự kiện ra toàn hệ thống để Vue Component bắt lấy
+    window.dispatchEvent(new CustomEvent('open-vocab-popup', {
+      detail: { 
+        word: wordToSave, 
+        meaning: meaningToSave 
+      }
+    }));
+  })
   // ── Click: AI giải thích (MỚI) ────────────────────────────────────────
   aiIcon.addEventListener('click', async () => {
     if (!ragContexts.length) {

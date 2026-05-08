@@ -1,162 +1,289 @@
 <template>
-  <div v-if="!isAuthenticated || accessDenied" class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors">
-    <div class="text-center bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-w-md w-full mx-4">
-      <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
+  <div v-if="!isAuthenticated || accessDenied" class="min-h-screen flex items-center justify-center bg-[#0d1117]">
+    <div class="text-center bg-[#161b22] p-8 rounded-2xl shadow-xl border border-[#30363d] max-w-md w-full mx-4">
+      <div class="w-16 h-16 bg-red-900/30 text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
       </div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Không khả dụng</h1>
-      <p class="text-gray-500 dark:text-gray-400 mb-6">Bạn Không có quyền truy cập vào Dự án này.</p>
+      <h1 class="text-2xl font-bold text-white mb-2">Không khả dụng</h1>
+      <p class="text-gray-400 mb-6">Bạn không có quyền truy cập vào Dự án này.</p>
       <div class="flex gap-3">
-        <button @click="$router.push('/workspaces')" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-sm">
-          Trang chủ
-        </button>
-        <button v-if="!isAuthenticated" @click="$router.push('/login')" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-sm">
-          Đăng nhập
-        </button>
+        <button @click="$router.push('/workspaces')" class="flex-1 px-4 py-2.5 bg-[#21262d] text-gray-300 rounded-lg font-bold hover:bg-[#30363d] transition-colors">Trang chủ</button>
+        <button v-if="!isAuthenticated" @click="$router.push('/login')" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">Đăng nhập</button>
       </div>
     </div>
   </div>
 
   <div v-else
-    class="bg-gray-50 dark:bg-gray-900 transition-colors min-h-screen"
+    class="min-h-screen bg-transparent text-[#c9d1d9]"
     @dragover.prevent="isDragging = true"
     @dragleave.prevent="isDragging = false"
     @drop.prevent="handleDrop"
   >
-    <div v-if="isDragging"
-      class="fixed inset-0 bg-blue-600/90 z-50 flex flex-col items-center justify-center text-white backdrop-blur-sm">
-      <svg class="w-24 h-24 mb-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    <!-- DROP OVERLAY -->
+    <div v-if="isDragging" class="fixed inset-0 bg-blue-600/90 z-50 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+      <svg class="w-20 h-20 mb-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
       </svg>
       <p class="text-3xl font-bold">Thả file vào đây</p>
-      <p class="text-xl mt-2 opacity-80">Trợ lý AI sẽ nhận diện ngay!</p>
+      <p class="text-lg mt-2 opacity-80">Trợ lý AI sẽ nhận diện ngay!</p>
     </div>
 
-  <main class="max-w-[1400px] mx-auto p-6 md:p-8">
-  <div class="flex items-center justify-between mb-8">
-    <div class="flex items-center gap-4">
-      <button @click="$router.back()"
-        class="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-all border border-gray-100 dark:border-gray-700">
+<main class="max-w-[1400px] mx-auto px-6 py-6 bg-transparent">
+
+  <!-- HEADER -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <button
+        @click="$router.back()"
+        class="p-2 rounded-full bg-gray-200 dark:bg-[#161b22]
+               hover:bg-gray-300 dark:hover:bg-[#30363d]
+               text-gray-700 dark:text-gray-400
+               transition-all border border-gray-300 dark:border-[#30363d]"
+      >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
       </button>
+
       <div>
-        <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-bold text-black dark:text-white">
             {{ projectName || 'Chi tiết Dự án' }}
           </h1>
-          <button @click="showDeleteProjectConfirm = true" 
-            class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-            title="Xóa toàn bộ dự án">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+
+          <button
+            v-if="isAdmin"
+            @click="showDeleteProjectConfirm = true"
+            class="p-1.5 text-gray-500 hover:text-red-400
+                   hover:bg-red-900/20 rounded-lg transition-all"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862
+                a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4
+                a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
             </svg>
           </button>
         </div>
-        <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">{{ files.length }} tài liệu hiện có</p>
+
+        <p class="text-sm text-gray-500">
+          {{ files.length }} tài liệu
+        </p>
       </div>
     </div>
 
-    <div class="flex items-center gap-3">
-      <button @click="$refs.fileInput.click()" :disabled="uploading"
-        class="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-60 transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20">
-        <svg v-if="uploading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-        </svg>
-        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-        </svg>
-        {{ uploading ? 'Đang xử lý...' : 'Tải lên tài liệu' }}
-      </button>
-      <input type="file" ref="fileInput" @change="handleFileChange" accept="image/*,application/pdf" class="hidden" />
+    <input
+      type="file"
+      ref="fileInput"
+      @change="handleFileChange"
+      accept="image/*,application/pdf"
+      class="hidden"
+    />
+  </div>
+
+  <!-- GRID -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+
+    <!-- CARD ADD FILE -->
+    <div
+      @click="$refs.fileInput.click()"
+      class="group cursor-pointer overflow-hidden
+             border-2 border-dashed border-gray-300 dark:border-[#30363d]
+             bg-white dark:bg-[#161b22]
+             hover:border-blue-500 hover:shadow-lg
+             transition-all duration-200"
+    >
+      <div class="aspect-[3/4] flex flex-col items-center justify-center
+                  bg-gray-50 dark:bg-[#0d1117]">
+
+        <div class="w-16 h-16
+                    bg-blue-100 dark:bg-blue-500/10
+                    flex items-center justify-center
+                    group-hover:scale-110 transition-transform">
+          <svg
+            class="w-8 h-8 text-blue-600 dark:text-blue-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.5"
+                  d="M12 4v16m8-8H4"/>
+          </svg>
+        </div>
+
+        <p class="mt-5 text-base font-semibold text-gray-700 dark:text-gray-200">
+          {{ uploading ? 'Đang tải...' : 'Tài liệu mới' }}
+        </p>
+
+        <!-- <p class="text-sm text-gray-500 mt-1">
+          Nhấn để tải file lên
+        </p> -->
+
+        <div
+          v-if="uploading"
+          class="mt-4 w-6 h-6 border-2 border-blue-400/30
+                 border-t-blue-500 rounded-full animate-spin"
+        ></div>
+      </div>
     </div>
-  </div>
 
-  <div v-if="isLoading" class="space-y-4">
-    <div v-for="i in 3" :key="i" class="h-20 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-2xl"></div>
-  </div>
+    <!-- FILE CARD -->
+    <div
+      v-for="file in files"
+      :key="file.id"
+      @click="openFile(file)"
+      class="group relative cursor-pointer flex flex-col
+      
+             bg-white dark:bg-[#161b22]
+            overflow-hidden
+             border border-gray-300 dark:border-[#30363d]
+             hover:border-blue-500
+             transition-all duration-200
+             hover:shadow-xl"
+    >
 
-  <div v-else class="bg-white dark:bg-gray-800 shadow-2xl rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-700">
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm text-left">
-        <thead class="text-xs text-gray-400 uppercase bg-gray-50/50 dark:bg-gray-700/50 border-b">
-          <tr>
-            <th class="px-8 py-5 font-bold">Tài liệu</th>
-            <th class="px-6 py-5 font-bold">Định dạng</th>
-            <th class="px-6 py-5 font-bold">Trạng thái AI</th>
-            <th class="px-6 py-5 font-bold">Ngày tải lên</th>
-            <th class="px-8 py-5 font-bold text-center">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-50 dark:divide-gray-700/50">
-          <tr v-for="file in files" :key="file.id" @click="openFile(file)" class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all cursor-pointer group">
-            <td class="px-8 py-5">
-              <div class="flex items-center gap-4">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
-                  :class="file.type === 'pdf' ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-500'">
-                  <svg v-if="file.type === 'pdf'" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M4 5a2 2 0 012-2h8.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10 1V4.5l3.5 3.5H16a2 2 0 01-2-2z"/>
-                  </svg>
-                  <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                     <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <span class="font-bold text-gray-700 dark:text-gray-200">{{ file.name }}</span>
-              </div>
-            </td>
-            <td class="px-6 py-5 uppercase font-bold text-xs text-gray-400">{{ file.type }}</td>
-            <td class="px-6 py-5">
-              <span :class="statusClass(file.status)" class="px-3 py-1 rounded-full text-[8px] font-black uppercase">
-                {{ statusText(file.status) }}
-              </span>
-            </td>
-            <td class="px-6 py-5 text-gray-500">{{ formatDate(file.createdAt) }}</td>
-            <td class="px-8 py-5 text-center">
-              <div class="flex items-center justify-center gap-1">
-                <!-- Nút Xem (Mở file) -->
-                <button @click.stop="openFile(file)" class="p-2 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 transition-all" title="Mở file">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                  </svg>
-                </button>
-                
-                <!-- Nút Sửa Tên -->
-                <button   v-if="isAdmin" @click.stop="promptRenameFile(file)" class="p-2 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/30 text-amber-600 transition-all" title="Đổi tên file">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                  </svg>
-                </button>
+      <!-- THUMB -->
+      <div class="relative aspect-[3/4] overflow-hidden bg-gray-100 dark:bg-[#0d1117]">
 
-                <!-- Nút Xóa File -->
-                <button   v-if="isAdmin" @click.stop="promptDeleteFile(file)" class="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 transition-all" title="Xóa file">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                  </svg>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <img
+          v-if="thumbnails[file.id]"
+          :src="thumbnails[file.id]"
+          :alt="file.name"
+          class="w-full h-full object-cover object-top
+                 group-hover:scale-[1.02] transition-transform duration-300"
+          draggable="false"
+        />
+
+        <!-- LOADING -->
+        <div
+          v-else-if="thumbnailLoading[file.id]"
+          class="w-full h-full flex items-center justify-center"
+        >
+          <div class="w-7 h-7 border-2 border-gray-400/30
+                      border-t-blue-500 rounded-full animate-spin">
+          </div>
+        </div>
+
+        <!-- EMPTY -->
+        <div
+          v-else
+          class="w-full h-full flex flex-col items-center justify-center"
+        >
+          <svg
+            v-if="file.type === 'pdf'"
+            class="w-14 h-14 text-red-400 opacity-70"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path d="M4 5a2 2 0 012-2h8.586a1 1 0 01.707.293
+                     l4.414 4.414a1 1 0 01.293.707V19a2 2
+                     0 01-2 2H6a2 2 0 01-2-2V5z"/>
+          </svg>
+
+          <svg
+            v-else
+            class="w-14 h-14 text-blue-400 opacity-70"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16"/>
+          </svg>
+
+          <span class="mt-3 text-xs uppercase tracking-widest text-gray-400">
+            {{ file.type }}
+          </span>
+        </div>
+
+        <!-- TYPE -->
+        <div class="absolute bottom-2 left-2">
+          <span class="px-2 py-1 rounded-lg text-[10px]
+                       font-bold uppercase
+                       bg-black/60 text-white backdrop-blur-sm">
+            {{ file.type }}
+          </span>
+        </div>
+      </div>
+
+      <!-- INFO -->
+      <div class="p-4 border-t border-gray-200 dark:border-[#30363d]">
+
+        <div class="flex items-center gap-2">
+          <div
+            class="w-2 h-2 rounded-full"
+            :class="file.type === 'pdf'
+              ? 'bg-red-400'
+              : 'bg-blue-400'"
+          ></div>
+
+          <p
+            class="text-sm font-semibold truncate
+                   text-gray-800 dark:text-gray-200"
+            :title="file.name"
+          >
+            {{ file.name }}
+          </p>
+        </div>
+
+        <p class="text-xs text-gray-500 mt-2">
+          {{ formatDate(file.createdAt) }}
+        </p>
+      </div>
+
+      <!-- ACTIONS -->
+      <div
+        class="absolute top-2 right-2 flex flex-col gap-2
+               opacity-0 group-hover:opacity-100
+               transition-opacity"
+      >
+        <button
+          v-if="isAdmin"
+          @click.stop="promptRenameFile(file)"
+          class="w-8 h-8 rounded-xl
+                 bg-white/90 dark:bg-[#21262d]/90
+                 border border-gray-300 dark:border-[#30363d]
+                 flex items-center justify-center
+                 text-amber-500 hover:bg-amber-500/10"
+        >
+          ✏️
+        </button>
+
+        <button
+          v-if="isAdmin"
+          @click.stop="promptDeleteFile(file)"
+          class="w-8 h-8 rounded-xl
+                 bg-white/90 dark:bg-[#21262d]/90
+                 border border-gray-300 dark:border-[#30363d]
+                 flex items-center justify-center
+                 text-red-500 hover:bg-red-500/10"
+        >
+          🗑️
+        </button>
+      </div>
+
     </div>
   </div>
 </main>
 
     <!-- MODAL XÁC NHẬN XÓA PROJECT -->
     <Transition name="fade">
-      <div v-if="showDeleteProjectConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
-        <div class="bg-[#1c2128] border border-red-500/30 p-8 rounded-[2rem] shadow-2xl w-full max-w-md text-center">
-          <div class="w-20 h-20 bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+      <div v-if="showDeleteProjectConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md px-4">
+        <div class="bg-[#161b22] border border-red-500/30 p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+          <div class="w-16 h-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
           </div>
-          <h3 class="text-2xl font-black text-white mb-3">Xóa vĩnh viễn dự án?</h3>
-          <p class="text-gray-400 text-sm leading-relaxed mb-8">Bạn đang thực hiện xóa <b>{{ projectName }}</b>. Tất cả dữ liệu dự án sẽ biến mất vĩnh viễn.</p>
-          <div class="flex gap-4">
-            <button   v-if="isAdmin" @click="showDeleteProjectConfirm = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy bỏ</button>
-            <button @click="handleDeleteProject" :disabled="isDeleting" class="flex-1 px-6 py-3 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 flex items-center justify-center gap-2">
+          <h3 class="text-xl font-black text-white mb-2">Xóa vĩnh viễn dự án?</h3>
+          <p class="text-gray-400 text-sm leading-relaxed mb-6">Bạn đang thực hiện xóa <b class="text-white">{{ projectName }}</b>. Tất cả dữ liệu dự án sẽ biến mất vĩnh viễn.</p>
+          <div class="flex gap-3">
+            <button @click="showDeleteProjectConfirm = false" class="flex-1 px-5 py-2.5 bg-[#21262d] text-white rounded-xl hover:bg-[#30363d] transition-all">Hủy bỏ</button>
+            <button @click="handleDeleteProject" :disabled="isDeleting" class="flex-1 px-5 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 flex items-center justify-center gap-2">
               <span v-if="isDeleting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               Xác nhận xóa
             </button>
@@ -167,16 +294,16 @@
 
     <!-- MODAL XÁC NHẬN XÓA FILE -->
     <Transition name="fade">
-      <div v-if="showDeleteFileConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
-        <div class="bg-[#1c2128] border border-red-500/30 p-8 rounded-[2rem] shadow-2xl w-full max-w-md text-center">
-          <div class="w-20 h-20 bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      <div v-if="showDeleteFileConfirm" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md px-4">
+        <div class="bg-[#161b22] border border-red-500/30 p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+          <div class="w-16 h-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </div>
-          <h3 class="text-2xl font-black text-white mb-3">Xóa tài liệu này?</h3>
-          <p class="text-gray-400 text-sm leading-relaxed mb-8">Bạn có chắc chắn muốn xóa file <br/><b class="text-white">{{ fileToDelete?.name }}</b> không?</p>
-          <div class="flex gap-4">
-            <button @click="showDeleteFileConfirm = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy</button>
-            <button @click="handleDeleteFile" :disabled="isDeletingFile" class="flex-1 px-6 py-3 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 flex items-center justify-center gap-2">
+          <h3 class="text-xl font-black text-white mb-2">Xóa tài liệu này?</h3>
+          <p class="text-gray-400 text-sm leading-relaxed mb-6">Bạn có chắc muốn xóa<br/><b class="text-white">{{ fileToDelete?.name }}</b>?</p>
+          <div class="flex gap-3">
+            <button @click="showDeleteFileConfirm = false" class="flex-1 px-5 py-2.5 bg-[#21262d] text-white rounded-xl hover:bg-[#30363d] transition-all">Hủy</button>
+            <button @click="handleDeleteFile" :disabled="isDeletingFile" class="flex-1 px-5 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 flex items-center justify-center gap-2">
               <span v-if="isDeletingFile" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               Xóa ngay
             </button>
@@ -187,16 +314,20 @@
 
     <!-- MODAL ĐỔI TÊN FILE -->
     <Transition name="fade">
-      <div v-if="showRenameModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
-        <div class="bg-[#1c2128] border border-gray-700 p-8 rounded-[2rem] shadow-2xl w-full max-w-md">
-          <h3 class="text-xl font-bold text-white mb-4">Đổi tên tài liệu</h3>
+      <div v-if="showRenameModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md px-4">
+        <div class="bg-[#161b22] border border-[#30363d] p-8 rounded-2xl shadow-2xl w-full max-w-md">
+          <h3 class="text-lg font-bold text-white mb-4">Đổi tên tài liệu</h3>
           <div class="mb-6">
             <label class="block text-sm text-gray-400 mb-2">Tên file mới</label>
-            <input v-model="newFileName" type="text" class="w-full bg-gray-900 border border-gray-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Nhập tên tài liệu..." @keyup.enter="handleRenameFile">
+            <input v-model="newFileName" type="text"
+              class="w-full bg-[#0d1117] border border-[#30363d] text-white rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              placeholder="Nhập tên tài liệu..."
+              @keyup.enter="handleRenameFile">
           </div>
-          <div class="flex gap-4">
-            <button @click="showRenameModal = false" class="flex-1 px-6 py-3 bg-gray-800 text-white rounded-2xl hover:bg-gray-700 transition-all">Hủy</button>
-            <button @click="handleRenameFile" :disabled="!newFileName || isRenaming" class="flex-1 px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+          <div class="flex gap-3">
+            <button @click="showRenameModal = false" class="flex-1 px-5 py-2.5 bg-[#21262d] text-white rounded-xl hover:bg-[#30363d] transition-all">Hủy</button>
+            <button @click="handleRenameFile" :disabled="!newFileName || isRenaming"
+              class="flex-1 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
               <span v-if="isRenaming" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               Lưu thay đổi
             </button>
@@ -205,16 +336,17 @@
       </div>
     </Transition>
 
+    <!-- TOAST -->
     <Transition name="toast-fade">
-      <div v-if="toast.visible" class="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none px-4">
-        <div class="bg-[#1c2128] border p-5 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center transform transition-all pointer-events-auto"
-          :class="toast.type === 'error' ? 'border-red-500/50' : 'border-blue-500/50'">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center mb-3"
-            :class="toast.type === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'">
-            <svg v-if="toast.type === 'error'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      <div v-if="toast.visible" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none">
+        <div class="bg-[#161b22] border px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+          :class="toast.type === 'error' ? 'border-red-500/50' : 'border-green-500/50'">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+            :class="toast.type === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'">
+            <svg v-if="toast.type === 'error'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
           </div>
-          <p class="text-white font-bold line-clamp-5 break-words">{{ toast.message }}</p>
+          <p class="text-white text-sm font-medium">{{ toast.message }}</p>
         </div>
       </div>
     </Transition>
@@ -227,6 +359,11 @@ definePageMeta({ layout: 'default', ssr: false })
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useJwt } from '~/composables/useJwt'
+
+// Import pdfjs-dist (đã có sẵn trong project)
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
 const route = useRoute()
 const router = useRouter()
@@ -241,8 +378,12 @@ const isLoading = ref(true)
 const uploading = ref(false)
 const isDragging = ref(false)
 const pendingFile = ref(null)
-
 const accessDenied = ref(false)
+
+// Thumbnail state: { [fileId]: dataURL | null }
+const thumbnails = ref({})
+// Thumbnail loading state: { [fileId]: true/false }
+const thumbnailLoading = ref({})
 
 // States cho Xóa Project
 const showDeleteProjectConfirm = ref(false)
@@ -253,6 +394,7 @@ const showDeleteFileConfirm = ref(false)
 const fileToDelete = ref(null)
 const isDeletingFile = ref(false)
 const isAdmin = ref(false)
+
 // States cho Đổi Tên File
 const showRenameModal = ref(false)
 const fileToRename = ref(null)
@@ -260,11 +402,80 @@ const newFileName = ref('')
 const isRenaming = ref(false)
 
 // State cho Toast UI
-const toast = reactive({
-  visible: false,
-  message: '',
-  type: 'success'
-})
+const toast = reactive({ visible: false, message: '', type: 'success' })
+
+// --- THUMBNAIL GENERATION ---
+
+/**
+ * Render trang đầu của PDF thành base64 dataURL bằng pdfjs-dist
+ * @param {string} pdfUrl - URL của file PDF
+ * @returns {Promise<string|null>} dataURL hoặc null nếu lỗi
+ */
+async function generatePdfThumbnail(pdfUrl) {
+  try {
+    const pdf = await pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise
+    const page = await pdf.getPage(1)
+
+    // Scale để thumbnail đủ nét, không cần quá lớn
+    const THUMB_WIDTH = 400
+    const viewport = page.getViewport({ scale: 1 })
+    const scale = THUMB_WIDTH / viewport.width
+    const scaledViewport = page.getViewport({ scale })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = scaledViewport.width
+    canvas.height = scaledViewport.height
+
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise
+
+    // Giải phóng bộ nhớ
+    pdf.destroy()
+
+    return canvas.toDataURL('image/jpeg', 0.85)
+  } catch (err) {
+    console.warn('Không thể tạo thumbnail:', err)
+    return null
+  }
+}
+
+/**
+ * Tạo thumbnail cho tất cả files sau khi load xong
+ * Xử lý tuần tự để không overload browser
+ */
+async function generateThumbnailsForFiles(fileList) {
+  for (const file of fileList) {
+    // Bỏ qua nếu đã có thumbnail hoặc không có URL
+    if (thumbnails.value[file.id]) continue
+
+    const url = file.imageUrl || file.fileUrl || file.url
+    console.log('file item:', file)
+console.log('thumbnail url:', file.imageUrl || file.fileUrl || file.url)
+    if (!url) continue
+
+    const isPdf = file.type === 'pdf' || url.toLowerCase().includes('.pdf')
+    const isImage = !isPdf && (
+      file.type === 'image' ||
+      /\.(jpg|jpeg|png|webp|gif|bmp)(\?|$)/i.test(url)
+    )
+
+    if (isPdf) {
+      // Đánh dấu đang loading
+      thumbnailLoading.value = { ...thumbnailLoading.value, [file.id]: true }
+      const dataUrl = await generatePdfThumbnail(url)
+      thumbnailLoading.value = { ...thumbnailLoading.value, [file.id]: false }
+      if (dataUrl) {
+        thumbnails.value = { ...thumbnails.value, [file.id]: dataUrl }
+      }
+    } else if (isImage) {
+      // File ảnh thì dùng trực tiếp làm thumbnail
+      thumbnails.value = { ...thumbnails.value, [file.id]: url }
+    }
+  }
+}
 
 // --- FUNCTIONS ---
 
@@ -277,7 +488,6 @@ function showToast(message, type = 'success') {
 
 const getToken = () => localStorage.getItem('jwt_token') || ''
 
-// KIỂM TRA QUYỀN TRUY CẬP TRƯỚC KHI LOAD
 async function checkAccessAndLoad() {
   const token = getToken()
   if (!token || !isAuthenticated.value) {
@@ -291,31 +501,27 @@ async function checkAccessAndLoad() {
     const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    
     if (!projRes.ok) throw new Error('Dự án không tồn tại')
     const projData = await projRes.json()
     const project = projData.result || projData
-    
+
     projectName.value = project.name
     const wsId = project.workspaceId
 
     const membersRes = await fetch(`${config.public.apiBaseUrl}/api/workspaces/${wsId}/members`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    
     if (!membersRes.ok) throw new Error('Không có quyền truy cập WS')
     const membersData = await membersRes.json()
     const members = membersData.result || membersData
-    
-   const currentMember = members.find(m => m.userId === currentUserId.value)
 
-if (!currentMember) {
-  accessDenied.value = true
-  return
-}
+    const currentMember = members.find(m => m.userId === currentUserId.value)
+    if (!currentMember) {
+      accessDenied.value = true
+      return
+    }
 
-// check role
-isAdmin.value = currentMember.role === 'Admin' // hoặc 'admin' tùy backend
+    isAdmin.value = currentMember.role === 'Admin'
 
     await fetchFiles(token)
 
@@ -338,6 +544,8 @@ async function fetchFiles(token) {
       if (files.value.length > 0 && !projectName.value) {
         projectName.value = files.value[0].projectName
       }
+      // Tạo thumbnail ngay sau khi có danh sách file
+      generateThumbnailsForFiles(files.value)
     }
   } catch (e) {
     console.error("Lỗi lấy file:", e)
@@ -348,13 +556,11 @@ async function handleDeleteProject() {
   const token = getToken()
   if (!token) return
   isDeleting.value = true
-
   try {
     const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     })
-
     if (res.ok) {
       showToast("Đã xóa dự án thành công!")
       setTimeout(() => { router.push('/projects') }, 1000)
@@ -370,7 +576,6 @@ async function handleDeleteProject() {
   }
 }
 
-// ---- LOGIC ĐỔI TÊN FILE ----
 function promptRenameFile(file) {
   fileToRename.value = file
   newFileName.value = file.name
@@ -380,21 +585,16 @@ function promptRenameFile(file) {
 async function handleRenameFile() {
   const token = getToken()
   if (!token || !newFileName.value.trim()) return
-
   isRenaming.value = true
   try {
     const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/files/${fileToRename.value.id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ fileName: newFileName.value.trim() })
     })
-
     if (res.ok) {
       showToast("Đã đổi tên file thành công!")
-      await fetchFiles(token) // Refresh danh sách
+      await fetchFiles(token)
       showRenameModal.value = false
     } else {
       const err = await res.json()
@@ -407,7 +607,6 @@ async function handleRenameFile() {
   }
 }
 
-// ---- LOGIC XÓA FILE ----
 function promptDeleteFile(file) {
   fileToDelete.value = file
   showDeleteFileConfirm.value = true
@@ -416,17 +615,15 @@ function promptDeleteFile(file) {
 async function handleDeleteFile() {
   const token = getToken()
   if (!token) return
-
   isDeletingFile.value = true
   try {
     const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/files/${fileToDelete.value.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     })
-
     if (res.ok) {
       showToast("Đã xóa file thành công!")
-      await fetchFiles(token) // Refresh danh sách
+      await fetchFiles(token)
       showDeleteFileConfirm.value = false
     } else {
       const err = await res.json()
@@ -457,7 +654,6 @@ async function handleFileUpload(pickedFile) {
       method: 'POST', body: formData, headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw new Error(await res.text() || "Lỗi upload")
-    
     showToast("Tải lên thành công!")
     await fetchFiles(token)
   } catch (err) {
@@ -484,11 +680,11 @@ function openFile(file) {
 // UI HELPERS
 const statusClass = (s) => {
   const map = {
-    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-    processing: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+    completed: 'bg-green-900/80 text-green-300',
+    processing: 'bg-yellow-900/80 text-yellow-300',
+    failed: 'bg-red-900/80 text-red-300'
   }
-  return map[s?.toLowerCase()] || 'bg-gray-100 text-gray-800'
+  return map[s?.toLowerCase()] || 'bg-gray-800/80 text-gray-400'
 }
 
 const statusText = (s) => {
@@ -497,12 +693,12 @@ const statusText = (s) => {
 }
 
 const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const utcString = dateString.endsWith('Z') ? dateString : `${dateString}Z`;
-  const date = new Date(utcString);
+  if (!dateString) return ''
+  const utcString = dateString.endsWith('Z') ? dateString : `${dateString}Z`
+  const date = new Date(utcString)
   return date.toLocaleString('vi-VN', {
     hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
-  });
+  })
 }
 
 onMounted(() => {
@@ -511,18 +707,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
-.toast-fade-enter-active { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-.toast-fade-leave-active { transition: all 0.3s ease; }
-.toast-fade-enter-from { opacity: 0; transform: translateY(20px) scale(0.8); }
-.toast-fade-leave-to { opacity: 0; transform: scale(0.9); }
-
-.line-clamp-5 {
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.toast-fade-enter-active { transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.toast-fade-leave-active { transition: all 0.25s ease; }
+.toast-fade-enter-from { opacity: 0; transform: translateX(-50%) translateY(16px) scale(0.9); }
+.toast-fade-leave-to { opacity: 0; transform: translateX(-50%) scale(0.95); }
 </style>
