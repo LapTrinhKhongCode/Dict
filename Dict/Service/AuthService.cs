@@ -79,7 +79,7 @@ namespace Dict.Service
                 UserName = request.Username,
                 Email = request.Email,
                 EmailConfirmed = false,
-                AvatarUrl = "https://ocrr.blob.core.windows.net/avatars/523d68a2-cc64-4537-b8b0-dbf9d40b26a8.png",
+                AvatarUrl = "/images/default_ava.jpg",
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
             };
