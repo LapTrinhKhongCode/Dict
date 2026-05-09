@@ -21,6 +21,7 @@
           :file-url="fileUrl" 
           :file-data="pdfData" 
           :job-id="jobId"
+          :project-id="projectId"
           :api-key="apiKey" 
           @rag-updated="(data) => ragIndex = data"
           @text-selected="handleTextSelection"

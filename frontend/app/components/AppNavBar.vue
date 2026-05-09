@@ -296,7 +296,7 @@ async function handleLogout() {
         />
         <span
           v-if="pendingInvitations.length > 0"
-          class="absolute top-1 right-2 w-6 h-6 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 pointer-events-none"
+          class="absolute top-1 right-2 w-3 h-3 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 pointer-events-none"
         >
           {{ pendingInvitations.length }}
         </span>

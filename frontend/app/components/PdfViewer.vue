@@ -36,6 +36,21 @@
       <span class="text-sm w-12 text-center">{{ Math.round(scale * 100) }}%</span>
       <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]" @click="zoomIn">+</button>
       <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d] ml-1" @click="fitWidth" title="Vừa chiều rộng">⟺</button>
+      <button 
+        @click="exportToSearchablePdf" 
+        :disabled="isExporting || ocrLoading"
+        :class="['px-3 py-1.5 rounded flex items-center gap-1.5 text-sm font-semibold transition-colors', (isExporting || ocrLoading) ? 'bg-[#30363d] text-gray-500 cursor-wait' : 'bg-[#2ea043] hover:bg-[#2c974b] text-white']"
+        title="Xuất Searchable PDF"
+      >
+        <svg v-if="isExporting" class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        {{ isExporting ? 'Đang xử lý...' : 'Xuất PDF' }}
+      </button>
     </div>
 
     <!-- MAIN CONTENT -->
@@ -126,10 +141,11 @@ const props = defineProps({
   fileData: { type: Uint8Array, required: false },
   jobId: { type: [String, Number], required: false },
   apiKey: { type: String, required: true },
+  projectId: { type: [String, Number], required: false }, // THÊM DÒNG NÀY
 });
 
 const emit = defineEmits(["text-selected", "rag-updated", "page-changed", "media-id-loaded", "access-denied"]);
-
+const isExporting = ref(false);
 const config = useRuntimeConfig();
 const route = useRoute();
 const router = useRouter();
@@ -631,6 +647,88 @@ function getOcrTextStyleForPdf(r, pageNum) {
     position: "absolute", left: `${x}px`, top: `${y}px`, width: `${Math.max(w, 2)}px`, height: `${Math.max(h, 2)}px`,
     fontSize: `${Math.max(h * 0.85, 4)}px`, lineHeight: "1", whiteSpace: "nowrap", overflow: "hidden", color: "transparent", userSelect: "text",
   };
+}
+// Hàm xuất Searchable PDF có ép chạy OCR toàn bộ
+async function exportToSearchablePdf() {
+  if (isExporting.value || ocrLoading.value) return;
+  isExporting.value = true;
+
+  try {
+    // 1. KIỂM TRA & ÉP CHẠY QUÉT OCR CHO CÁC TRANG LAZY LOAD (Chỉ áp dụng với PDF)
+    if (!ocrMode.value && pdfDoc.value) {
+      const missingPages = [];
+      for (let i = 1; i <= totalPages.value; i++) {
+        const status = pageUploadStatus.value[i];
+        // Nếu trang chưa hoàn thành hoặc chưa được cache từ trước -> Đưa vào danh sách cần quét
+        if (status !== "done" && status !== "cached") {
+          missingPages.push(i);
+        }
+      }
+
+      if (missingPages.length > 0) {
+        console.log(`Đang ép nhận diện ${missingPages.length} trang còn thiếu để xuất PDF...`);
+        // Chạy tuần tự (hạn chế chạy song song quá nhiều để tránh spam server AI)
+        for (const p of missingPages) {
+          await uploadOnePage(p);
+        }
+      }
+    }
+
+    // 2. LẤY PROJECT ID VÀ GỌI API CỦA BACKEND
+    // Lấy projectId từ url (VD: /workspaces/project/1) hoặc thông qua prop
+    const projectId = route.params.id || props.projectId; 
+    const fileId = props.jobId; // JobId được sử dụng tương đương FileId
+
+    if (!projectId) {
+      alert("Không tìm thấy ID dự án (Project ID). Vui lòng kiểm tra lại component cha.");
+      isExporting.value = false;
+      return;
+    }
+
+    const token = getToken();
+    const url = `${config.public.apiBaseUrl}/api/Projects/${projectId}/files/${fileId}/export-pdf`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.log(response)
+      throw new Error(errorData.message || "Đã xảy ra lỗi khi tạo file PDF từ máy chủ.");
+    }
+
+    // 3. NHẬN FILE BLOB TỪ BACKEND VÀ TẢI XUỐNG CỤC BỘ
+    const blob = await response.blob();
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    
+    // Ưu tiên lấy tên file chuẩn từ Header Backend gửi về, nếu không có thì tự tạo tên mặc định
+    let fileName = `Searchable_Document_${new Date().getTime()}.pdf`;
+    const disposition = response.headers.get('Content-Disposition');
+    if (disposition && disposition.includes('filename=')) {
+      const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+      if (matches != null && matches[1]) fileName = matches[1].replace(/['"]/g, '');
+    }
+
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Dọn dẹp DOM
+    document.body.removeChild(a);
+    URL.revokeObjectURL(downloadUrl);
+
+  } catch (error) {
+    console.error("Lỗi khi xuất PDF:", error);
+    alert(error.message || "Không thể xuất file PDF. Vui lòng thử lại sau.");
+  } finally {
+    isExporting.value = false;
+  }
 }
 
 onMounted(() => {
