@@ -36,29 +36,41 @@
       <span class="text-sm w-12 text-center">{{ Math.round(scale * 100) }}%</span>
       <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]" @click="zoomIn">+</button>
       <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d] ml-1" @click="fitWidth" title="Vừa chiều rộng">⟺</button>
+      <button 
+        @click="exportToSearchablePdf" 
+        :disabled="isExporting || ocrLoading"
+        :class="['px-3 py-1.5 rounded flex items-center gap-1.5 text-sm font-semibold transition-colors', (isExporting || ocrLoading) ? 'bg-[#30363d] text-gray-500 cursor-wait' : 'bg-[#2ea043] hover:bg-[#2c974b] text-white']"
+        title="Xuất Searchable PDF"
+      >
+        <svg v-if="isExporting" class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        {{ isExporting ? 'Đang xử lý...' : 'Xuất PDF' }}
+      </button>
     </div>
 
     <!-- MAIN CONTENT -->
     <!-- Đã bỏ 'flex', 'flex-col', 'items-center' để tránh xung đột cắt mất góc màn hình -->
     <div v-if="!accessDenied" class="flex-1 overflow-auto relative pdf-scroll-area p-4" ref="pdfScrollAllEl" @mouseup="handleTextSelection">
       
-      <!-- WRAPPER MỚI: Ép chiều ngang nở to tự do (w-max) và tự căn ra giữa (mx-auto) -->
-      <div class="min-w-full w-max mx-auto flex flex-col items-center gap-6 pb-12">
+      <div class="min-w-full block pb-12">
 
-        <!-- LOADING -->
-        <div v-if="!pdfDoc && !ocrMode" class="flex flex-col items-center justify-center h-full text-gray-400 mt-20">
+        <div v-if="!pdfDoc && !ocrMode" class="flex flex-col items-center justify-center text-gray-400 mt-20">
           <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
           <p>Đang tải tài liệu PDF...</p>
         </div>
 
-        <!-- OCR IMAGE MODE (Chỉ file ảnh) -->
         <template v-else-if="ocrMode">
           <div v-if="ocrLoading" class="flex flex-col items-center justify-center text-gray-400 mt-20">
             <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
             <p>AI đang đọc tài liệu OCR...</p>
           </div>
           
-          <div v-else-if="ocrImageUrl" class="relative no-drag inline-block leading-none" :style="{ width: Math.round(scale * 100) + '%' }">
+          <div v-else-if="ocrImageUrl" class="relative no-drag block leading-none mx-auto mb-6" :style="{ width: Math.round(scale * 100) + '%' }">
             <img 
               :src="ocrImageUrl" 
               ref="ocrImgEl" 
@@ -80,19 +92,15 @@
           </div>
         </template>
 
-        <!-- PDF PAGES -->
         <template v-else>
           <template v-for="n in totalPages" :key="n">
-            <div v-if="viewMode === 'scroll' || n === currentPage" :data-page="n" :ref="(el) => { if (el) pageRefs[n] = el; }" class="flex justify-center relative" :style="{ minHeight: defaultPageHeight + 'px' }">
+            <div v-if="viewMode === 'scroll' || n === currentPage" :data-page="n" :ref="(el) => { if (el) pageRefs[n] = el; }" class="relative block mx-auto mb-6 w-max max-w-none" :style="{ minHeight: defaultPageHeight + 'px' }">
               
-              <div v-if="pageRendered[n] || viewMode === 'single'" class="relative shadow-2xl bg-white leading-none" style="overflow: hidden;">
-                <!-- 1. Canvas render hình ảnh PDF -->
+              <div v-if="pageRendered[n] || viewMode === 'single'" class="relative shadow-2xl bg-white leading-none text-left" style="overflow: hidden;">
                 <canvas :ref="(el) => { if (el) pageCanvases[n] = el; else delete pageCanvases[n]; }" class="block relative z-0"></canvas>
 
-                <!-- 2. TextLayer gốc của PDFJS (Cho file PDF thường) -->
                 <div :ref="(el) => { if (el) textLayerRefs[n] = el; else delete textLayerRefs[n]; }" class="absolute inset-0 z-10 textLayer"></div>
 
-                <!-- 3. TextLayer của OCR Vision (Cho file PDF ảnh/scan) -->
                 <div v-if="pageOcrResults[n] && pageOcrResults[n].length > 0" class="absolute inset-0 z-20 ocr-text-layer">
                   <span v-for="(r, i) in pageOcrResults[n]" :key="'ocr-'+n+'-'+i" class="absolute cursor-text pointer-events-auto select-text ocr-word" :style="getOcrTextStyleForPdf(r, n)">
                     {{ r.wordText }}
@@ -100,7 +108,7 @@
                 </div>
               </div>
 
-              <div v-else-if="viewMode === 'scroll'" class="w-[800px] max-w-full bg-white/5 border border-dashed border-gray-700 flex items-center justify-center rounded" :style="{ height: defaultPageHeight + 'px' }">
+              <div v-else-if="viewMode === 'scroll'" class="w-[800px] max-w-full bg-white/5 border border-dashed border-gray-700 flex items-center justify-center rounded mx-auto" :style="{ height: defaultPageHeight + 'px' }">
                 <span class="text-gray-500 text-sm">Trang {{ n }}</span>
               </div>
 
@@ -133,10 +141,11 @@ const props = defineProps({
   fileData: { type: Uint8Array, required: false },
   jobId: { type: [String, Number], required: false },
   apiKey: { type: String, required: true },
+  projectId: { type: [String, Number], required: false }, // THÊM DÒNG NÀY
 });
 
 const emit = defineEmits(["text-selected", "rag-updated", "page-changed", "media-id-loaded", "access-denied"]);
-
+const isExporting = ref(false);
 const config = useRuntimeConfig();
 const route = useRoute();
 const router = useRouter();
@@ -625,23 +634,101 @@ function getOcrTextStyleForPdf(r, pageNum) {
   const ys = b.map((p) => (Array.isArray(p) ? p[1] : p.y ?? 0));
   let x = Math.min(...xs), y = Math.min(...ys), w = Math.max(...xs) - x, h = Math.max(...ys) - y;
 
-  const canvasEl = pageCanvases.value[pageNum];
-  const origDim = pageDimensions.value[pageNum];
-
-  if (canvasEl && origDim) {
-    const displayW = parseFloat(canvasEl.style.width);
-    const displayH = parseFloat(canvasEl.style.height);
-    
-    const scX = displayW / origDim.w;
-    const scY = displayH / origDim.h;
-    
-    x *= scX; y *= scY; w *= scX; h *= scY;
-  }
+  // SỬA Ở ĐÂY: Không đọc DOM (canvasEl) nữa, dùng trực tiếp biến scale
+  // Vì lúc lưu pageDimensions, ta đang lấy ở scale = 2.0, nên tỷ lệ chuẩn sẽ là:
+  const ratio = scale.value / 2.0;
+  
+  x *= ratio; 
+  y *= ratio; 
+  w *= ratio; 
+  h *= ratio;
 
   return {
     position: "absolute", left: `${x}px`, top: `${y}px`, width: `${Math.max(w, 2)}px`, height: `${Math.max(h, 2)}px`,
     fontSize: `${Math.max(h * 0.85, 4)}px`, lineHeight: "1", whiteSpace: "nowrap", overflow: "hidden", color: "transparent", userSelect: "text",
   };
+}
+// Hàm xuất Searchable PDF có ép chạy OCR toàn bộ
+async function exportToSearchablePdf() {
+  if (isExporting.value || ocrLoading.value) return;
+  isExporting.value = true;
+
+  try {
+    // 1. KIỂM TRA & ÉP CHẠY QUÉT OCR CHO CÁC TRANG LAZY LOAD (Chỉ áp dụng với PDF)
+    if (!ocrMode.value && pdfDoc.value) {
+      const missingPages = [];
+      for (let i = 1; i <= totalPages.value; i++) {
+        const status = pageUploadStatus.value[i];
+        // Nếu trang chưa hoàn thành hoặc chưa được cache từ trước -> Đưa vào danh sách cần quét
+        if (status !== "done" && status !== "cached") {
+          missingPages.push(i);
+        }
+      }
+
+      if (missingPages.length > 0) {
+        console.log(`Đang ép nhận diện ${missingPages.length} trang còn thiếu để xuất PDF...`);
+        // Chạy tuần tự (hạn chế chạy song song quá nhiều để tránh spam server AI)
+        for (const p of missingPages) {
+          await uploadOnePage(p);
+        }
+      }
+    }
+
+    // 2. LẤY PROJECT ID VÀ GỌI API CỦA BACKEND
+    // Lấy projectId từ url (VD: /workspaces/project/1) hoặc thông qua prop
+    const projectId = route.params.id || props.projectId; 
+    const fileId = props.jobId; // JobId được sử dụng tương đương FileId
+
+    if (!projectId) {
+      alert("Không tìm thấy ID dự án (Project ID). Vui lòng kiểm tra lại component cha.");
+      isExporting.value = false;
+      return;
+    }
+
+    const token = getToken();
+    const url = `${config.public.apiBaseUrl}/api/Projects/${projectId}/files/${fileId}/export-pdf`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.log(response)
+      throw new Error(errorData.message || "Đã xảy ra lỗi khi tạo file PDF từ máy chủ.");
+    }
+
+    // 3. NHẬN FILE BLOB TỪ BACKEND VÀ TẢI XUỐNG CỤC BỘ
+    const blob = await response.blob();
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    
+    // Ưu tiên lấy tên file chuẩn từ Header Backend gửi về, nếu không có thì tự tạo tên mặc định
+    let fileName = `Searchable_Document_${new Date().getTime()}.pdf`;
+    const disposition = response.headers.get('Content-Disposition');
+    if (disposition && disposition.includes('filename=')) {
+      const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+      if (matches != null && matches[1]) fileName = matches[1].replace(/['"]/g, '');
+    }
+
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Dọn dẹp DOM
+    document.body.removeChild(a);
+    URL.revokeObjectURL(downloadUrl);
+
+  } catch (error) {
+    console.error("Lỗi khi xuất PDF:", error);
+    alert(error.message || "Không thể xuất file PDF. Vui lòng thử lại sau.");
+  } finally {
+    isExporting.value = false;
+  }
 }
 
 onMounted(() => {
@@ -654,6 +741,16 @@ onBeforeUnmount(() => {
   if (activeRenderTask) {
     try { activeRenderTask.cancel(); } catch {}
     activeRenderTask = null;
+  }
+});
+// Thêm watcher này để bắt sự kiện khi bấm Zoom (+ / -)
+watch(scale, () => {
+  if (ocrMode.value && ocrImgEl.value) {
+    // Đợi DOM nở ra theo scale mới rồi mới lấy kích thước
+    setTimeout(() => {
+      ocrDisplayW.value = ocrImgEl.value.offsetWidth || 0;
+      ocrDisplayH.value = ocrImgEl.value.offsetHeight || 0;
+    }, 50);
   }
 });
 

@@ -14,6 +14,9 @@ export default defineNuxtPlugin((nuxtApp) => {
   const selectedWord            = useLookupSelectedWord()
   const ocrResultsState         = useOcrResultsState()
 
+  const route = useRoute()
+  const disabledPaths = ['/login', '/confirm-account']
+
   // ── Helper: parse boundingBox từ Google Vision ────────────────────────
   function parseBbox(raw: any) {
     try {
@@ -392,6 +395,11 @@ saveIcon.addEventListener('click', () => {
 
   // ── mouseup: bôi đen → hiện popup + gọi rag/search ngay ─────────────
   document.addEventListener('mouseup', async (e: MouseEvent) => {
+    const isBlocked = disabledPaths.some(p => route.path.startsWith(p))
+    if (isBlocked) {
+      popupContainer.style.display = 'none'
+      return
+    }
     const target = e.target as HTMLElement
     if (target.closest('#global-lookup-container')) return
 

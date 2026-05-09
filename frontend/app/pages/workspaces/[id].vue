@@ -101,28 +101,28 @@
           <div v-if="isAdmin" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Mời thành viên</p>
             <div class="flex gap-2">
-              <input
-                v-model="inviteEmail"
-                type="email"
-                placeholder="Email..."
-                class="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors placeholder-gray-400 dark:placeholder-gray-500"
-                @keyup.enter="handleInvite"
-              />
-              <select
-                v-model="inviteRole"
-                class="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors cursor-pointer"
-              >
-                <option value="MEMBER">Member</option>
-                <option value="ADMIN">Admin</option>
-              </select>
-              <button
-                @click="handleInvite"
-                :disabled="!inviteEmail.trim() || inviting"
-                class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-semibold text-sm rounded-lg transition-colors whitespace-nowrap"
-              >
-                {{ inviting ? 'Đang mời...' : 'Mời' }}
-              </button>
-            </div>
+  <input
+    v-model="inviteIdentifier"
+    type="text"
+    placeholder="Nhập Email hoặc Username..."
+    class="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors placeholder-gray-400 dark:placeholder-gray-500"
+    @keyup.enter="handleInvite"
+  />
+  <select
+    v-model="inviteRole"
+    class="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors cursor-pointer"
+  >
+    <option value="MEMBER">Member</option>
+    <option value="ADMIN">Admin</option>
+  </select>
+  <button
+    @click="handleInvite"
+    :disabled="!inviteIdentifier.trim() || inviting"
+    class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-semibold text-sm rounded-lg transition-colors whitespace-nowrap"
+  >
+    {{ inviting ? 'Đang mời...' : 'Mời' }}
+  </button>
+</div>
             <p v-if="inviteError" class="text-red-500 dark:text-red-400 text-xs mt-2">{{ inviteError }}</p>
           </div>
 
@@ -347,7 +347,7 @@ const saving = ref(false)
 const deleting = ref(false)
 const leaving = ref(false) 
 const inviting = ref(false)
-const inviteEmail = ref('')
+const inviteIdentifier = ref('')
 const inviteRole = ref('MEMBER')
 const inviteError = ref('')
 const editForm = ref({ name: '', description: '' })
@@ -414,17 +414,22 @@ async function handleDelete() {
 }
 
 async function handleInvite() {
-  if (!inviteEmail.value.trim()) return
+  if (!inviteIdentifier.value.trim()) return
   try {
     inviting.value = true
     inviteError.value = ''
-    await inviteMember(id, inviteEmail.value, inviteRole.value)
+    
+    // Gọi composable inviteMember, truyền chuỗi email/username xuống
+    await inviteMember(id, inviteIdentifier.value, inviteRole.value)
+    
     members.value = await getMembers(id)
-    inviteEmail.value = ''
+    inviteIdentifier.value = '' // Xóa trống ô input sau khi mời thành công
     showToast('Mời thành công', 'success')
   } catch (e: any) {
-    inviteError.value = e?.data?.message || 'Không tìm thấy user hoặc đã là thành viên.'
-  } finally { inviting.value = false }
+    inviteError.value = e?.data?.message || 'Không tìm thấy người dùng hoặc đã là thành viên.'
+  } finally { 
+    inviting.value = false 
+  }
 }
 
 async function handleRoleChange(userId: number, role: string) {
