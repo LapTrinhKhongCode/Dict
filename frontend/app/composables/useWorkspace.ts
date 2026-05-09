@@ -119,7 +119,7 @@ const inviteMember = (workspaceId: number, email: string, role = 'MEMBER') => {
     method: 'POST', 
     body: { 
       workspaceId: workspaceId,
-      inviteeEmail: email, 
+      inviteeIdentifier: email, 
       expectedRole: role 
     }, 
     headers: headers()

@@ -4,7 +4,7 @@
     public class CreateInvitationDTO
     {
         public int WorkspaceId { get; set; }
-        public string InviteeEmail { get; set; }
+        public string InviteeIdentifier { get; set; }
         public string ExpectedRole { get; set; } // WorkspaceRole.ADMIN hoặc WorkspaceRole.MEMBER
     }
 

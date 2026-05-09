@@ -226,7 +226,7 @@ async function handleLogout() {
       </span>
 
       <div v-if="isAuthenticated" class="relative">
-        <UButton icon="i-lucide-bell" size="xl" variant="ghost" @click="showNotifications = !showNotifications" class="relative rounded-full" />
+        <UButton icon="i-lucide-bell" size="sm" variant="ghost" @click="showNotifications = !showNotifications" class="relative rounded-full" />
         <span v-if="pendingInvitations.length > 0" class="absolute top-1 right-2 w-6 h-6 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 pointer-events-none">
           {{ pendingInvitations.length }}
         </span>

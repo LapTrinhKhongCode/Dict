@@ -25,11 +25,13 @@ namespace Dict.Services
 
         public async Task<WorkspaceInvitationDTO> InviteMemberAsync(int inviterId, CreateInvitationDTO dto)
         {
-            // 0. Tìm người dùng trong hệ thống dựa trên Email
-            var invitee = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.InviteeEmail);
+            // 0. Tìm người dùng trong hệ thống dựa trên Email HOẶC Username
+            var invitee = await _db.Users.FirstOrDefaultAsync(u =>
+                u.Email == dto.InviteeIdentifier || u.UserName == dto.InviteeIdentifier);
+
             if (invitee == null)
             {
-                throw new Exception("Không tìm thấy người dùng nào đăng ký với email này.");
+                throw new Exception("Không tìm thấy người dùng nào đăng ký với email hoặc username này.");
             }
 
             // (Bảo mật thêm) Không cho phép tự gửi lời mời cho chính mình
@@ -58,7 +60,7 @@ namespace Dict.Services
             var invite = new WorkspaceInvitation
             {
                 WorkspaceId = dto.WorkspaceId,
-                InviteeId = invitee.Id, // Lấy ID của người dùng vừa tìm được bằng Email
+                InviteeId = invitee.Id,
                 InviterId = inviterId,
                 ExpectedRole = dto.ExpectedRole,
                 Status = InvitationStatus.PENDING
@@ -83,11 +85,12 @@ namespace Dict.Services
             };
 
             // 4. Bắn SignalR (Xử lý Online - Realtime)
-            // Gửi thông báo đến đúng người được mời thông qua ID của họ
-            // Gửi cho người được mời (Invitee)
+            // Tới bước này thì không quan tâm người ta mời bằng Username hay Email nữa, 
+            // vì mình luôn lấy Email từ DB ra để làm định danh gửi SignalR.
             var inviteeEmail = invitee.Email.ToLower();
             await _hubContext.Clients.User(inviteeEmail)
                 .SendAsync("ReceiveNewInvitation", resultDto);
+
             return resultDto;
         }
         public async Task<IEnumerable<WorkspaceInvitationDTO>> GetMyPendingInvitationsAsync(int userid)

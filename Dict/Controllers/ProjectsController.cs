@@ -1,5 +1,6 @@
 ﻿using Dict.Data;
 using Dict.DTO;
+using Dict.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -98,7 +99,7 @@ public class ProjectsController : ControllerBase
         var isAdmin = await _context.WorkspaceMembers
             .AnyAsync(wm => wm.WorkspaceId == job.Project.WorkspaceId
                          && wm.UserId == userId
-                         && wm.Role == "Admin");
+                         && wm.Role == WorkspaceRole.ADMIN);
 
         if (!isAdmin)
         {

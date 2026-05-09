@@ -18,6 +18,18 @@ namespace Dict.Controllers
             _invitationService = invitationService;
             _response = new ResponseDTO();
         }
+        private int GetUserId()
+        {
+            var userIdClaim = User.FindFirst("userId");
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                // Dòng này sẽ được kích hoạt nếu token không hợp lệ hoặc không chứa userId,
+                // mặc dù [Authorize] thường sẽ chặn các request này trước.
+                throw new InvalidOperationException("User ID không hợp lệ hoặc không tìm thấy trong token.");
+            }
+            return userId;
+        }
+
 
         // Tạo lời mời (Dành cho Admin)
         [HttpPost("invite")]
@@ -25,7 +37,7 @@ namespace Dict.Controllers
         {
             try
             {
-                int currentUserId = 1; // Tự thay bằng logic lấy từ Token (VD: int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)))
+                int currentUserId = GetUserId(); // Tự thay bằng logic lấy từ Token (VD: int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)))
                 _response.Result = await _invitationService.InviteMemberAsync(currentUserId, dto);
                 _response.Message = "Đã gửi lời mời thành công.";
             }
