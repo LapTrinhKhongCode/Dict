@@ -52,15 +52,15 @@ namespace Dict.Controllers
         [HttpPost("rag/explain")]
         public async Task<IActionResult> RagExplainWithAi([FromBody] RagExplainRequestDto request)
         {
-            if (string.IsNullOrWhiteSpace(request.Keyword) || string.IsNullOrWhiteSpace(request.Context))
-            {
-                return BadRequest(new { Message = "Thiếu Keyword hoặc Context." });
-            }
+            //if (string.IsNullOrWhiteSpace(request.Keyword) || string.IsNullOrWhiteSpace(request.Context))
+            //{
+            //    return BadRequest(new { Message = "Thiếu Keyword hoặc Context." });
+            //}
 
-            if (request.RagContexts == null || request.RagContexts.Count == 0)
-            {
-                return BadRequest(new { Message = "Không có ngữ cảnh RAG nào được truyền lên để AI phân tích." });
-            }
+            //if (request.RagContexts == null || request.RagContexts.Count == 0)
+            //{
+            //    return BadRequest(new { Message = "Không có ngữ cảnh RAG nào được truyền lên để AI phân tích." });
+            //}
 
             try
             {

@@ -119,17 +119,16 @@ namespace Dict.Service
         // =========================================================================
         public async Task<(string word, string best_meaning, string explanation)> ExplainWithGeminiAsync(string keyword, string context, List<RagContextItem> ragContexts)
         {
-            if (ragContexts == null || ragContexts.Count == 0)
-            {
-                return (keyword, "", "Không có ngữ cảnh RAG để phân tích.");
-            }
+            // 1. XÓA BỎ CHỐT CHẶN RỖNG (Early Return)
+            // Giờ đây dù ragContexts rỗng, ta vẫn tiếp tục xây dựng prompt cho Gemini.
 
             var promptBuilder = new StringBuilder();
             promptBuilder.AppendLine($"Bạn là một chuyên gia từ điển Nhật-Việt cao cấp. Người dùng đang tra từ \"{keyword}\" trong ngữ cảnh câu: \"{context}\"");
-            promptBuilder.AppendLine("\nDưới đây là các định nghĩa được hệ thống tự động trích xuất từ cơ sở dữ liệu (có thể ĐÚNG hoặc SAI):");
 
+            // 2. ĐIỀU CHỈNH PHẦN NẠP DỮ LIỆU THAM KHẢO
             if (ragContexts != null && ragContexts.Count > 0)
             {
+                promptBuilder.AppendLine("\nDưới đây là các định nghĩa được hệ thống tự động trích xuất từ cơ sở dữ liệu (có thể ĐÚNG hoặc SAI):");
                 for (int i = 0; i < ragContexts.Count; i++)
                 {
                     var item = ragContexts[i];
@@ -138,19 +137,31 @@ namespace Dict.Service
             }
             else
             {
-                promptBuilder.AppendLine("- Không có dữ liệu tham khảo nào từ Database.");
+                // Thông báo rõ cho AI là không có dữ liệu tham khảo để nó tự "vận công"
+                promptBuilder.AppendLine("\nLưu ý: Hệ thống không tìm thấy định nghĩa nào trong cơ sở dữ liệu cho từ này.");
             }
 
             promptBuilder.AppendLine("\nNHIỆM VỤ CỦA BẠN:");
-            promptBuilder.AppendLine("1. Đọc ngữ cảnh câu của người dùng và kiểm tra xem có 'Tùy chọn' nào ở trên khớp ý nghĩa không.");
-            promptBuilder.AppendLine("2. NẾU CÓ: Hãy chọn nghĩa đó và giải thích sắc thái sâu hơn.");
-            promptBuilder.AppendLine("3. NẾU TẤT CẢ ĐỀU SAI (hoặc không có tùy chọn): HÃY BỎ QUA CHÚNG. Tự dùng kiến thức chuyên gia của bạn để đưa ra nghĩa đúng nhất và giải thích.");
-            // THÊM ĐOẠN "CẤM KHẨU" NÀY VÀO ĐÂY:
+            promptBuilder.AppendLine("1. Phân tích ngữ cảnh câu của người dùng để xác định nghĩa đúng nhất của từ.");
+
+            // Điều chỉnh logic nhiệm vụ để bao quát cả trường hợp không có RAG
+            if (ragContexts != null && ragContexts.Count > 0)
+            {
+                promptBuilder.AppendLine("2. NẾU có 'Tùy chọn' nào ở trên khớp ý nghĩa: Hãy chọn nghĩa đó và giải thích sắc thái sâu hơn.");
+                promptBuilder.AppendLine("3. NẾU tất cả 'Tùy chọn' đều sai hoặc không phù hợp: HÃY BỎ QUA CHÚNG. Tự dùng kiến thức chuyên gia của bạn để đưa ra nghĩa đúng nhất và giải thích.");
+            }
+            else
+            {
+                promptBuilder.AppendLine("2. Vì không có dữ liệu tham khảo, hãy sử dụng kiến thức chuyên gia của bạn để giải nghĩa từ này dựa hoàn toàn vào ngữ cảnh câu đã cho.");
+            }
+
+            // LUẬT TRÌNH BÀY (Giữ nguyên các "Luật thép" của ông)
             promptBuilder.AppendLine("\nLUẬT TRÌNH BÀY (TUYỆT ĐỐI TUÂN THỦ):");
             promptBuilder.AppendLine("- Phải giải thích một cách tự nhiên, trôi chảy như một người thầy giáo đang giảng bài.");
             promptBuilder.AppendLine("- KHÔNG ĐƯỢC phép nhắc đến các từ ngữ như: 'Tùy chọn 1, 2, 3', 'danh sách trên', 'cơ sở dữ liệu', 'RAG' hay 'hệ thống'.");
-            promptBuilder.AppendLine("- Tuyệt đối giấu kín việc bạn đang tham khảo dữ liệu từ các Tùy chọn vì tôi sẽ gửi thông tin bạn trả lời thẳng tới người dùng.");
-            // LUẬT THÉP VỀ ĐỊNH DẠNG (BẮT BUỘC PHẢI CÓ)
+            promptBuilder.AppendLine("- Tuyệt đối giấu kín việc bạn đang tham khảo dữ liệu từ các Tùy chọn (nếu có).");
+
+            // Định dạng JSON (Giữ nguyên)
             promptBuilder.AppendLine("\nTrình bày kết quả dưới định dạng JSON nguyên bản. Cấu trúc BẮT BUỘC phải y hệt như sau:");
             promptBuilder.AppendLine("{");
             promptBuilder.AppendLine("  \"word\": \"từ đang tra\",");
@@ -158,6 +169,7 @@ namespace Dict.Service
             promptBuilder.AppendLine("  \"explanation\": \"giải thích chi tiết tại sao dịch như vậy\"");
             promptBuilder.AppendLine("}");
 
+            // 3. GỌI GEMINI (Lúc này prompt luôn được gửi đi)
             return await CallGeminiAsync(promptBuilder.ToString());
         }
 
