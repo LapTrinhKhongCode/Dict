@@ -33,33 +33,37 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   // ── Helper: lấy câu context từ ocrResults (hướng A — cùng dòng) ──────
   function getContextSentence(keyword: string): string {
-    const results = ocrResultsState.value
-    if (!results || results.length === 0) return keyword
+  const results = ocrResultsState.value;
+  if (!results || results.length === 0) return keyword;
 
-    const target = results.find((r: any) => r.wordText === keyword)
-    if (!target) return keyword
+  // 1. Sắp xếp toàn bộ chữ trên trang theo luồng đọc tự nhiên
+  // Ưu tiên Y (dòng) trước, sau đó đến X (vị trí trong dòng)
+  const sortedResults = [...results].sort((a: any, b: any) => {
+    const ba = parseBbox(a.boundingBox);
+    const bb = parseBbox(b.boundingBox);
+    if (!ba || !bb) return 0;
 
-    const tb = parseBbox(target.boundingBox)
-    if (!tb) return keyword
+    // Sai số dòng (Line threshold) khoảng 10px để coi là cùng một dòng
+    if (Math.abs(ba.minY - bb.minY) > 10) {
+      return ba.minY - bb.minY;
+    }
+    return ba.minX - bb.minX;
+  });
 
-    const targetCenterY = (tb.minY + tb.maxY) / 2
-    const targetHeight  = tb.maxY - tb.minY
+  // 2. Tìm index của từ khóa trong mảng đã sắp xếp
+  const targetIdx = sortedResults.findIndex((r: any) => r.wordText === keyword);
+  if (targetIdx === -1) return keyword;
 
-    const sameLine = results
-      .filter((r: any) => {
-        const b = parseBbox(r.boundingBox)
-        if (!b) return false
-        const centerY = (b.minY + b.maxY) / 2
-        return Math.abs(centerY - targetCenterY) < targetHeight * 0.8
-      })
-      .sort((a: any, b: any) => {
-        const ba = parseBbox(a.boundingBox)
-        const bb = parseBbox(b.boundingBox)
-        return (ba?.minX ?? 0) - (bb?.minX ?? 0)
-      })
+  // 3. Lấy "Cửa sổ" ngữ cảnh lan tỏa (15 từ trước và 15 từ sau)
+  const windowSize = 15;
+  const start = Math.max(0, targetIdx - windowSize);
+  const end = Math.min(sortedResults.length, targetIdx + windowSize + 1);
 
-    return sameLine.map((r: any) => r.wordText).join('')
-  }
+  const contextWords = sortedResults.slice(start, end);
+  
+  // Trả về chuỗi văn bản đã được khôi phục thứ tự logic
+  return contextWords.map((r: any) => r.wordText).join(' ');
+}
 
   // ── RAG state cục bộ ──────────────────────────────────────────────────
   let ragContexts: any[] = []
@@ -345,12 +349,11 @@ saveIcon.addEventListener('click', () => {
     }));
   })
   // ── Click: AI giải thích (MỚI) ────────────────────────────────────────
+  // ── Click: AI giải thích (Cập nhật: Không chặn khi ragContexts rỗng) ──
   aiIcon.addEventListener('click', async () => {
-    if (!ragContexts.length) {
-      aiExplainBox.innerHTML     = `<span style="color:#f87171">Chưa có dữ liệu RAG, hãy bôi đen lại.</span>`
-      aiExplainBox.style.display = 'block'
-      return
-    }
+    // Thay vì return ngay, ta cho phép gửi đi. 
+    // Chỉ cảnh báo nếu cả Keyword cũng trống (trường hợp hy hữu)
+    if (!ragKeyword) return 
 
     // Reset + show loading
     aiExplainBox.style.display = 'none'
@@ -371,7 +374,7 @@ saveIcon.addEventListener('click', () => {
         body: JSON.stringify({
           keyword:     ragKeyword,
           context:     ragContext,
-          ragContexts: ragContexts,
+          ragContexts: ragContexts, // Gửi mảng rỗng [] lên, AI vẫn xử lý được
         }),
       })
 
