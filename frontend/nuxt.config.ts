@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
@@ -10,8 +12,24 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: [
     '@/assets/css/main.css',
-    'pdfjs-dist/web/pdf_viewer.css',  // CSS text layer của pdfjs
+    'pdfjs-dist/web/pdf_viewer.css', 
   ],
+
+  // === ĐÃ SỬA: DÙNG MOCK LOCAL TỰ CHẾ ===
+  nitro: {
+    alias: {
+      papaparse: fileURLToPath(new URL('./papaparse-mock.js', import.meta.url))
+    }
+  },
+  vite: {
+    css: {
+      postcss: {
+        // Giữ cấu hình lờ đi cảnh báo CSS nếu cần
+      }
+    }
+  },
+  // =====================================
+
   icon: {
     customCollections: [{
       prefix: 'custom',
