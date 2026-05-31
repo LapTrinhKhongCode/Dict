@@ -1,29 +1,13 @@
+version: '3.8'
+
 services:
   backend:
     build:
       context: .
       dockerfile: ./Dict/Dockerfile
     ports:
-      - "5008:8080"   # HTTP
-      - "7084:8081"   # HTTPS
+      - "5008:8080" 
     environment:
-      - ASPNETCORE_URLS=http://+:8080;https://+:8081
-      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
-      - ASPNETCORE_Kestrel__Certificates__Default__Password=25102004
-      - CorsOrigins=${FE_DOMAIN}
-      - ServiceUrls__PythonApiBaseUrl=${PYTHON_API_URL}
-    volumes:
-      - ./Dict/aspnetapp.pfx:/https/aspnetapp.pfx:ro
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: .
-      dockerfile: ./frontend/Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - NUXT_PUBLIC_API_BASE_URL=${API_DOMAIN}
-    depends_on:
-      - backend
+      - ASPNETCORE_URLS=http://+:8080
+      - CorsOrigins=https://dict-six-kappa.vercel.app
     restart: unless-stopped
