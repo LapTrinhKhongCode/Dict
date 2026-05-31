@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="AdvUITestLogger" Version="1.0.0.9" />
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="FluentAssertions" Version="8.10.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.7" />
@@ -30,11 +31,6 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="UnitTests\AddDeckTests\" />
-    <Folder Include="UnitTests\EditDeckTests\" />
   </ItemGroup>
 
   <ItemGroup>
