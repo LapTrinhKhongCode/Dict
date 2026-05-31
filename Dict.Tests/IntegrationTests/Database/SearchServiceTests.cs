@@ -23,7 +23,6 @@ public class SearchServiceTests : IDisposable
     public SearchServiceTests()
     {
         Env.Load();
-
         var connectionString = Environment.GetEnvironmentVariable("TEST_CONNECTION_STRING");
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -32,9 +31,11 @@ public class SearchServiceTests : IDisposable
 
         _context = new TestApplicationDbContext(options);
 
-        //_service = new SearchService(_context);
+        // FIX LỖI TẠI ĐÂY: Khởi tạo thêm TrieCache rỗng để tiêm vào Service
+        var emptyTrieCache = new TrieAutocompleteCache { IsLoaded = false };
 
-        // Bắt đầu transaction (để đảm bảo test không "ghi" gì vào DB)
+        _service = new SearchService(_context, emptyTrieCache);
+
         _transaction = _context.Database.BeginTransaction();
     }
 
