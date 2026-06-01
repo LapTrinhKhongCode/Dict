@@ -1,5 +1,4 @@
-﻿  GNU nano 7.2                                                               Dict/Dockerfile
-# --- Giai đoạn 1: Build (Chỉ tập trung vào dự án chính) ---
+﻿# --- Giai đoạn 1: Build (Chỉ tập trung vào dự án chính) ---
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
