@@ -1,12 +1,11 @@
-version: '3.8'
-
+  GNU nano 7.2                                                             docker-compose.yml
 services:
   backend:
     build:
       context: .
-      dockerfile: ./Dict/Dockerfile
+      dockerfile: ./Dict/Dockerfile  # Đường dẫn từ thư mục gốc trỏ vào file Dockerfile
     ports:
-      - "5008:8080" 
+      - "5008:8080"
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - CorsOrigins=https://dict-six-kappa.vercel.app
