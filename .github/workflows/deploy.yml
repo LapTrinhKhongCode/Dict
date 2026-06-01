@@ -14,13 +14,10 @@ jobs:
         uses: slackapi/slack-github-action@v1.26.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          # Đưa nội dung commit và actor vào biến môi trường để an toàn dữ liệu
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          COMMIT_ACTOR: ${{ github.actor }}
         with:
           payload: |
             {
-              "text": "🚀 *[MiYo CI/CD]* Tiến trình tự động Deploy đã bắt đầu trên Raspberry Pi 5!\nCommit: `${{ env.COMMIT_MSG }}` bởi *${{ env.COMMIT_ACTOR }}*."
+              "text": ${{ toJSON(format('🚀 *[MiYo CI/CD]* Tiến trình tự động Deploy đã bắt đầu trên Raspberry Pi 5! | Commit: {0} | Cập nhật bởi: {1}', github.event.head_commit.message, github.actor)) }}
             }
 
       - name: 📥 Checkout Code
@@ -55,5 +52,5 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚨 *[MiYo CI/CD] FAILED!* Quá trình build Docker hoặc Deploy trên Pi 5 dính lỗi rồi bác Anh ơi. Kiểm tra ngay log trên GitHub Actions!"
+              "text": "🚨 *[MiYo CI/CD] FAILED!* Quá trình build Docker hoặc Deploy trên Pi 5 dính lỗi rồi. Kiểm tra ngay log trên GitHub Actions!"
             }
