@@ -1,0 +1,56 @@
+steps:
+      - name: 🔔 Notify Slack - Deployment Started
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚀 *[MiYo CI/CD]* Tiến trình tự động Deploy đã bắt đầu trên Raspberry Pi 5!\nCommit: `${{ github.event.head_commit.message }}` bởi *${{ github.actor }}*."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Rebuild and Run Docker Containers (With Force Pull)
+        run: |
+          # 1. Phi thẳng vào thư mục chứa dự án trên Pi
+          cd ~/app/Dict
+          
+          # 🔥 ĐÒN PHÒNG THỦ 1: Hủy bỏ mọi thay đổi rác không mong muốn ở local trên Pi
+          git reset --hard HEAD
+          
+          # 🔥 ĐÒN PHÒNG THỦ 2: Kéo toàn bộ danh sách nhánh mới nhất từ GitHub về
+          git fetch --all
+          
+          # 🔥 ĐÒN PHÒNG THỦ 3 (FORCE PULL): Ép nhánh main ở Pi tuân thủ tuyệt đối theo origin/main của GitHub
+          git reset --hard origin/main
+          
+          # 2. Tiến hành gạt cần Rebuild Docker sạch sẽ
+          docker compose down
+          docker compose up -d --build
+          
+          # 3. Dọn dẹp các ảnh Docker cũ bị thừa (Dangling Images) để tránh đầy dung lượng thẻ nhớ của Pi
+          docker image prune -f
+
+      - name: 🎉 Notify Slack - Deployment Success
+        if: success()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "✅ *[MiYo CI/CD] SUCCESS!* Hệ thống từ điển MiYo đã được deploy thành công lên Pi 5.\nAPI RAG & Backend .NET Core đã hoạt động ổn định tại cổng 8080!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: ❌ Notify Slack - Deployment Failed
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "🚨 *[MiYo CI/CD] FAILED!* Quá trình build Docker hoặc Deploy trên Pi 5 dính lỗi rồi bác Anh ơi. Kiểm tra ngay log trên GitHub Actions!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
