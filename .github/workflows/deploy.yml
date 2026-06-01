@@ -8,17 +8,17 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
-    
+
     steps:
       - name: 🔔 Notify Slack - Deployment Started
         uses: slackapi/slack-github-action@v1.26.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           payload: |
             {
-              "text": "🚀 *[MiYo CI/CD]* Tiến trình tự động Deploy đã bắt đầu trên Raspberry Pi 5!\nCommit: `${{ github.event.head_commit.message }}` bởi *${{ github.actor }}*."
+              "text": ${{ toJSON(format('🚀 *[MiYo CI/CD]* Tiến trình tự động Deploy đã bắt đầu trên Raspberry Pi 5! | Commit: {0} | Cập nhật bởi: {1}', github.event.head_commit.message, github.actor)) }}
             }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -36,21 +36,21 @@ jobs:
       - name: 🎉 Notify Slack - Deployment Success
         if: success()
         uses: slackapi/slack-github-action@v1.26.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           payload: |
             {
               "text": "✅ *[MiYo CI/CD] SUCCESS!* Hệ thống từ điển MiYo đã được deploy thành công lên Pi 5.\nAPI RAG & Backend .NET Core đã hoạt động ổn định tại cổng 8080!"
             }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: ❌ Notify Slack - Deployment Failed
         if: failure()
         uses: slackapi/slack-github-action@v1.26.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           payload: |
             {
-              "text": "🚨 *[MiYo CI/CD] FAILED!* Quá trình build Docker hoặc Deploy trên Pi 5 dính lỗi rồi bác Anh ơi. Kiểm tra ngay log trên GitHub Actions!"
+              "text": "🚨 *[MiYo CI/CD] FAILED!* Quá trình build Docker hoặc Deploy trên Pi 5 dính lỗi rồi. Kiểm tra ngay log trên GitHub Actions!"
             }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
