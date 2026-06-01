@@ -30,6 +30,15 @@ namespace Dict.Service
             // 2. Khởi tạo ONNX Runtime
             string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "multilingual-e5-small.onnx");
             var sessionOptions = new Microsoft.ML.OnnxRuntime.SessionOptions();
+            // 🔥 ĐÒN ÉP XUNG CPU CỰC MẠNH CHO ARM64
+            // Khóa mõm tính năng tìm GPU, ép chạy 100% bằng CPU
+            sessionOptions.AppendExecutionProvider_CPU();
+
+            // Ép ONNX vắt kiệt 4 nhân vật lý của Raspberry Pi 5 để xử lý song song
+            sessionOptions.IntraOpNumThreads = 4;
+
+            // Bật tối ưu hóa đồ thị mạng nơ-ron ở mức cao nhất
+            sessionOptions.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
             _session = new InferenceSession(modelPath, sessionOptions);
 
             // 3. Khởi tạo Client
