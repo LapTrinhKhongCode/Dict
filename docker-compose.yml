@@ -1,9 +1,8 @@
-  GNU nano 7.2                                                             docker-compose.yml
 services:
   backend:
     build:
       context: .
-      dockerfile: ./Dict/Dockerfile  # Đường dẫn từ thư mục gốc trỏ vào file Dockerfile
+      dockerfile: ./Dict/Dockerfile
     ports:
       - "5008:8080"
     environment:
