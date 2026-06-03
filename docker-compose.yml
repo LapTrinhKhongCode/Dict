@@ -8,4 +8,7 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - CorsOrigins=https://dict-six-kappa.vercel.app
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-vision-key.json
+    volumes:
+      - ../gcp-vision-key.json:/app/gcp-vision-key.json:ro
     restart: unless-stopped
