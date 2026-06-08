@@ -41,7 +41,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "✅ *[MiYo CI/CD] SUCCESS!* Hệ thống từ điển MiYo đã được deploy thành công lên Pi 5.\nAPI RAG & Backend .NET Core đã hoạt động ổn định tại cổng 8080!"
+              "text": "✅ *[MiYo CI/CD] SUCCESS!* Hệ thống từ điển MiYo đã được deploy thành công lên Pi 5.\nAPI RAG & Backend .NET Core đã hoạt động ổn định tại cổng 8082!"
             }
 
       - name: ❌ Notify Slack - Deployment Failed

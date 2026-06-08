@@ -155,6 +155,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IOcrJobService, OcrJobService>();
+builder.Services.AddSingleton<Google.Cloud.Vision.V1.ImageAnnotatorClient>(_ =>
+    new Google.Cloud.Vision.V1.ImageAnnotatorClientBuilder().Build());
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<IBlobService, BlobService>();
