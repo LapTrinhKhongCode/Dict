@@ -168,7 +168,28 @@ namespace Dict.Service
                 _logger.LogInformation("✅ Cache HIT — Trả về từ DB cho Job {JobId}", jobId);
                 return MapToResultDto(ocrJob);
             }
+            bool isPdf = ocrJob.Media != null &&
+                 !string.IsNullOrEmpty(ocrJob.Media.MimeType) &&
+                 ocrJob.Media.MimeType.Contains("pdf", StringComparison.OrdinalIgnoreCase);
 
+            if (isPdf)
+            {
+                _logger.LogInformation("📄 Job {JobId} là file PDF. Nhường quyền OCR cho luồng Lazy Load từng trang của Frontend.", jobId);
+
+                // Cập nhật trạng thái thành processing nếu Frontend đã đẩy lên được vài trang
+                if (ocrJob.Results != null && ocrJob.Results.Any() && ocrJob.Status == "pending")
+                {
+                    ocrJob.Status = "processing";
+                    await _db.SaveChangesAsync();
+                }
+
+                // Tuyệt đối KHÔNG gọi Google Vision. Trả về ngay lập tức dữ liệu hiện có.
+                return MapToResultDto(ocrJob);
+            }
+            // =========================================================================
+
+            // 3. NẾU LÀ ẢNH TĨNH (.PNG, .JPG) THÌ MỚI GỌI GOOGLE VISION TỔNG
+            _logger.LogInformation("🚀 Bắt đầu gọi Google Vision cho Job {JobId} (File Ảnh)", jobId);
             // 3. NẾU CHƯA XONG (Bất kể là pending hay đang processing mà chưa có kết quả)
             // Thực hiện khóa (Lock) đơn giản bằng cách kiểm tra thời gian Update gần nhất hoặc cho phép ghi đè
             _logger.LogInformation("🚀 Bắt đầu gọi Google Vision cho Job {JobId}", jobId);
