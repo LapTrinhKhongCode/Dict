@@ -160,21 +160,25 @@ namespace Dict.Service
         public async Task<IEnumerable<CardDto>> GetReviewQueueAsync(int deckId, int userId)
         {
             var now = DateTime.UtcNow;
+            // LEFT JOIN card_states một lần — tránh 2 ANY subquery trùng nhau
             return await _db.Cards
                 .AsNoTracking()
                 .Where(c => c.DeckId == deckId)
-                .Where(c => !c.CardStates.Any(cs => cs.UserId == userId) ||
-                             c.CardStates.Any(cs => cs.UserId == userId && cs.DueDate <= now))
-                .Select(c => new CardDto
+                .Select(c => new
                 {
-                    Id = c.Id,
-                    CharBig = c.FrontText,
+                    c.Id,
+                    c.FrontText,
+                    c.BackText,
+                    State = c.CardStates.FirstOrDefault(cs => cs.UserId == userId)
+                })
+                .Where(x => x.State == null || x.State.DueDate <= now)
+                .Select(x => new CardDto
+                {
+                    Id = x.Id,
+                    CharBig = x.FrontText,
                     Pinyin = "",
-                    Meaning = c.BackText,
-                    NextReviewAt = c.CardStates
-                                    .Where(cs => cs.UserId == userId)
-                                    .Select(cs => cs.DueDate ?? DateTime.MinValue)
-                                    .FirstOrDefault()
+                    Meaning = x.BackText,
+                    NextReviewAt = x.State != null ? (x.State.DueDate ?? DateTime.MinValue) : DateTime.MinValue
                 })
                 .ToListAsync();
         }

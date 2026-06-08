@@ -8,7 +8,7 @@
       </button>
       <div class="font-bold">{{ pdfName || 'Tài liệu' }}</div>
       <div class="text-xs px-3 py-1 bg-[#1e3a5f] text-[#5b8dee] rounded-full border border-[#5b8dee]/30 flex items-center gap-2">
-        <div class="w-2 h-2 rounded-full bg-[#5b8dee]"></div> AI Ready
+        <div class="w-2 h-2 rounded-full bg-[#5b8dee]"></div> Live
       </div>
     </header>
 
@@ -22,13 +22,10 @@
           :file-data="pdfData" 
           :job-id="jobId"
           :project-id="projectId"
-          :api-key="apiKey" 
-          @rag-updated="(data) => ragIndex = data"
-          @text-selected="handleTextSelection"
           @page-changed="handlePageChanged"
           @media-id-loaded="(id) => fileId = id"
           @access-denied="handleAccessDenied" 
-        /> 
+        />
         <div v-else class="flex flex-col items-center justify-center h-full text-gray-400">
           <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
           <p>Đang chờ nạp dữ liệu OCR/PDF...</p>
@@ -47,26 +44,13 @@
           <p class="text-sm text-gray-400">Bạn không có quyền truy cập vào công cụ hỗ trợ của dự án này.</p>
         </div>
 
-        <div class="flex border-b border-[#30363d] bg-[#0d1117] shrink-0 overflow-x-auto custom-scrollbar">
-          <button @click="activeTab='chat'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='chat' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">💬 Trợ lý AI</button>
-          <button @click="activeTab='vocab'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='vocab' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">📚 Từ vựng</button>
-          <button @click="activeTab='comment'" :class="['flex-1 p-3 text-sm font-semibold transition whitespace-nowrap', activeTab==='comment' ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]' : 'text-gray-500 hover:text-gray-300']">📝 Thảo luận</button>
+        <div class="flex border-b border-[#30363d] bg-[#0d1117] shrink-0">
+          <div class="flex-1 p-3 text-sm font-semibold text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d] flex items-center justify-center gap-2">
+            📝 Thảo luận
+          </div>
         </div>
 
-        <div v-show="activeTab === 'chat'" class="flex-1 overflow-hidden">
-          <GeminiChat 
-            :api-key="apiKey" 
-            :pdf-name="pdfName" 
-            :rag-index="ragIndex" 
-            :accessDenied="isAccessDenied"  
-          /> 
-        </div>
-
-        <div v-show="activeTab === 'vocab'" class="flex-1 overflow-hidden">
-          <VocabManager ref="vocabMgrRef" :project-id="projectId" :pdf-name="pdfName" />
-        </div>
-
-        <div v-show="activeTab === 'comment'" class="flex-1 overflow-hidden">
+        <div class="flex-1 overflow-hidden">
           <FileCommentTab 
             v-if="fileId"
             :file-id="Number(fileId)" 
@@ -75,44 +59,22 @@
           />
         </div>
       </section>
-      <Transition name="fade">
-        <div v-if="vocabPopup.visible" class="fixed z-[9999] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1c2128] border border-[#f0c040] p-5 rounded-xl shadow-2xl w-[400px] max-w-[90vw]">
-          <h4 class="text-lg font-bold text-[#f0c040] mb-3 line-clamp-4 overflow-hidden break-words leading-tight">
-            {{ vocabPopup.word }}
-          </h4>
-          <div v-if="vocabPopup.loading" class="text-sm text-gray-400 flex items-center gap-2 py-2">
-            <span class="w-4 h-4 border-2 border-gray-400 border-t-[#f0c040] rounded-full animate-spin"></span> Đang dịch...
-          </div>
-          <div v-else>
-            <input v-model="vocabPopup.meaning" @keyup.enter="saveVocab" class="w-full bg-[#0d1117] border border-[#30363d] p-2.5 rounded text-sm mb-4 outline-none text-white focus:border-[#f0c040] transition-colors" placeholder="Nhập nghĩa..." ref="vocabInput" />
-            <div class="flex justify-end gap-2">
-              <button @click="vocabPopup.visible = false" class="px-4 py-1.5 bg-[#30363d] text-[#c9d1d9] rounded-lg text-sm hover:bg-[#444c56] transition">Đóng</button>
-              <button @click="saveVocab" class="px-4 py-1.5 bg-[#f0c040] text-black font-bold rounded-lg text-sm hover:bg-[#d4a017] transition shadow-lg">Lưu từ</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </main>
+      </main>
   </div>
 </template>
 
 <script setup>
 definePageMeta({ layout: 'reader', ssr: false })
 
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useRuntimeConfig } from '#app'
 
 import PdfViewer from '~/components/PdfViewer.vue'
-import GeminiChat from '~/components/GeminiChat.vue'
-import VocabManager from '~/components/VocabManager.vue'
 import FileCommentTab from '~/components/FileCommentTab.vue'
 
 const route = useRoute()
 const router = useRouter()
-const config = useRuntimeConfig()
 
-// --- FIX LỖI DÁN LINK: SỬ DỤNG COMPUTED ĐỂ BIẾN LUÔN BÁM SÁT URL ---
 const fileUrl = computed(() => route.query.url || '')
 const jobId = computed(() => route.query.jobId ? Number(route.query.jobId) : null)
 const projectId = computed(() => route.query.projectId ? Number(route.query.projectId) : null)
@@ -122,37 +84,25 @@ const pdfName = computed(() => {
   try {
     return decodeURIComponent(route.query.name)
   } catch (e) {
-    return route.query.name // Fallback nếu decode lỗi
+    return route.query.name
   }
 })
 
-// Các state khác giữ nguyên
 const pdfData = ref(null) 
 const fileId = ref(null) 
-const apiKey = ref('')
 const leftPanelWidth = ref(60)
-
 const isAccessDenied = ref(false)
-
-const activeTab = ref('chat')
-const ragIndex = ref([])
-const vocabMgrRef = ref(null)
-const vocabPopup = ref({ visible: false, word: '', meaning: '', x: 0, y: 0, loading: false })
-
 const pdfViewerRef = ref(null)
 const pdfCurrentPage = ref(1)
 
-// --- Lắng nghe ID từ URL để khôi phục fileData (nếu có id) ---
 watch(() => route.query.id, (newId) => {
   if (newId && !fileId.value) {
     fileId.value = Number(newId)
-    // Load local sessionStorage (nếu user đi từ trang project vào)
     const raw = sessionStorage.getItem(`pdf_${newId}`)
     if (raw) pdfData.value = new Uint8Array(JSON.parse(raw)) 
   }
 }, { immediate: true })
 
-// --- HÀM BẢO MẬT ---
 function handleAccessDenied() {
   isAccessDenied.value = true
 }
@@ -167,72 +117,6 @@ function triggerPdfJump(pageNum) {
     pdfViewerRef.value.jumpToPage()
   }
 }
-function handleOpenVocabPopup(event) {
-  const { word, meaning } = event.detail;
-  
-  // Mở popup vàng lên và điền sẵn từ + nghĩa lấy từ RAG
-  vocabPopup.value = { 
-    visible: true, 
-    word: word, 
-    meaning: meaning, // Gắn nghĩa lấy từ menu đen vào đây
-    loading: false 
-  };
-}
-// --- LOGIC XỬ LÝ SỰ KIỆN TỪ PDF VIEWER ---
-function handleTextSelection(data) {
-  if (isAccessDenied.value) return; 
-
-  // const popupHeight = 220; 
-  // const popupWidth = 270;  
-
-  // let posX = data.x + 10;
-  // let posY = data.y + 15; 
-
-  // if (posY + popupHeight > window.innerHeight) {
-  //   posY = data.y - popupHeight - 15;
-  // }
-  // posY = Math.max(10, posY);
-  // posX = Math.min(posX, window.innerWidth - popupWidth - 10);
-
-  // vocabPopup.value = { 
-  //   visible: true, 
-  //   word: data.text, 
-  //   meaning: '', 
-  //   x: posX, 
-  //   y: posY, 
-  //   loading: true 
-  // }
-  
-  // fetchWordMeaning(data.text)
-}
-
-async function fetchWordMeaning(word) {
-  try {
-    const url = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(word)}`
-    const res = await fetch(url)
-    if (res.ok) {
-      const data = await res.json()
-      if (data.status === 200 && data.data) {
-        const words = data.data?.words || []
-        const firstMeaning = words[0]?.means?.[0]?.mean || ''
-        const fallback = data.data?.suggestWords?.[0]?.means?.[0]?.mean || ''
-        vocabPopup.value.meaning = firstMeaning || fallback
-      }
-    }
-  } catch (e) {
-  } finally {
-    vocabPopup.value.loading = false
-  }
-}
-
-function saveVocab() {
-  if (!vocabPopup.value.meaning) return
-  if (vocabMgrRef.value) {
-    vocabMgrRef.value.addNewVocab({ wordText: vocabPopup.value.word, contextMeaning: vocabPopup.value.meaning })
-  }
-  vocabPopup.value.visible = false
-  activeTab.value = 'vocab' 
-}
 
 function startResize() {
   const move = (e) => { leftPanelWidth.value = Math.max(25, Math.min(75, (e.clientX / window.innerWidth) * 100)) }
@@ -241,21 +125,9 @@ function startResize() {
 }
 
 const goBack = () => router.back()
-
-onMounted(() => {
-  apiKey.value = config.public.geminiApiKey || ''
-  window.addEventListener('open-vocab-popup', handleOpenVocabPopup)
-})
-onUnmounted(() => {
-  // Gỡ bỏ lắng nghe khi rời trang để tránh rò rỉ bộ nhớ (memory leak)
-  window.removeEventListener('open-vocab-popup', handleOpenVocabPopup)
-})
 </script>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-5px); }
-
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -264,10 +136,4 @@ onUnmounted(() => {
   background-color: #0d1117;
   color: #c9d1d9;
 }
-
-/* Scrollbar */
-.custom-scrollbar::-webkit-scrollbar { height: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #484f58; }
 </style>

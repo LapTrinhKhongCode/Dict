@@ -7,9 +7,7 @@ using Dict.DTO.Deck;
 using Dict.Models;
 using Dict.Service;
 using FluentAssertions;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Moq;
 using Xunit;
 
 namespace Dict.Tests.Services
@@ -17,7 +15,6 @@ namespace Dict.Tests.Services
     public class DeckServiceTests : IDisposable
     {
         private readonly ApplicationDbContext _db;
-        private readonly Mock<UserManager<ApplicationUser>> _mockUserManager;
         private readonly DeckService _sut;
 
         public DeckServiceTests()
@@ -27,12 +24,7 @@ namespace Dict.Tests.Services
                 .Options;
 
             _db = new ApplicationDbContext(options);
-
-            var store = new Mock<IUserStore<ApplicationUser>>();
-            _mockUserManager = new Mock<UserManager<ApplicationUser>>(
-                store.Object, null, null, null, null, null, null, null, null);
-
-            _sut = new DeckService(_db, _mockUserManager.Object);
+            _sut = new DeckService(_db);
         }
 
         public void Dispose()
@@ -47,9 +39,8 @@ namespace Dict.Tests.Services
             // Arrange
             int userId = 1;
             var user = new ApplicationUser { Id = userId, UserName = "duc_anh", AvatarUrl = "" };
-
-            _mockUserManager.Setup(u => u.FindByIdAsync(userId.ToString()))
-                            .ReturnsAsync(user);
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
 
             var dto = new DeckCreateDto
             {
@@ -127,8 +118,8 @@ namespace Dict.Tests.Services
             await _db.SaveChangesAsync();
 
             var newOwner = new ApplicationUser { Id = newOwnerId, UserName = "Student", AvatarUrl = "" };
-            _mockUserManager.Setup(u => u.FindByIdAsync(newOwnerId.ToString()))
-                            .ReturnsAsync(newOwner);
+            _db.Users.Add(newOwner);
+            await _db.SaveChangesAsync();
 
             // Act
             var result = await _sut.SaveDeckForUserAsync(originalDeckId, newOwnerId);

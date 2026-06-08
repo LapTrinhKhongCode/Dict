@@ -1,4 +1,4 @@
-﻿using Dict.DTO;
+using Dict.DTO;
 using Dict.DTO.Deck; // Namespace chứa các DTO trên
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authorization;
@@ -40,11 +40,11 @@ namespace Dict.Controllers
 
         [HttpGet("public")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetPublicDecks()
+        public async Task<IActionResult> GetPublicDecks([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             try
             {
-                _response.Result = await _deckService.GetPublicDecksAsync();
+                _response.Result = await _deckService.GetPublicDecksAsync(page, pageSize);
                 _response.Message = "Successfully retrieved public decks.";
             }
             catch (Exception ex)
@@ -84,17 +84,17 @@ namespace Dict.Controllers
         {
             try
             {
-                //int userId = GetUserId();
-                              
+                int userId = 0;
+                var userIdClaim = User.FindFirst("userId");
+                if (userIdClaim != null) int.TryParse(userIdClaim.Value, out userId);
 
-                var deck = await _deckService.GetDeckDetailsAsync(deckId, 1);
+                var deck = await _deckService.GetDeckDetailsAsync(deckId, userId);
                 if (deck == null)
                 {
                     _response.IsSuccess = false;
                     _response.Message = "Deck not found.";
                     return NotFound(_response);
                 }
-                // TODO: Thêm kiểm tra nếu deck là private và người dùng không phải chủ sở hữu
                 _response.Result = deck;
                 _response.Message = "Successfully retrieved deck details.";
             }

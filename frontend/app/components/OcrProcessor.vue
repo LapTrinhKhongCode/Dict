@@ -21,8 +21,10 @@
         v-model="selectedProjectId"
         class="p-2 border rounded-lg dark:bg-gray-700 dark:text-white dark:border-gray-600"
       >
-        <option :value="null">Không thuộc dự án</option>
-        <option :value="1">Dự án Alpha</option>
+        <option :value="null">Không thuộc workspace</option>
+        <option v-for="ws in projects" :key="ws.id" :value="ws.id">
+          {{ ws.name }}
+        </option>
       </select>
 
       <button
@@ -119,7 +121,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useJwt } from "~/composables/useJwt";
 
 // --- STATES ---
 const file = ref(null);
@@ -130,6 +133,7 @@ const imageDimensions = ref({ nativeWidth: 0, nativeHeight: 0 });
 const isLoading = ref(false);
 const statusMessage = ref("Chưa chọn file");
 const selectedProjectId = ref(null);
+const projects = ref([]); // Danh sách project từ API
 
 // Data từ API
 const detectedText = ref("");
@@ -137,6 +141,20 @@ const rawResults = ref([]); // Mảng chứa wordText và boundingBox JSON strin
 
 const hoveredIndex = ref(-1);
 const config = useRuntimeConfig();
+const { jwt } = useJwt();
+
+// Load project list từ backend (workspace hiện tại nếu có, hoặc tất cả workspace)
+onMounted(async () => {
+  try {
+    const res = await $fetch(`${config.public.apiBaseUrl}/api/workspaces`, {
+      headers: { Authorization: `Bearer ${jwt.value ?? ""}` },
+    });
+    // Lấy tất cả workspace để user chọn project/workspace
+    projects.value = Array.isArray(res) ? res : [];
+  } catch {
+    // Không fatal — chỉ bỏ dropdown nếu API lỗi
+  }
+});
 
 // --- LOGIC GIAO DIỆN ---
 function handleFileChange(event) {
@@ -227,9 +245,9 @@ function calculateBoxStyle(bbox) {
 async function startOCR() {
   if (!file.value) return;
 
-  const token = localStorage.getItem("jwt_token"); // Thay bằng useJwt() của bạn nếu cần
+  const token = jwt.value;
   if (!token) {
-    statusMessage.value = "Lỗi: Chưa đăng nhập (Không tìm thấy Token).";
+    statusMessage.value = "Lỗi: Chưa đăng nhập.";
     return;
   }
 

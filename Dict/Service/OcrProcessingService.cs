@@ -1,6 +1,10 @@
 ﻿using Dict.Data;
+using Dict.Hubs;
 using Dict.Models;
 using Dict.Service.IService;
+using ImageMagick;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Text;
@@ -29,6 +33,11 @@ namespace Dict.Service
         }
 
         private static readonly TimeSpan VisionTimeout = TimeSpan.FromSeconds(60);
+        private const string OcrCachePrefix = "ocr_job_";
+        private static readonly TimeSpan OcrCacheTtl = TimeSpan.FromMinutes(10);
+
+        // Max width ảnh gửi lên Vision — đủ để nhận diện tốt, giảm bandwidth
+        private const int MaxImageWidth = 1500;
 
         private readonly IHttpClientFactory _httpFactory;
         private readonly ILogger<OcrProcessingService> _logger;
@@ -36,6 +45,8 @@ namespace Dict.Service
         private readonly ApplicationDbContext _db;
         private readonly IBlobService _blobService;
         private readonly ImageAnnotatorClient _visionClient;
+        private readonly IMemoryCache _cache;
+        private readonly IHubContext<NotificationHub> _hub;
 
         public OcrProcessingService(
             IHttpClientFactory httpFactory,
@@ -43,7 +54,9 @@ namespace Dict.Service
             IOcrJobService ocrJobService,
             ApplicationDbContext db,
             IBlobService blobService,
-            ImageAnnotatorClient visionClient)
+            ImageAnnotatorClient visionClient,
+            IMemoryCache cache,
+            IHubContext<NotificationHub> hub)
         {
             _httpFactory = httpFactory;
             _logger = logger;
@@ -51,45 +64,33 @@ namespace Dict.Service
             _db = db;
             _blobService = blobService;
             _visionClient = visionClient;
+            _cache = cache;
+            _hub = hub;
         }
         public async Task<IEnumerable<OcrJobDetailDto>> GetRecentOcrJobsForUserAsync(int userId, int limit = 5)
         {
             var jobs = await _db.OcrJobs
                 .AsNoTracking()
                 .Where(job => job.UserId == userId)
-                // Sắp xếp theo ngày tạo mới nhất
                 .OrderByDescending(job => job.CreatedAt)
-                // Giới hạn số lượng kết quả
                 .Take(limit)
-                // Tải kèm dữ liệu liên quan
-                .Include(job => job.Media) // Tải ảnh (MediaStore)
-                .Include(job => job.Results) // Tải kết quả chi tiết
-                                             // Ánh xạ sang DTO
+                .Include(job => job.Media)
                 .Select(job => new OcrJobDetailDto
                 {
                     Id = job.Id,
                     Status = job.Status,
                     DetectedText = job.DetectedText,
                     CreatedAt = job.CreatedAt,
-                    // Lấy URL từ MediaStore liên quan
                     ImageUrl = job.Media != null ? job.Media.StorageUrl : null,
-                    // Ánh xạ danh sách các kết quả con
-                    Results = job.Results.Select(result => new OcrResultDto
-                    {
-                        Id = result.Id,
-                        WordText = result.WordText,
-                        BoundingBox = result.BoundingBox,
-                        Confidence = result.Confidence
-                    }).ToList()
+                    Results = new List<OcrResultDto>() // Không load results ở list view — gọi riêng khi cần
                 })
                 .ToListAsync();
 
             return jobs;
         }
-        // --- HÀM 1: CHỈ UPLOAD LÊN AZURE VÀ TẠO JOB PENDING ---
+        // --- HÀM 1: UPLOAD + GỌI VISION SONG SONG — trả kết quả ngay trong 1 request ---
         public async Task<OcrProcessingResultDto> UploadImageOnlyAsync(IFormFile image, int userId, int workspaceId, int? projectId)
         {
-            // Đọc ảnh vào bộ nhớ
             byte[] originalImageBytes;
             await using (var ms = new MemoryStream())
             {
@@ -97,37 +98,57 @@ namespace Dict.Service
                 originalImageBytes = ms.ToArray();
             }
 
-            // Tải ảnh gốc lên Azure Blob Storage
+            string sha256 = ComputeSha256(originalImageBytes);
+
+            // ── Chạy Azure upload và Google Vision song song ──────────────────────
+            // Vision dùng bytes trong RAM — không cần download lại từ Azure
+            var visionTask = CallVisionAsync(originalImageBytes);
+
             int originalMediaId;
             string uploadedUrl;
             try
             {
-                var uniqueFileName = $"{Guid.NewGuid()}_{image.FileName}";
-                await using (var stream = new MemoryStream(originalImageBytes))
-                {
-                    uploadedUrl = await _blobService.UploadFileBlobAsync(
-                        containerName: "ocr-images",
-                        content: stream,
-                        contentType: image.ContentType,
-                        fileName: uniqueFileName
-                    );
-                }
+                var existing = await _db.MediaStore
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(m => m.Sha256 == sha256 && m.OwnerId == userId);
 
-                var originalMedia = new MediaStore
+                if (existing != null)
                 {
-                    OwnerId = userId,
-                    WorkspaceId = workspaceId,
-                    FileName = image.FileName,
-                    MimeType = image.ContentType,
-                    ProjectId = projectId,
-                    SizeBytes = image.Length,
-                    StorageUrl = uploadedUrl,
-                    Sha256 = ComputeSha256(originalImageBytes),
-                    CreatedAt = DateTime.UtcNow
-                };
-                _db.MediaStore.Add(originalMedia);
-                await _db.SaveChangesAsync();
-                originalMediaId = originalMedia.Id;
+                    _logger.LogInformation("♻️ Dedup HIT — tái sử dụng MediaStore {Id}", existing.Id);
+                    originalMediaId = existing.Id;
+                    uploadedUrl = existing.StorageUrl;
+                }
+                else
+                {
+                    var uniqueFileName = $"{Guid.NewGuid()}_{image.FileName}";
+                    // Compress trước khi upload Azure (không ảnh hưởng Vision vì Vision dùng originalBytes)
+                    var compressedBytes = CompressImage(originalImageBytes);
+                    await using (var stream = new MemoryStream(compressedBytes))
+                    {
+                        uploadedUrl = await _blobService.UploadFileBlobAsync(
+                            containerName: "ocr-images",
+                            content: stream,
+                            contentType: "image/jpeg",
+                            fileName: uniqueFileName
+                        );
+                    }
+
+                    var originalMedia = new MediaStore
+                    {
+                        OwnerId = userId,
+                        WorkspaceId = workspaceId,
+                        FileName = image.FileName,
+                        MimeType = image.ContentType,
+                        ProjectId = projectId,
+                        SizeBytes = image.Length,
+                        StorageUrl = uploadedUrl,
+                        Sha256 = sha256,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _db.MediaStore.Add(originalMedia);
+                    await _db.SaveChangesAsync();
+                    originalMediaId = originalMedia.Id;
+                }
             }
             catch (Exception ex)
             {
@@ -135,32 +156,108 @@ namespace Dict.Service
                 throw new Exception("Lỗi lưu ảnh lên Cloud.", ex);
             }
 
-            // Tạo OcrJob với trạng thái PROCESSING
-            var createJobDto = new OcrJobCreateDto
+            // ── Tạo job và chờ Vision hoàn thành ─────────────────────────────────
+            var jobDto = await _ocrJobService.CreateAsync(new OcrJobCreateDto
             {
                 UserId = userId,
                 MediaId = originalMediaId,
                 ProjectId = projectId,
-                Status = "pending", // <--- BẮT BUỘC LÀ "pending" (Đang chờ)
+                Status = OcrStatus.Processing,
                 DetectedText = string.Empty
-            };
-            var jobDto = await _ocrJobService.CreateAsync(createJobDto);
+            });
 
-            return new OcrProcessingResultDto
+            try
             {
-                JobId = jobDto.Id,
-                Status = "pending", // <--- Đổi thành "pending"
-                MediaId = originalMediaId,
-                ImageUrl = uploadedUrl,
-                Results = new List<CreateOcrResultDto>()
-            };
+                var (createResults, fullText) = await visionTask;
+
+                if (createResults.Any())
+                    await _ocrJobService.AppendResultsAsync(jobDto.Id, createResults);
+
+                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto
+                {
+                    Status = OcrStatus.Completed,
+                    DetectedText = fullText
+                });
+
+                _logger.LogInformation("✅ UploadImageOnlyAsync: Vision xong Job {JobId} — {Count} từ", jobDto.Id, createResults.Count);
+
+                var completedDto = new OcrProcessingResultDto
+                {
+                    JobId = jobDto.Id,
+                    Status = OcrStatus.Completed,
+                    DetectedText = fullText,
+                    MediaId = originalMediaId,
+                    ImageUrl = uploadedUrl,
+                    Results = createResults
+                };
+
+                _cache.Set($"{OcrCachePrefix}{jobDto.Id}", completedDto, OcrCacheTtl);
+                return completedDto;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Vision thất bại cho Job {JobId}", jobDto.Id);
+                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto
+                {
+                    Status = OcrStatus.Failed,
+                    DetectedText = string.Empty
+                });
+
+                return new OcrProcessingResultDto
+                {
+                    JobId = jobDto.Id,
+                    Status = OcrStatus.Failed,
+                    MediaId = originalMediaId,
+                    ImageUrl = uploadedUrl,
+                    Results = new List<CreateOcrResultDto>()
+                };
+            }
+        }
+
+        // Helper: gọi Google Vision với bytes trong RAM
+        private async Task<(List<CreateOcrResultDto> results, string fullText)> CallVisionAsync(byte[] imageBytes)
+        {
+            var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(imageBytes);
+            var response = await _visionClient.DetectDocumentTextAsync(googleImage);
+
+            var createResults = new List<CreateOcrResultDto>();
+            var sb = new StringBuilder();
+
+            if (response?.Text != null)
+            {
+                foreach (var page in response.Pages)
+                    foreach (var block in page.Blocks)
+                        foreach (var paragraph in block.Paragraphs)
+                            foreach (var word in paragraph.Words)
+                            {
+                                string wordText = string.Join("", word.Symbols.Select(s => s.Text));
+                                sb.Append(wordText).Append(" ");
+                                var bboxList = word.BoundingBox.Vertices.Select(v => new[] { v.X, v.Y }).ToList();
+                                createResults.Add(new CreateOcrResultDto
+                                {
+                                    PageNumber = 1,
+                                    WordText = wordText,
+                                    BoundingBox = JsonSerializer.Serialize(bboxList)
+                                });
+                            }
+            }
+
+            return (createResults, sb.ToString().Trim());
         }
 
 
         // --- HÀM 2: GỌI GOOGLE VISION KHI FRONTEND YÊU CẦU ---
         public async Task<OcrProcessingResultDto> ProcessOcrLazyAsync(int jobId)
         {
-            // 1. Lấy thông tin Job kèm kết quả (nếu đã có)
+            // 0. Memory Cache — completed jobs không bao giờ thay đổi
+            var cacheKey = $"{OcrCachePrefix}{jobId}";
+            if (_cache.TryGetValue(cacheKey, out OcrProcessingResultDto cached))
+            {
+                _logger.LogInformation("⚡ Memory Cache HIT — Job {JobId}", jobId);
+                return cached;
+            }
+
+            // 1. Lấy thông tin Job kèm kết quả
             var ocrJob = await _db.OcrJobs
                 .Include(j => j.Media)
                 .Include(j => j.Results)
@@ -168,11 +265,13 @@ namespace Dict.Service
 
             if (ocrJob == null) return null;
 
-            // 2. KIỂM TRA THỰC SỰ ĐÃ XONG CHƯA
+            // 2. Completed → cache và trả về
             if (ocrJob.Status == OcrStatus.Completed && ocrJob.Results != null && ocrJob.Results.Any())
             {
-                _logger.LogInformation("✅ Cache HIT — Trả về từ DB cho Job {JobId}", jobId);
-                return MapToResultDto(ocrJob);
+                _logger.LogInformation("✅ DB Cache HIT — Job {JobId}", jobId);
+                var dto = MapToResultDto(ocrJob);
+                _cache.Set(cacheKey, dto, OcrCacheTtl);
+                return dto;
             }
             bool isPdf = ocrJob.Media != null &&
                  !string.IsNullOrEmpty(ocrJob.Media.MimeType) &&
@@ -274,6 +373,15 @@ namespace Dict.Service
                 await _db.SaveChangesAsync();
                 _logger.LogInformation("✅ OCR hoàn tất cho Job {JobId}", jobId);
 
+                // Cache kết quả completed
+                var completedDto = MapToResultDto(ocrJob);
+                _cache.Set(cacheKey, completedDto, OcrCacheTtl);
+
+                // SignalR: push về client đang chờ trong room OcrJob_{jobId}
+                await _hub.Clients.Group($"OcrJob_{jobId}")
+                    .SendAsync("OcrCompleted", new { jobId, status = OcrStatus.Completed, wordCount = createResults.Count });
+
+                return completedDto;
             }
             catch (Exception ex)
             {
@@ -282,6 +390,9 @@ namespace Dict.Service
                     .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, OcrStatus.Failed)
                         .SetProperty(j => j.UpdatedAt, DateTime.UtcNow));
                 ocrJob.Status = OcrStatus.Failed;
+
+                await _hub.Clients.Group($"OcrJob_{jobId}")
+                    .SendAsync("OcrCompleted", new { jobId, status = OcrStatus.Failed });
             }
 
             return MapToResultDto(ocrJob);
@@ -335,24 +446,21 @@ namespace Dict.Service
         }
 
         /// <summary>
-        /// Upload 1 trang PNG → lưu Azure → gọi Google Vision → lưu kết quả vào Job
+        /// Upload 1 trang PNG → compress → lưu Azure → gọi Google Vision → lưu kết quả vào Job
         /// Nếu trang đã có trong DB rồi thì bỏ qua (idempotent)
         /// </summary>
         public async Task<object> UploadAndOcrPageAsync(int jobId, int pageNumber, IFormFile image)
         {
-            // ── 1. Check xem trang này đã OCR chưa ──────────────────────────────
+            // ── 1. Check xem trang này đã OCR chưa (idempotent) ──────────────────
             bool alreadyDone = await _db.OcrResults
                 .AnyAsync(r => r.OcrJobId == jobId && r.PageNumber == pageNumber);
 
-            // TÌM ĐOẠN NÀY:
             if (alreadyDone)
             {
                 _logger.LogInformation("✅ Cache HIT trang {Page} Job {JobId} — bỏ qua", pageNumber, jobId);
-                // Thay đổi return ở đây
                 var cachedResults = await _db.OcrResults
                     .Where(r => r.OcrJobId == jobId && r.PageNumber == pageNumber)
                     .ToListAsync();
-
                 return new { jobId, pageNumber, status = "cached", results = cachedResults };
             }
 
@@ -364,20 +472,25 @@ namespace Dict.Service
                 imageBytes = ms.ToArray();
             }
 
-            // ── 3. Upload lên Azure ───────────────────────────────────────────────
-            var fileName = $"job{jobId}_page{pageNumber}_{Guid.NewGuid()}.png";
+            // ── 3. Compress ảnh trước khi upload (giảm bandwidth ~60-70%) ────────
+            byte[] compressedBytes = CompressImage(imageBytes);
+            _logger.LogInformation("🗜️ Compress trang {Page}: {Before}KB → {After}KB",
+                pageNumber, imageBytes.Length / 1024, compressedBytes.Length / 1024);
+
+            // ── 4. Upload lên Azure ───────────────────────────────────────────────
+            var fileName = $"job{jobId}_page{pageNumber}_{Guid.NewGuid()}.jpg";
             string blobUrl;
-            await using (var stream = new MemoryStream(imageBytes))
+            await using (var stream = new MemoryStream(compressedBytes))
             {
                 blobUrl = await _blobService.UploadFileBlobAsync(
                     containerName: "ocr-images",
                     content: stream,
-                    contentType: "image/png",
+                    contentType: "image/jpeg",
                     fileName: fileName
                 );
             }
 
-            // ── 4. Gọi Google Cloud Vision ────────────────────────────────────────
+            // ── 5. Gọi Google Cloud Vision (dùng ảnh gốc để đảm bảo chất lượng OCR) ──
             using var visionCts = new CancellationTokenSource(VisionTimeout);
             var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(imageBytes);
             var response = await _visionClient.DetectDocumentTextAsync(googleImage);
@@ -405,18 +518,43 @@ namespace Dict.Service
                             }
             }
 
-            // ── 5. Lưu kết quả vào DB ─────────────────────────────────────────────
+            // ── 6. Lưu kết quả vào DB ─────────────────────────────────────────────
             if (createResults.Any())
                 await _ocrJobService.AppendResultsAsync(jobId, createResults);
 
-            // Cập nhật DetectedText (append thêm, không ghi đè)
             await _ocrJobService.AppendDetectedTextAsync(jobId,
                 $"[Trang {pageNumber}]\n{fullTextBuilder.ToString().Trim()}\n");
 
             _logger.LogInformation("✅ OCR xong trang {Page} Job {JobId} — {Count} từ",
                 pageNumber, jobId, createResults.Count);
 
-            return new { jobId, pageNumber, status = "completed", results = createResults };
+            // ── 7. SignalR: push progress về client ──────────────────────────────
+            await _hub.Clients.Group($"OcrJob_{jobId}")
+                .SendAsync("OcrPageCompleted", new { jobId, pageNumber, wordCount = createResults.Count });
+
+            return new { jobId, pageNumber, status = OcrStatus.Completed, results = createResults };
+        }
+
+        /// <summary>Resize về max 1500px width và encode JPEG Q85 để giảm size upload.</summary>
+        private static byte[] CompressImage(byte[] original)
+        {
+            try
+            {
+                using var img = new MagickImage(original);
+                if (img.Width > MaxImageWidth)
+                {
+                    var geo = new MagickGeometry(MaxImageWidth, 0) { IgnoreAspectRatio = false };
+                    img.Resize(geo);
+                }
+                img.Format = MagickFormat.Jpeg;
+                img.Quality = 85;
+                return img.ToByteArray();
+            }
+            catch
+            {
+                // Nếu compress lỗi thì dùng ảnh gốc — không làm hỏng luồng OCR
+                return original;
+            }
         }
 
         public async Task<OcrProcessingResultDto> ProcessImageAsync(IFormFile image, int userId, int workspaceId, int? projectId, bool saveAnnotated)

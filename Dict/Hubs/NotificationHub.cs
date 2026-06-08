@@ -29,6 +29,21 @@ namespace Dict.Hubs
         }
 
         // =========================================================
+        // PHẦN DÀNH CHO OCR — REALTIME PROGRESS
+        // =========================================================
+
+        /// <summary>Frontend gọi khi bắt đầu chờ OCR job — nhận event OcrCompleted / OcrPageCompleted</summary>
+        public async Task JoinOcrRoom(int jobId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"OcrJob_{jobId}");
+        }
+
+        public async Task LeaveOcrRoom(int jobId)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"OcrJob_{jobId}");
+        }
+
+        // =========================================================
         // PHẦN DÀNH CHO COMMENT FILE PDF THỜI GIAN THỰC
         // =========================================================
 

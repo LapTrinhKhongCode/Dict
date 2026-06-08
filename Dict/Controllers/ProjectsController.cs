@@ -21,10 +21,12 @@ using System.Text.Json;
 public class ProjectsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public ProjectsController(ApplicationDbContext context)
+    public ProjectsController(ApplicationDbContext context, IHttpClientFactory httpClientFactory)
     {
         _context = context;
+        _httpClientFactory = httpClientFactory;
     }
     private int GetUserId()
     {
@@ -39,50 +41,25 @@ public class ProjectsController : ControllerBase
     [HttpGet("{projectId}/files")]
     public async Task<IActionResult> GetProjectFiles(int projectId)
     {
-        // Kiểm tra Project tồn tại
-        var projectExists = await _context.Projects
-            .AnyAsync(p => p.Id == projectId);
-
-        if (!projectExists)
-        {
-            return NotFound(new
-            {
-                message = "Không tìm thấy dự án này!"
-            });
-        }
-
-        // Lấy danh sách file
         var files = await _context.OcrJobs
-            .Include(j => j.Media)
+            .AsNoTracking()
             .Where(j => j.ProjectId == projectId)
             .OrderByDescending(j => j.CreatedAt)
             .Select(j => new ProjectFileDto
             {
                 Id = j.Id,
-
-                Name = j.Media != null &&
-                       !string.IsNullOrEmpty(j.Media.FileName)
-                    ? j.Media.FileName
-                    : "Tài liệu không tên",
-
-                Type = j.Media != null &&
-                       !string.IsNullOrEmpty(j.Media.FileName)
-                    ? System.IO.Path.GetExtension(j.Media.FileName)
-                        .Replace(".", "")
-                        .ToLower()
+                Name = j.Media != null && !string.IsNullOrEmpty(j.Media.FileName)
+                    ? j.Media.FileName : "Tài liệu không tên",
+                Type = j.Media != null && !string.IsNullOrEmpty(j.Media.FileName)
+                    ? System.IO.Path.GetExtension(j.Media.FileName).Replace(".", "").ToLower()
                     : "unknown",
-
                 Status = j.Status,
-
                 CreatedAt = (DateTime)j.CreatedAt,
-
-                // QUAN TRỌNG
-                ImageUrl = j.Media != null
-                    ? j.Media.StorageUrl
-                    : null
+                ImageUrl = j.Media != null ? j.Media.StorageUrl : null
             })
             .ToListAsync();
 
+        // Nếu không có file, project có thể không tồn tại hoặc chưa có file
         return Ok(files);
     }
     [HttpPut("{projectId}/files/{fileId}")]
@@ -215,7 +192,7 @@ public class ProjectsController : ControllerBase
         {
             if (job.Media.StorageUrl.StartsWith("http"))
             {
-                using var httpClient = new HttpClient();
+                using var httpClient = _httpClientFactory.CreateClient();
                 fileBytes = await httpClient.GetByteArrayAsync(job.Media.StorageUrl);
             }
             else

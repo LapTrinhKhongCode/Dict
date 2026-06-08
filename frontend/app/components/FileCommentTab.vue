@@ -153,8 +153,17 @@ function setupSignalR() {
   if (!token) return
 
   hubConnection = new signalR.HubConnectionBuilder()
-    .withUrl(`${config.public.apiBaseUrl}/notificationHub`, { accessTokenFactory: () => token })
-    .withAutomaticReconnect()
+    .withUrl(`${config.public.apiBaseUrl}/notificationHub`, {
+      accessTokenFactory: () => token,
+      // Fallback: WebSockets → ServerSentEvents → LongPolling
+      // Cần thiết khi production proxy không forward WebSocket upgrade headers
+      transport: signalR.HttpTransportType.WebSockets
+        | signalR.HttpTransportType.ServerSentEvents
+        | signalR.HttpTransportType.LongPolling,
+      skipNegotiation: false,
+    })
+    .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+    .configureLogging(signalR.LogLevel.Warning)
     .build()
 
   hubConnection.on("ReceiveNewComment", (newCmt) => {
