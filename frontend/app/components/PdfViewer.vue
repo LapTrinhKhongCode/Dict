@@ -1,89 +1,230 @@
 <template>
   <div class="flex flex-col h-full bg-[#1c2128] w-full relative">
     <!-- ACCESS DENIED OVERLAY -->
-    <div v-if="accessDenied" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#161b22] text-[#c9d1d9] p-6 text-center">
-      <div class="w-20 h-20 bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6">
-        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    <div
+      v-if="accessDenied"
+      class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#161b22] text-[#c9d1d9] p-6 text-center"
+    >
+      <div
+        class="w-20 h-20 bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6"
+      >
+        <svg
+          class="w-10 h-10"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
         </svg>
       </div>
       <h2 class="text-2xl font-bold text-white mb-2">Không khả dụng</h2>
-      <p class="text-gray-400 mb-6 max-w-md">Bạn chưa đăng nhập hoặc tài liệu này thuộc về một Workspace mà bạn không có quyền truy cập.</p>
-      <button @click="$router.push('/workspaces')" class="px-6 py-2.5 bg-[#f0c040] text-black font-bold rounded-lg hover:bg-[#e3b330] transition-colors">
+      <p class="text-gray-400 mb-6 max-w-md">
+        Bạn chưa đăng nhập hoặc tài liệu này thuộc về một Workspace mà bạn không
+        có quyền truy cập.
+      </p>
+      <button
+        @click="$router.push('/workspaces')"
+        class="px-6 py-2.5 bg-[#f0c040] text-black font-bold rounded-lg hover:bg-[#e3b330] transition-colors"
+      >
         Quay lại trang chủ
       </button>
     </div>
 
     <!-- TOOLBAR -->
-    <div v-if="!accessDenied" class="flex items-center gap-2 p-2 bg-[#161b22] border-b border-[#30363d] shrink-0 text-[#c9d1d9] flex-wrap z-10">
-      <div class="flex bg-[#21262d] border border-[#30363d] rounded overflow-hidden">
-        <button :class="['px-3 py-1 hover:bg-[#30363d]', viewMode === 'single' ? 'bg-[#f0c040] text-black font-semibold' : '']" @click="setViewMode('single')">Trang đơn</button>
-        <button :class="['px-3 py-1 hover:bg-[#30363d]', viewMode === 'scroll' ? 'bg-[#f0c040] text-black font-semibold' : '']" @click="setViewMode('scroll')">Cuộn</button>
+    <div
+      v-if="!accessDenied"
+      class="flex items-center gap-2 p-2 bg-[#161b22] border-b border-[#30363d] shrink-0 text-[#c9d1d9] flex-wrap z-10"
+    >
+      <div
+        class="flex bg-[#21262d] border border-[#30363d] rounded overflow-hidden"
+      >
+        <button
+          :class="[
+            'px-3 py-1 hover:bg-[#30363d]',
+            viewMode === 'single'
+              ? 'bg-[#f0c040] text-black font-semibold'
+              : '',
+          ]"
+          @click="setViewMode('single')"
+        >
+          Trang đơn
+        </button>
+        <button
+          :class="[
+            'px-3 py-1 hover:bg-[#30363d]',
+            viewMode === 'scroll'
+              ? 'bg-[#f0c040] text-black font-semibold'
+              : '',
+          ]"
+          @click="setViewMode('scroll')"
+        >
+          Cuộn
+        </button>
       </div>
       <div class="w-px h-5 bg-[#30363d] mx-1"></div>
       <template v-if="viewMode === 'single'">
-        <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]" @click="prevPage" :disabled="currentPage <= 1">‹</button>
+        <button
+          class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]"
+          @click="prevPage"
+          :disabled="currentPage <= 1"
+        >
+          ‹
+        </button>
         <span class="text-sm px-2">
-          <input v-model.number="gotoPage" type="number" class="w-10 text-center bg-[#161b22] border border-[#30363d] rounded outline-none" @change="jumpToPage" /> / {{ totalPages }}
+          <input
+            v-model.number="gotoPage"
+            type="number"
+            class="w-10 text-center bg-[#161b22] border border-[#30363d] rounded outline-none"
+            @change="jumpToPage"
+          />
+          / {{ totalPages }}
         </span>
-        <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]" @click="nextPage" :disabled="currentPage >= totalPages">›</button>
+        <button
+          class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]"
+          @click="nextPage"
+          :disabled="currentPage >= totalPages"
+        >
+          ›
+        </button>
       </template>
       <template v-else>
-        <span class="text-sm px-2">Trang {{ currentPage }} / {{ totalPages }}</span>
+        <span class="text-sm px-2"
+          >Trang {{ currentPage }} / {{ totalPages }}</span
+        >
       </template>
       <div class="w-px h-5 bg-[#30363d] mx-1"></div>
-      <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]" @click="zoomOut">−</button>
-      <span class="text-sm w-12 text-center">{{ Math.round(scale * 100) }}%</span>
-      <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]" @click="zoomIn">+</button>
-      <button class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d] ml-1" @click="fitWidth" title="Vừa chiều rộng">⟺</button>
-      <button 
-        @click="exportToSearchablePdf" 
+      <button
+        class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]"
+        @click="zoomOut"
+      >
+        −
+      </button>
+      <span class="text-sm w-12 text-center"
+        >{{ Math.round(scale * 100) }}%</span
+      >
+      <button
+        class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d]"
+        @click="zoomIn"
+      >
+        +
+      </button>
+      <button
+        class="px-2 py-1 bg-[#21262d] rounded border border-[#30363d] ml-1"
+        @click="fitWidth"
+        title="Vừa chiều rộng"
+      >
+        ⟺
+      </button>
+      <button
+        @click="exportToSearchablePdf"
         :disabled="isExporting || ocrLoading"
-        :class="['px-3 py-1.5 rounded flex items-center gap-1.5 text-sm font-semibold transition-colors', (isExporting || ocrLoading) ? 'bg-[#30363d] text-gray-500 cursor-wait' : 'bg-[#2ea043] hover:bg-[#2c974b] text-white']"
+        :class="[
+          'px-3 py-1.5 rounded flex items-center gap-1.5 text-sm font-semibold transition-colors',
+          isExporting || ocrLoading
+            ? 'bg-[#30363d] text-gray-500 cursor-wait'
+            : 'bg-[#2ea043] hover:bg-[#2c974b] text-white',
+        ]"
         title="Xuất Searchable PDF"
       >
-        <svg v-if="isExporting" class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        <svg
+          v-if="isExporting"
+          class="w-4 h-4 animate-spin text-white"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v8H4z"
+          ></path>
         </svg>
-        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        <svg
+          v-else
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+          />
         </svg>
-        {{ isExporting ? 'Đang xử lý...' : 'Xuất PDF' }}
+        {{ isExporting ? "Đang xử lý..." : "Xuất PDF" }}
       </button>
     </div>
 
     <!-- MAIN CONTENT -->
     <!-- Đã bỏ 'flex', 'flex-col', 'items-center' để tránh xung đột cắt mất góc màn hình -->
-    <div v-if="!accessDenied" class="flex-1 overflow-auto relative pdf-scroll-area p-4" ref="pdfScrollAllEl" @mouseup="handleTextSelection">
-      
+    <div
+      v-if="!accessDenied"
+      class="flex-1 overflow-auto relative pdf-scroll-area p-4"
+      ref="pdfScrollAllEl"
+      @mouseup="handleTextSelection"
+    >
       <div class="min-w-full block pb-12">
-
-        <div v-if="!pdfDoc && !ocrMode" class="flex flex-col items-center justify-center text-gray-400 mt-20">
-          <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
+        <div
+          v-if="!pdfDoc && !ocrMode"
+          class="flex flex-col items-center justify-center text-gray-400 mt-20"
+        >
+          <div
+            class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"
+          ></div>
           <p>Đang tải tài liệu PDF...</p>
         </div>
 
         <template v-else-if="ocrMode">
-          <div v-if="ocrLoading" class="flex flex-col items-center justify-center text-gray-400 mt-20">
-            <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
-            <p>AI đang đọc tài liệu OCR...</p>
-          </div>
-          
-          <div v-else-if="ocrImageUrl" class="relative no-drag block leading-none mx-auto mb-6" :style="{ width: Math.round(scale * 100) + '%' }">
-            <img 
-              :src="ocrImageUrl" 
-              ref="ocrImgEl" 
-              @load="onOcrImageLoad" 
-              draggable="false" 
-              class="block shadow-2xl w-full" 
-              style="pointer-events: none; user-select: none;"
+          <div
+            v-if="ocrImageUrl"
+            class="relative no-drag block leading-none mx-auto mb-6"
+            :style="{ width: Math.round(scale * 100) + '%' }"
+          >
+            <img
+              :src="ocrImageUrl"
+              ref="ocrImgEl"
+              @load="onOcrImageLoad"
+              draggable="false"
+              class="block shadow-2xl w-full"
+              style="pointer-events: none; user-select: none"
             />
-            <div v-if="ocrResults && ocrDisplayW > 0" class="absolute inset-0 overflow-hidden ocr-text-layer z-20">
-              <span 
-                v-for="(r, i) in ocrResults" 
-                :key="i" 
-                class="absolute cursor-text pointer-events-auto select-text ocr-word" 
+
+            <div
+              v-if="ocrLoading"
+              class="absolute inset-0 z-30 bg-[#161b22]/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-white transition-opacity"
+            >
+              <div
+                class="w-8 h-8 border-4 border-gray-400 border-t-[#f0c040] rounded-full animate-spin mb-3 shadow-lg"
+              ></div>
+              <p
+                class="text-sm font-semibold drop-shadow-md bg-black/50 px-4 py-1.5 rounded-full"
+              >
+                AI đang phân tích ký tự ngầm...
+              </p>
+            </div>
+
+            <div
+              v-if="!ocrLoading && ocrResults && ocrDisplayW > 0"
+              class="absolute inset-0 overflow-hidden ocr-text-layer z-20"
+            >
+              <span
+                v-for="(r, i) in ocrResults"
+                :key="i"
+                class="absolute cursor-text pointer-events-auto select-text ocr-word"
                 :style="getOcrTextStyle(r)"
               >
                 {{ r.wordText }}
@@ -94,35 +235,81 @@
 
         <template v-else>
           <template v-for="n in totalPages" :key="n">
-            <div v-if="viewMode === 'scroll' || n === currentPage" :data-page="n" :ref="(el) => { if (el) pageRefs[n] = el; }" class="relative block mx-auto mb-6 w-max max-w-none" :style="{ minHeight: defaultPageHeight + 'px' }">
-              
-              <div v-if="pageRendered[n] || viewMode === 'single'" class="relative shadow-2xl bg-white leading-none text-left" style="overflow: hidden;">
-                <canvas :ref="(el) => { if (el) pageCanvases[n] = el; else delete pageCanvases[n]; }" class="block relative z-0"></canvas>
+            <div
+              v-if="viewMode === 'scroll' || n === currentPage"
+              :data-page="n"
+              :ref="
+                (el) => {
+                  if (el) pageRefs[n] = el;
+                }
+              "
+              class="relative block mx-auto mb-6 w-max max-w-none"
+              :style="{ minHeight: defaultPageHeight + 'px' }"
+            >
+              <div
+                v-if="pageRendered[n] || viewMode === 'single'"
+                class="relative shadow-2xl bg-white leading-none text-left"
+                style="overflow: hidden"
+              >
+                <canvas
+                  :ref="
+                    (el) => {
+                      if (el) pageCanvases[n] = el;
+                      else delete pageCanvases[n];
+                    }
+                  "
+                  class="block relative z-0"
+                ></canvas>
 
-                <div :ref="(el) => { if (el) textLayerRefs[n] = el; else delete textLayerRefs[n]; }" class="absolute inset-0 z-10 textLayer"></div>
+                <div
+                  :ref="
+                    (el) => {
+                      if (el) textLayerRefs[n] = el;
+                      else delete textLayerRefs[n];
+                    }
+                  "
+                  class="absolute inset-0 z-10 textLayer"
+                ></div>
 
-                <div v-if="pageOcrResults[n] && pageOcrResults[n].length > 0" class="absolute inset-0 z-20 ocr-text-layer">
-                  <span v-for="(r, i) in pageOcrResults[n]" :key="'ocr-'+n+'-'+i" class="absolute cursor-text pointer-events-auto select-text ocr-word" :style="getOcrTextStyleForPdf(r, n)">
+                <div
+                  v-if="pageOcrResults[n] && pageOcrResults[n].length > 0"
+                  class="absolute inset-0 z-20 ocr-text-layer"
+                >
+                  <span
+                    v-for="(r, i) in pageOcrResults[n]"
+                    :key="'ocr-' + n + '-' + i"
+                    class="absolute cursor-text pointer-events-auto select-text ocr-word"
+                    :style="getOcrTextStyleForPdf(r, n)"
+                  >
                     {{ r.wordText }}
                   </span>
                 </div>
               </div>
 
-              <div v-else-if="viewMode === 'scroll'" class="w-[800px] max-w-full bg-white/5 border border-dashed border-gray-700 flex items-center justify-center rounded mx-auto" :style="{ height: defaultPageHeight + 'px' }">
+              <div
+                v-else-if="viewMode === 'scroll'"
+                class="w-[800px] max-w-full bg-white/5 border border-dashed border-gray-700 flex items-center justify-center rounded mx-auto"
+                :style="{ height: defaultPageHeight + 'px' }"
+              >
                 <span class="text-gray-500 text-sm">Trang {{ n }}</span>
               </div>
-
             </div>
           </template>
         </template>
-
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, shallowRef, nextTick, onMounted, onBeforeUnmount, watch } from "vue";
+import {
+  ref,
+  shallowRef,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+} from "vue";
 import { useRuntimeConfig, useRoute, useRouter } from "#imports";
 import { useJwt } from "~/composables/useJwt";
 import { useOcrResultsState } from "~/composables/useLookupState";
@@ -144,7 +331,13 @@ const props = defineProps({
   projectId: { type: [String, Number], required: false }, // THÊM DÒNG NÀY
 });
 
-const emit = defineEmits(["text-selected", "rag-updated", "page-changed", "media-id-loaded", "access-denied"]);
+const emit = defineEmits([
+  "text-selected",
+  "rag-updated",
+  "page-changed",
+  "media-id-loaded",
+  "access-denied",
+]);
 const isExporting = ref(false);
 const config = useRuntimeConfig();
 const route = useRoute();
@@ -193,9 +386,24 @@ const pdfJobId = ref(null);
 let isUploadRunning = false;
 const pageDimensions = ref({});
 
-watch(() => props.jobId, (v) => { if (v) startLoadJob(v); });
-watch(() => props.fileUrl, (v) => { if (v) loadPdf(); });
-watch(() => props.fileData, (v) => { if (v) loadPdf(); });
+watch(
+  () => props.jobId,
+  (v) => {
+    if (v) startLoadJob(v);
+  },
+);
+watch(
+  () => props.fileUrl,
+  (v) => {
+    if (v) loadPdf();
+  },
+);
+watch(
+  () => props.fileData,
+  (v) => {
+    if (v) loadPdf();
+  },
+);
 
 // FIX 4: Theo dõi ảnh cẩn thận để tránh lỗi cache trình duyệt làm ocrDisplayW bị kẹt số 0
 watch(ocrImgEl, (el) => {
@@ -212,11 +420,14 @@ async function initPdfJob(file) {
   if (props.projectId) formData.append("projectId", props.projectId);
 
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/create-pdf-job`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
+    const res = await fetch(
+      `${config.public.apiBaseUrl}/api/Infer/create-pdf-job`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      },
+    );
     const data = await res.json();
     pdfJobId.value = data.jobId;
     enqueuePagesAhead(1);
@@ -227,7 +438,11 @@ async function initPdfJob(file) {
 
 function enqueuePagesAhead(fromPage) {
   const AHEAD = 2;
-  for (let p = fromPage; p <= Math.min(fromPage + AHEAD, totalPages.value); p++) {
+  for (
+    let p = fromPage;
+    p <= Math.min(fromPage + AHEAD, totalPages.value);
+    p++
+  ) {
     if (!pageUploadStatus.value[p]) {
       pageUploadStatus.value[p] = "queued";
       uploadQueue.value.push(p);
@@ -242,7 +457,11 @@ async function runUploadQueue() {
 
   while (uploadQueue.value.length > 0) {
     const pageNum = uploadQueue.value.shift();
-    if (pageUploadStatus.value[pageNum] === "done" || pageUploadStatus.value[pageNum] === "cached") continue;
+    if (
+      pageUploadStatus.value[pageNum] === "done" ||
+      pageUploadStatus.value[pageNum] === "cached"
+    )
+      continue;
     await uploadOnePage(pageNum);
   }
   isUploadRunning = false;
@@ -254,13 +473,16 @@ async function uploadOnePage(pageNum) {
 
   try {
     const page = await pdfDoc.value.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 }); 
+    const viewport = page.getViewport({ scale: 2.0 });
     const canvas = document.createElement("canvas");
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport })
+      .promise;
 
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.9),
+    );
 
     const token = getToken();
     const formData = new FormData();
@@ -268,18 +490,27 @@ async function uploadOnePage(pageNum) {
     formData.append("jobId", pdfJobId.value);
     formData.append("pageNumber", pageNum);
 
-    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/upload-pdf-page`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
-    
+    const res = await fetch(
+      `${config.public.apiBaseUrl}/api/Infer/upload-pdf-page`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      },
+    );
+
     const data = await res.json();
     pageUploadStatus.value[pageNum] = data.status || "done";
-    
+
     if (data.results && data.results.length > 0) {
-      pageOcrResults.value = { ...pageOcrResults.value, [pageNum]: data.results };
-      pageDimensions.value = { ...pageDimensions.value, [pageNum]: { w: viewport.width, h: viewport.height } };
+      pageOcrResults.value = {
+        ...pageOcrResults.value,
+        [pageNum]: data.results,
+      };
+      pageDimensions.value = {
+        ...pageDimensions.value,
+        [pageNum]: { w: viewport.width, h: viewport.height },
+      };
     }
   } catch (err) {
     console.error(`[Upload] Lỗi trang ${pageNum}:`, err);
@@ -293,13 +524,19 @@ watch(currentPage, (newPage) => {
 
 async function checkAccessByProjectId(token, projectId) {
   try {
-    const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, { headers: { Authorization: `Bearer ${token}` } });
+    const projRes = await fetch(
+      `${config.public.apiBaseUrl}/api/projects/${projectId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     if (!projRes.ok) return false;
     const projData = await projRes.json();
     const wsId = projData.result?.workspaceId ?? projData.workspaceId;
     if (!wsId) return false;
 
-    const membersRes = await fetch(`${config.public.apiBaseUrl}/api/workspaces/${wsId}/members`, { headers: { Authorization: `Bearer ${token}` } });
+    const membersRes = await fetch(
+      `${config.public.apiBaseUrl}/api/workspaces/${wsId}/members`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     if (!membersRes.ok) return false;
     const membersData = await membersRes.json();
     const members = membersData.result ?? membersData;
@@ -317,93 +554,102 @@ async function startLoadJob(jobId) {
     return;
   }
 
-  // Bật loading mờ lên nếu chưa có ảnh
-  if (!ocrImageUrl.value) {
-    ocrLoading.value = true;
-  }
-
-  // (Phần logic urlProjectId của bạn nếu có thì để ở đây...)
-  // let hasAccess = false; ...
-
   accessDenied.value = false;
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/job/${jobId}`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(
+      `${config.public.apiBaseUrl}/api/Infer/job/${jobId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     if (!res.ok) throw new Error("Load Job thất bại.");
 
     const data = await res.json();
-    
     if (data.mediaId) emit("media-id-loaded", data.mediaId);
 
-    // =====================================================================
-    // 1. HIỂN THỊ ẢNH/PDF NGAY LẬP TỨC (TRƯỚC CẢ KHI CHECK POLLING)
-    // =====================================================================
-    if (data.imageUrl?.toLowerCase().includes(".pdf")) {
+    const isPdf = data.imageUrl?.toLowerCase().includes(".pdf");
+
+    // =========================================================
+    // KỊCH BẢN 1: FILE PDF -> CHỈ LOAD 1 LẦN, KHÔNG LẶP LẠI
+    // =========================================================
+    if (isPdf) {
       ocrMode.value = false;
-      ocrImageUrl.value = data.imageUrl;
-      pdfJobId.value = jobId;
-      
-      // Chỉ tải PDF lần đầu tiên, tránh giật màn hình khi Polling hỏi lại
+      ocrLoading.value = false; // Tắt vòng quay loading
+
       if (!pdfDoc.value) {
-        pdfDoc.value = await pdfjsLib.getDocument(data.imageUrl).promise;
-        totalPages.value = pdfDoc.value.numPages;
+        ocrImageUrl.value = data.imageUrl; // Đánh dấu đã nạp URL
+        pdfJobId.value = jobId;
 
-        await nextTick();
-        viewMode.value === "scroll" ? setupScrollObserver() : renderPage(1);
-        enqueuePagesAhead(1);
+        // 1. Phục hồi dữ liệu chữ đã OCR từ trước (nếu bạn F5 tải lại trang)
+        if (data.results?.length > 0) {
+          const grouped = {};
+          data.results.forEach((r) => {
+            const pNum = r.pageNumber || 1;
+            if (!grouped[pNum]) grouped[pNum] = [];
+            grouped[pNum].push(r);
+          });
+          pageOcrResults.value = grouped;
+
+          // CHIÊU TỐI ƯU: Báo cho hệ thống biết trang này đã có data
+          // Để hàm cuộn trang không gọi API Upload OCR lại nữa!
+          Object.keys(grouped).forEach((pNum) => {
+            pageUploadStatus.value[pNum] = "done";
+          });
+        }
+
+        // 2. Tải cái vỏ PDF và kích hoạt logic Lazy Load (cuộn + 3 trang)
+        pdfjsLib
+          .getDocument(data.imageUrl)
+          .promise.then((doc) => {
+            pdfDoc.value = doc;
+            totalPages.value = doc.numPages;
+            nextTick(() =>
+              viewMode.value === "scroll"
+                ? setupScrollObserver()
+                : renderPage(1),
+            );
+
+            // Logic 3 trang của bạn được gọi tại đây (chỉ chạy 1 lần lúc khởi tạo)
+            enqueuePagesAhead(1);
+          })
+          .catch((err) => console.error("Lỗi vẽ PDF ban đầu:", err));
       }
-    } else {
-      // ── File ảnh đơn lẻ ──
+
+      // LƯU Ý: Tuyệt đối không có đoạn setTimeout gọi lại hàm ở đây!
+      return; // Chấm dứt vòng lặp!
+    }
+    // =========================================================
+    // KỊCH BẢN 2: FILE ẢNH -> LẶP LẠI (POLLING) CHỜ AI XONG
+    // =========================================================
+    else {
       ocrMode.value = true;
-      ocrImageUrl.value = data.imageUrl; // Ảnh sẽ hiện ra ngay lập tức ở giao diện!
+      ocrImageUrl.value = data.imageUrl; // Ảnh hiện ra ngay lập tức
       totalPages.value = 1;
-    }
 
-    // =====================================================================
-    // 2. 🔴 CƠ CHẾ POLLING (NẾU AI CHƯA QUÉT XONG THÌ DỪNG LẠI & ĐỢI)
-    // =====================================================================
-    if (data.status === "processing" || data.status === "pending") {
-      console.log("AI đang quét... chờ 2 giây rồi hỏi lại Backend.");
-      ocrLoading.value = true; // Bật icon xoay loading báo cho User biết AI đang chạy
-      
-      setTimeout(() => startLoadJob(jobId), 2000);
-      
-      return; // 🛑 NGẮT HÀM TẠI ĐÂY để không chạy xuống phần gán text
-    }
-    
-    // =====================================================================
-    // 3. XUỐNG ĐẾN ĐÂY NGHĨA LÀ AI ĐÃ QUÉT XONG (completed hoặc cached)
-    // =====================================================================
-    ocrLoading.value = false; // Tắt icon vòng xoay loading
+      // Nếu AI chưa xong -> Chờ 2s rồi hỏi lại
+      if (data.status === "processing" || data.status === "pending") {
+        ocrLoading.value = true; // Bật lớp mờ mờ trên ảnh
+        setTimeout(() => startLoadJob(jobId), 2000);
+        return;
+      }
 
-    // Nhận mảng tọa độ và vẽ chữ tàng hình lên mặt ảnh
-    if (data.results?.length > 0) {
-      dbOcrResults.value = data.results;
-      
-      // Nhóm theo trang (Dành cho PDF)
-      const grouped = {};
-      data.results.forEach(r => {
-        const pNum = r.pageNumber || 1;
-        if (!grouped[pNum]) grouped[pNum] = [];
-        grouped[pNum].push(r);
-      });
-      pageOcrResults.value = grouped;
-
-      // Cập nhật state trực tiếp (Dành cho Ảnh đơn lẻ)
-      if (ocrMode.value) {
+      // AI quét xong -> Vẽ box chữ
+      ocrLoading.value = false;
+      if (data.results?.length > 0) {
         ocrResults.value = data.results;
         ocrResultsState.value = data.results;
       }
     }
-
   } catch (err) {
     console.error("Lỗi nạp dữ liệu OCR:", err);
     ocrLoading.value = false;
   }
 }
+
 async function loadPdf() {
   if (!props.fileUrl && !props.fileData) return;
   try {
-    const source = props.fileData ? { data: props.fileData } : { url: props.fileUrl };
+    const source = props.fileData
+      ? { data: props.fileData }
+      : { url: props.fileUrl };
     pdfDoc.value = await pdfjsLib.getDocument(source).promise;
     totalPages.value = pdfDoc.value.numPages;
 
@@ -442,7 +688,9 @@ async function renderPage(pageNum) {
   }
   if (!canvas) return;
 
-  while (isDisplayRendering) { await new Promise((r) => setTimeout(r, 30)); }
+  while (isDisplayRendering) {
+    await new Promise((r) => setTimeout(r, 30));
+  }
   isDisplayRendering = true;
 
   try {
@@ -455,11 +703,14 @@ async function renderPage(pageNum) {
     canvas.height = Math.floor(viewport.height * dpr);
     canvas.style.width = `${Math.floor(viewport.width)}px`;
     canvas.style.height = `${Math.floor(viewport.height)}px`;
-    
+
     // Cố định hệ quy chiếu lấy kích thước của trang ở scale = 2.0
     // Toàn bộ tọa độ Google Vision được trả về trên hệ quy chiếu này
     const ocrViewport = page.getViewport({ scale: 2.0 });
-    pageDimensions.value = { ...pageDimensions.value, [pageNum]: { w: ocrViewport.width, h: ocrViewport.height } };
+    pageDimensions.value = {
+      ...pageDimensions.value,
+      [pageNum]: { w: ocrViewport.width, h: ocrViewport.height },
+    };
 
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -487,7 +738,8 @@ async function renderPage(pageNum) {
       await textLayer.render();
     }
   } catch (err) {
-    if (err?.name !== "RenderingCancelledException") console.error(`renderPage lỗi trang ${pageNum}:`, err);
+    if (err?.name !== "RenderingCancelledException")
+      console.error(`renderPage lỗi trang ${pageNum}:`, err);
   } finally {
     isDisplayRendering = false;
   }
@@ -496,7 +748,9 @@ async function renderPage(pageNum) {
 function processQueue() {
   if (isRendering || renderQueue.length === 0) return;
   isRendering = true;
-  renderQueue.sort((a, b) => Math.abs(a - currentPage.value) - Math.abs(b - currentPage.value));
+  renderQueue.sort(
+    (a, b) => Math.abs(a - currentPage.value) - Math.abs(b - currentPage.value),
+  );
   renderPage(renderQueue.shift()).then(() => {
     isRendering = false;
     requestAnimationFrame(processQueue);
@@ -521,7 +775,8 @@ function setupScrollObserver() {
           }
         } else {
           visiblePagesSet.delete(p);
-          if (Math.abs(p - currentPage.value) > 15) pageRendered.value[p] = false;
+          if (Math.abs(p - currentPage.value) > 15)
+            pageRendered.value[p] = false;
         }
       });
 
@@ -547,10 +802,14 @@ function setupScrollObserver() {
         emit("page-changed", closestPage);
       }
     },
-    { root: rootEl, rootMargin: "800px 0px", threshold: [0, 0.1, 0.5, 1] }
+    { root: rootEl, rootMargin: "800px 0px", threshold: [0, 0.1, 0.5, 1] },
   );
 
-  nextTick(() => Object.values(pageRefs.value).forEach((el) => el && scrollObserver.observe(el)));
+  nextTick(() =>
+    Object.values(pageRefs.value).forEach(
+      (el) => el && scrollObserver.observe(el),
+    ),
+  );
 }
 
 function handleTextSelection(e) {
@@ -565,32 +824,49 @@ const setViewMode = (m) => {
   if (viewMode.value === m) return;
   viewMode.value = m;
   if (scrollObserver) scrollObserver.disconnect();
-  nextTick(() => m === "scroll" ? setupScrollObserver() : renderPage(currentPage.value));
+  nextTick(() =>
+    m === "scroll" ? setupScrollObserver() : renderPage(currentPage.value),
+  );
 };
 
-const zoomIn = () => { scale.value = Math.min(scale.value + 0.2, 4); rerender(); };
-const zoomOut = () => { scale.value = Math.max(scale.value - 0.2, 0.4); rerender(); };
+const zoomIn = () => {
+  scale.value = Math.min(scale.value + 0.2, 4);
+  rerender();
+};
+const zoomOut = () => {
+  scale.value = Math.max(scale.value - 0.2, 0.4);
+  rerender();
+};
 const fitWidth = () => rerender();
 
 function rerender() {
   pageRendered.value = {};
-  nextTick(() => viewMode.value === "scroll" ? setupScrollObserver() : renderPage(currentPage.value));
+  nextTick(() =>
+    viewMode.value === "scroll"
+      ? setupScrollObserver()
+      : renderPage(currentPage.value),
+  );
 }
 
 async function prevPage() {
   if (currentPage.value <= 1) return;
-  currentPage.value--; gotoPage.value = currentPage.value; emit("page-changed", currentPage.value);
+  currentPage.value--;
+  gotoPage.value = currentPage.value;
+  emit("page-changed", currentPage.value);
   await renderPage(currentPage.value);
 }
 
 async function nextPage() {
   if (currentPage.value >= totalPages.value) return;
-  currentPage.value++; gotoPage.value = currentPage.value; emit("page-changed", currentPage.value);
+  currentPage.value++;
+  gotoPage.value = currentPage.value;
+  emit("page-changed", currentPage.value);
   await renderPage(currentPage.value);
 }
 
 async function jumpToPage() {
-  currentPage.value = Math.max(1, Math.min(gotoPage.value, totalPages.value)); gotoPage.value = currentPage.value;
+  currentPage.value = Math.max(1, Math.min(gotoPage.value, totalPages.value));
+  gotoPage.value = currentPage.value;
   emit("page-changed", currentPage.value);
   await renderPage(currentPage.value);
 }
@@ -607,45 +883,79 @@ function onOcrImageLoad() {
 }
 
 function getOcrTextStyle(r) {
-  const b = typeof r.boundingBox === "string" ? JSON.parse(r.boundingBox) : r.boundingBox;
+  const b =
+    typeof r.boundingBox === "string"
+      ? JSON.parse(r.boundingBox)
+      : r.boundingBox;
   if (!b) return { display: "none" };
 
   const xs = b.map((p) => (Array.isArray(p) ? p[0] : p.x ?? 0));
   const ys = b.map((p) => (Array.isArray(p) ? p[1] : p.y ?? 0));
-  let x = Math.min(...xs), y = Math.min(...ys), w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  let x = Math.min(...xs),
+    y = Math.min(...ys),
+    w = Math.max(...xs) - x,
+    h = Math.max(...ys) - y;
 
   if (ocrNaturalW.value > 0 && ocrDisplayW.value > 0) {
     const scX = ocrDisplayW.value / ocrNaturalW.value;
-    const scY = ocrDisplayH.value > 0 ? ocrDisplayH.value / ocrNaturalH.value : scX;
-    x *= scX; y *= scY; w *= scX; h *= scY;
+    const scY =
+      ocrDisplayH.value > 0 ? ocrDisplayH.value / ocrNaturalH.value : scX;
+    x *= scX;
+    y *= scY;
+    w *= scX;
+    h *= scY;
   }
 
   return {
-    position: "absolute", left: `${x}px`, top: `${y}px`, width: `${Math.max(w, 4)}px`, height: `${Math.max(h, 4)}px`,
-    fontSize: `${Math.max(h * 0.85, 6)}px`, lineHeight: "1", whiteSpace: "nowrap", overflow: "hidden", color: "transparent", userSelect: "text",
+    position: "absolute",
+    left: `${x}px`,
+    top: `${y}px`,
+    width: `${Math.max(w, 4)}px`,
+    height: `${Math.max(h, 4)}px`,
+    fontSize: `${Math.max(h * 0.85, 6)}px`,
+    lineHeight: "1",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "transparent",
+    userSelect: "text",
   };
 }
 
 function getOcrTextStyleForPdf(r, pageNum) {
-  const b = typeof r.boundingBox === "string" ? JSON.parse(r.boundingBox) : r.boundingBox;
+  const b =
+    typeof r.boundingBox === "string"
+      ? JSON.parse(r.boundingBox)
+      : r.boundingBox;
   if (!b) return { display: "none" };
 
   const xs = b.map((p) => (Array.isArray(p) ? p[0] : p.x ?? 0));
   const ys = b.map((p) => (Array.isArray(p) ? p[1] : p.y ?? 0));
-  let x = Math.min(...xs), y = Math.min(...ys), w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  let x = Math.min(...xs),
+    y = Math.min(...ys),
+    w = Math.max(...xs) - x,
+    h = Math.max(...ys) - y;
 
   // SỬA Ở ĐÂY: Không đọc DOM (canvasEl) nữa, dùng trực tiếp biến scale
   // Vì lúc lưu pageDimensions, ta đang lấy ở scale = 2.0, nên tỷ lệ chuẩn sẽ là:
   const ratio = scale.value / 2.0;
-  
-  x *= ratio; 
-  y *= ratio; 
-  w *= ratio; 
+
+  x *= ratio;
+  y *= ratio;
+  w *= ratio;
   h *= ratio;
 
   return {
-    position: "absolute", left: `${x}px`, top: `${y}px`, width: `${Math.max(w, 2)}px`, height: `${Math.max(h, 2)}px`,
-    fontSize: `${Math.max(h * 0.85, 4)}px`, lineHeight: "1", whiteSpace: "nowrap", overflow: "hidden", color: "transparent", userSelect: "text",
+    position: "absolute",
+    left: `${x}px`,
+    top: `${y}px`,
+    width: `${Math.max(w, 2)}px`,
+    height: `${Math.max(h, 2)}px`,
+    fontSize: `${Math.max(h * 0.85, 4)}px`,
+    lineHeight: "1",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    color: "transparent",
+    userSelect: "text",
   };
 }
 // Hàm xuất Searchable PDF có ép chạy OCR toàn bộ
@@ -666,7 +976,9 @@ async function exportToSearchablePdf() {
       }
 
       if (missingPages.length > 0) {
-        console.log(`Đang ép nhận diện ${missingPages.length} trang còn thiếu để xuất PDF...`);
+        console.log(
+          `Đang ép nhận diện ${missingPages.length} trang còn thiếu để xuất PDF...`,
+        );
         // Chạy tuần tự (hạn chế chạy song song quá nhiều để tránh spam server AI)
         for (const p of missingPages) {
           await uploadOnePage(p);
@@ -676,53 +988,59 @@ async function exportToSearchablePdf() {
 
     // 2. LẤY PROJECT ID VÀ GỌI API CỦA BACKEND
     // Lấy projectId từ url (VD: /workspaces/project/1) hoặc thông qua prop
-    const projectId = route.params.id || props.projectId; 
+    const projectId = route.params.id || props.projectId;
     const fileId = props.jobId; // JobId được sử dụng tương đương FileId
 
     if (!projectId) {
-      alert("Không tìm thấy ID dự án (Project ID). Vui lòng kiểm tra lại component cha.");
+      alert(
+        "Không tìm thấy ID dự án (Project ID). Vui lòng kiểm tra lại component cha.",
+      );
       isExporting.value = false;
       return;
     }
 
     const token = getToken();
     const url = `${config.public.apiBaseUrl}/api/Projects/${projectId}/files/${fileId}/export-pdf`;
-    
+
     const response = await fetch(url, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.log(response)
-      throw new Error(errorData.message || "Đã xảy ra lỗi khi tạo file PDF từ máy chủ.");
+      console.log(response);
+      throw new Error(
+        errorData.message || "Đã xảy ra lỗi khi tạo file PDF từ máy chủ.",
+      );
     }
 
     // 3. NHẬN FILE BLOB TỪ BACKEND VÀ TẢI XUỐNG CỤC BỘ
     const blob = await response.blob();
     const downloadUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = downloadUrl;
-    
+
     // Ưu tiên lấy tên file chuẩn từ Header Backend gửi về, nếu không có thì tự tạo tên mặc định
     let fileName = `Searchable_Document_${new Date().getTime()}.pdf`;
-    const disposition = response.headers.get('Content-Disposition');
-    if (disposition && disposition.includes('filename=')) {
-      const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-      if (matches != null && matches[1]) fileName = matches[1].replace(/['"]/g, '');
+    const disposition = response.headers.get("Content-Disposition");
+    if (disposition && disposition.includes("filename=")) {
+      const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(
+        disposition,
+      );
+      if (matches != null && matches[1])
+        fileName = matches[1].replace(/['"]/g, "");
     }
 
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
-    
+
     // Dọn dẹp DOM
     document.body.removeChild(a);
     URL.revokeObjectURL(downloadUrl);
-
   } catch (error) {
     console.error("Lỗi khi xuất PDF:", error);
     alert(error.message || "Không thể xuất file PDF. Vui lòng thử lại sau.");
@@ -739,7 +1057,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (scrollObserver) scrollObserver.disconnect();
   if (activeRenderTask) {
-    try { activeRenderTask.cancel(); } catch {}
+    try {
+      activeRenderTask.cancel();
+    } catch {}
     activeRenderTask = null;
   }
 });
@@ -777,15 +1097,17 @@ defineExpose({ gotoPage, jumpToPage });
   color: transparent !important;
 }
 
-:deep(.textLayer br) { display: none; }
+:deep(.textLayer br) {
+  display: none;
+}
 
 .ocr-text-layer {
   user-select: text;
   overflow: hidden !important;
   position: absolute;
   inset: 0;
-  z-index: 20; 
-  pointer-events: auto !important; 
+  z-index: 20;
+  pointer-events: auto !important;
 }
 
 .ocr-word {
