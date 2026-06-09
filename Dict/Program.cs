@@ -69,18 +69,30 @@ var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl");
 var allowedOrigins = new[]
 {
     frontendUrl,
+    "https://dict-six-kappa.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
-}.Where(o => !string.IsNullOrEmpty(o)).ToArray();
+}.Where(o => !string.IsNullOrEmpty(o)).Select(o => o!.TrimEnd('/')).Distinct().ToArray();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAnyOrigin", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+        if (allowedOrigins.Length == 0)
+        {
+            // Fallback an toàn — không nên xảy ra trên production
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
     });
 });
 builder.Services.AddHttpContextAccessor();
@@ -205,7 +217,6 @@ if (app.Environment.IsDevelopment())
 app.UseStaticFiles();
 //app.UseHttpsRedirection();
 app.UseCors("AllowAnyOrigin");
-app.UseStaticFiles();
 app.UseMiddleware<ApiLoggingMiddleware>();
 // Thứ tự này là CHUẨN XÁC
 app.UseAuthentication();
