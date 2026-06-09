@@ -68,8 +68,14 @@ namespace Dict.Service
             if (string.IsNullOrEmpty(request.Username) || !Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
                 throw new InvalidOperationException("Username chỉ được chứa chữ cái, số hoặc dấu gạch dưới.");
 
-            if (await _userManager.FindByEmailAsync(request.Email) != null)
-                throw new InvalidOperationException("Email already exists.");
+            if (await _userManager.FindByEmailAsync(request.Email) is ApplicationUser existingByEmail)
+            {
+                // Nếu đã xác nhận → báo lỗi bình thường
+                if (existingByEmail.EmailConfirmed)
+                    throw new InvalidOperationException("Email already exists.");
+                // Chưa xác nhận → xóa đi cho đăng ký lại (tránh account zombie)
+                await _userManager.DeleteAsync(existingByEmail);
+            }
 
             if (await _userManager.FindByNameAsync(request.Username) != null)
                 throw new InvalidOperationException("Username already exists.");
@@ -98,7 +104,9 @@ namespace Dict.Service
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var frontendUrl = _configuration["FrontendUrl"];
             var encodedToken = Uri.EscapeDataString(token);
-            var confirmationUrl = $"{frontendUrl}/confirm-account?email={user.Email}&token={encodedToken}";
+            var encodedEmail = Uri.EscapeDataString(user.Email);
+            // Dùng &amp; thay vì & trong HTML để email client không cắt URL
+            var confirmationUrl = $"{frontendUrl}/confirm-account?email={encodedEmail}&amp;token={encodedToken}";
 
             var subject = "Chào mừng bạn - Xác nhận tài khoản";
             var body = $"<p>Vui lòng nhấp vào link sau để xác nhận email của bạn:</p><a href='{confirmationUrl}'>Xác nhận Email</a>";
@@ -151,7 +159,31 @@ namespace Dict.Service
         }
 
         // ==========================================
-        // 3. QUÊN MẬT KHẨU (GỬI MÃ OTP)
+        // 3. GỬI LẠI EMAIL XÁC NHẬN
+        // ==========================================
+        public async Task<string> ResendConfirmationAsync(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+                throw new InvalidOperationException("Email không tồn tại.");
+            if (user.EmailConfirmed)
+                throw new InvalidOperationException("Tài khoản đã được xác nhận.");
+
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var frontendUrl = _configuration["FrontendUrl"];
+            var encodedToken = Uri.EscapeDataString(token);
+            var encodedEmail = Uri.EscapeDataString(user.Email);
+            var confirmationUrl = $"{frontendUrl}/confirm-account?email={encodedEmail}&amp;token={encodedToken}";
+
+            await _emailService.SendEmailAsync(user.Email,
+                "Xác nhận tài khoản - Gửi lại",
+                $"<p>Vui lòng nhấp vào link sau để xác nhận email của bạn:</p><a href='{confirmationUrl}'>Xác nhận Email</a>");
+
+            return "Đã gửi lại email xác nhận. Vui lòng kiểm tra hộp thư.";
+        }
+
+        // ==========================================
+        // 4. QUÊN MẬT KHẨU (GỬI MÃ OTP)
         // ==========================================
         public async Task<string> ForgotPasswordAsync(string email)
         {

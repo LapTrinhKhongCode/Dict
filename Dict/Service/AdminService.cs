@@ -578,26 +578,30 @@ namespace Dict.Service
         /// </summary>
         public async Task<List<ApiStatItemDto>> GetApiPerformanceStatsAsync()
         {
-            // (Code này đúng, không phụ thuộc vào schema)
             var apiStats = await _context.ApiCalls
                 .GroupBy(a => a.Endpoint)
-                .Select(g => new ApiStatItemDto
+                .Select(g => new
                 {
                     Endpoint = g.Key,
                     TotalCalls = g.Count(),
-                    ErrorCount = g.Count(a => a.ResponseStatus >= 400),
-                    AvgResponseTimeMs = (int)g.Average(a => a.ResponseTimeMs),
+                    // Sum đáng tin cậy hơn Count(predicate) với nullable int trong EF Core
+                    ErrorCount = g.Sum(a => (a.ResponseStatus.HasValue && a.ResponseStatus.Value >= 400) ? 1 : 0),
+                    AverageResponseTimeMs = (int)g.Average(a => a.ResponseTimeMs ?? 0),
                 })
-                .OrderByDescending(a => (double)a.ErrorCount / a.TotalCalls)
-                .ThenByDescending(a => a.AvgResponseTimeMs)
                 .ToListAsync();
 
-            foreach (var stat in apiStats)
-            {
-                stat.ErrorRate = stat.TotalCalls > 0 ? Math.Round((double)stat.ErrorCount / stat.TotalCalls * 100, 2) : 0;
-            }
-
-            return apiStats;
+            return apiStats
+                .Select(a => new ApiStatItemDto
+                {
+                    Endpoint = a.Endpoint,
+                    TotalCalls = a.TotalCalls,
+                    ErrorCount = a.ErrorCount,
+                    AverageResponseTimeMs = a.AverageResponseTimeMs,
+                    ErrorRate = a.TotalCalls > 0 ? Math.Round((double)a.ErrorCount / a.TotalCalls, 4) : 0,
+                })
+                .OrderByDescending(a => a.ErrorRate)
+                .ThenByDescending(a => a.AverageResponseTimeMs)
+                .ToList();
         }
 
         /// <summary>
@@ -605,7 +609,6 @@ namespace Dict.Service
         /// </summary>
         public async Task<List<FailedJobItemDto>> GetFailedSystemJobsAsync()
         {
-            // (Code này đúng, không phụ thuộc vào schema)
             var failedOcrJobs = await _context.OcrJobs
                 .AsNoTracking()
                 .Where(j => j.Status == "Failed")
@@ -616,7 +619,7 @@ namespace Dict.Service
                     JobType = "OCR",
                     Status = j.Status,
                     ErrorMessage = "Check OcrJob details for specific error.",
-                    StartedAt = j.CreatedAt ?? DateTime.MinValue
+                    FailedAt = j.CreatedAt ?? DateTime.MinValue
                 })
                 .Take(50)
                 .ToListAsync();
@@ -631,13 +634,13 @@ namespace Dict.Service
                     JobType = j.JobType,
                     Status = j.Status,
                     ErrorMessage = EF.Functions.Like(j.Meta, "%error%") ? j.Meta.Substring(0, Math.Min(j.Meta.Length, 200)) : j.Meta,
-                    StartedAt = j.StartedAt ?? DateTime.MinValue
+                    FailedAt = j.StartedAt ?? DateTime.MinValue
                 })
                 .Take(50)
                 .ToListAsync();
 
             return failedOcrJobs.Concat(failedImportJobs)
-                .OrderByDescending(j => j.StartedAt)
+                .OrderByDescending(j => j.FailedAt)
                 .ToList();
         }
 

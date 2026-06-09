@@ -25,8 +25,8 @@ namespace Dict.DTO.Admin
         public string Endpoint { get; set; }
         public int TotalCalls { get; set; }
         public int ErrorCount { get; set; }
-        public double ErrorRate { get; set; } // Tỷ lệ lỗi (%)
-        public int AvgResponseTimeMs { get; set; }
+        public double ErrorRate { get; set; } // Tỷ lệ lỗi (0.0 - 1.0)
+        public int AverageResponseTimeMs { get; set; }
     }
 
     /// <summary>
@@ -38,6 +38,6 @@ namespace Dict.DTO.Admin
         public string JobType { get; set; } // Import, OCR
         public string Status { get; set; }
         public string? ErrorMessage { get; set; } // Trích xuất từ Meta/JsonErrorMessage
-        public DateTime StartedAt { get; set; }
+        public DateTime FailedAt { get; set; }
     }
 }

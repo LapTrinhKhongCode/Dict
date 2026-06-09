@@ -1,18 +1,19 @@
 <!-- app.vue -->
 <template>
+  <NuxtLoadingIndicator color="#f0c040" :height="3" />
   <NuxtLayout>
-    <NuxtPage />
+    <NuxtPage :transition="{ name: 'page', mode: 'out-in' }" />
   </NuxtLayout>
 
   <ToastDisplay />
 
-  <WordResultModal
+  <LazyWordResultModal
     v-if="isLookupModalVisible"
     :search-word="selectedWord"
     @close="isLookupModalVisible = false"
   />
 
-  <TranslationModal 
+  <LazyTranslationModal
     v-if="isTranslateModalVisible"
     :is-open="isTranslateModalVisible"
     :search-word="selectedWord"
@@ -23,8 +24,6 @@
 <script setup lang="ts">
 import { onMounted, provide, watch } from "vue";
 import ToastDisplay from "@/components/ToastDisplay.vue";
-import WordResultModal from "~/components/WordResultModal.vue";
-import TranslationModal from "~/components/translate/TranslationModal.vue";
 import {
   useLookupModalVisible,
   useTranslateModalVisible,
@@ -81,5 +80,19 @@ body {
 .dark {
   background-color: #121212;
   color: #f5f5f5;
+}
+
+/* Page transition */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

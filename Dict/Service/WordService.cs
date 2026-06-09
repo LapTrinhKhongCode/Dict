@@ -109,6 +109,11 @@ namespace Dict.Service
                 _db.Entries.Add(newCacheEntry);
             }
             await _db.SaveChangesAsync();
+
+            // Xóa IMemoryCache để lần tra kế tiếp đọc RawJson mới từ DB
+            string cacheKey = $"word_json_{label}";
+            _memoryCache.Remove(cacheKey);
+            _logger.LogInformation("MemoryCache invalidated for label={Label}", label);
         }
 
 

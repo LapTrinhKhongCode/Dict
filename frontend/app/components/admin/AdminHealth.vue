@@ -339,12 +339,14 @@ async function fetchVmCpu() {
     });
     const jsonString = await handleResponse<string>(response);
     const parsedResult = JSON.parse(jsonString);
-    const data = parsedResult.value[0].timeseries[0].data;
+    const metric = parsedResult.value?.[0];
+    const timeseries = metric?.timeseries?.[0];
+    const data: AzureMetricDataPoint[] = timeseries?.data ?? [];
     azureVmMetrics.value = data;
     azureVmMetadata.value = {
-      name: parsedResult.value[0].name.localizedValue,
-      unit: parsedResult.value[0].unit,
-      timespan: parsedResult.timespan,
+      name: metric?.name?.localizedValue ?? 'VM CPU',
+      unit: metric?.unit ?? '%',
+      timespan: parsedResult.timespan ?? '',
       latestValue: data.length > 0 ? data[data.length - 1].average : null,
     };
   } catch (err: any) {
@@ -363,12 +365,14 @@ async function fetchSqlDbCpu() {
     });
     const jsonString = await handleResponse<string>(response);
     const parsedResult = JSON.parse(jsonString);
-    const data = parsedResult.value[0].timeseries[0].data;
+    const metric = parsedResult.value?.[0];
+    const timeseries = metric?.timeseries?.[0];
+    const data: AzureMetricDataPoint[] = timeseries?.data ?? [];
     azureSqlMetrics.value = data;
     azureSqlMetadata.value = {
-      name: parsedResult.value[0].name.localizedValue,
-      unit: parsedResult.value[0].unit,
-      timespan: parsedResult.timespan,
+      name: metric?.name?.localizedValue ?? 'SQL CPU',
+      unit: metric?.unit ?? '%',
+      timespan: parsedResult.timespan ?? '',
       latestValue: data.length > 0 ? data[data.length - 1].average : null,
     };
   } catch (err: any) {

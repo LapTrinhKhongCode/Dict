@@ -386,6 +386,85 @@ const pdfJobId = ref(null);
 let isUploadRunning = false;
 const pageDimensions = ref({});
 
+// SignalR connection cho OCR progress
+let signalrConnection = null;
+
+async function setupSignalR(jobId) {
+  if (!process.client) return;
+  try {
+    const { HubConnectionBuilder, LogLevel } = await import("@microsoft/signalr");
+    const token = getToken();
+    signalrConnection = new HubConnectionBuilder()
+      .withUrl(`${config.public.apiBaseUrl}/notificationHub`, {
+        accessTokenFactory: () => token,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+
+    // Lắng nghe khi backend push OcrCompleted (ảnh đơn)
+    signalrConnection.on("OcrCompleted", (payload) => {
+      if (payload.jobId !== jobId) return;
+      if (payload.status === "completed") {
+        ocrLoading.value = false;
+        startLoadJob(jobId); // fetch 1 lần để lấy results
+      } else if (payload.status === "failed") {
+        ocrLoading.value = false;
+        console.error("OCR thất bại, thử lại bằng cách bấm lại.");
+      }
+    });
+
+    // Lắng nghe progress từng trang PDF
+    signalrConnection.on("OcrPageCompleted", (payload) => {
+      if (payload.jobId !== Number(jobId) && payload.jobId !== jobId) return;
+      // Đã có data rồi → đánh dấu nếu cần
+    });
+
+    await signalrConnection.start();
+    await signalrConnection.invoke("JoinOcrRoom", Number(jobId));
+  } catch (err) {
+    console.warn("SignalR OCR connect thất bại (fallback polling):", err);
+  }
+}
+
+// Dành cho ảnh đơn: kết nối SignalR và lắng nghe OcrCompleted
+// Trả về true nếu kết nối thành công (không cần polling)
+async function trySetupSignalRForImage(jobId) {
+  if (!process.client) return false;
+  try {
+    const { HubConnectionBuilder, LogLevel } = await import("@microsoft/signalr");
+    const token = getToken();
+
+    if (signalrConnection) {
+      signalrConnection.stop().catch(() => {});
+    }
+
+    signalrConnection = new HubConnectionBuilder()
+      .withUrl(`${config.public.apiBaseUrl}/notificationHub`, {
+        accessTokenFactory: () => token,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+
+    signalrConnection.on("OcrCompleted", (payload) => {
+      const id = Number(payload.jobId ?? payload.JobId);
+      if (id !== Number(jobId)) return;
+      ocrLoading.value = false;
+      if (payload.status === "completed" || payload.Status === "completed") {
+        startLoadJob(jobId);
+      }
+    });
+
+    await signalrConnection.start();
+    await signalrConnection.invoke("JoinOcrRoom", Number(jobId));
+    return true;
+  } catch (err) {
+    console.warn("SignalR image OCR thất bại, dùng polling:", err);
+    return false;
+  }
+}
+
 watch(
   () => props.jobId,
   (v) => {
@@ -455,25 +534,30 @@ async function runUploadQueue() {
   if (isUploadRunning || uploadQueue.value.length === 0) return;
   isUploadRunning = true;
 
+  const CONCURRENCY = 3; // Upload tối đa 3 trang song song
+
   while (uploadQueue.value.length > 0) {
-    const pageNum = uploadQueue.value.shift();
-    if (
-      pageUploadStatus.value[pageNum] === "done" ||
-      pageUploadStatus.value[pageNum] === "cached"
-    )
-      continue;
-    await uploadOnePage(pageNum);
+    const batch = uploadQueue.value.splice(0, CONCURRENCY);
+    const pending = batch.filter(
+      (p) =>
+        pageUploadStatus.value[p] !== "done" &&
+        pageUploadStatus.value[p] !== "cached",
+    );
+    if (pending.length > 0) {
+      await Promise.all(pending.map((p) => uploadOnePage(p)));
+    }
   }
   isUploadRunning = false;
 }
 
-async function uploadOnePage(pageNum) {
+async function uploadOnePage(pageNum, retryCount = 0) {
   if (!pdfDoc.value || !pdfJobId.value) return;
   pageUploadStatus.value[pageNum] = "uploading";
 
   try {
     const page = await pdfDoc.value.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 });
+    // Scale 1.5 — đủ chất lượng cho Google Vision, nhẹ hơn 2.0 ~44%
+    const viewport = page.getViewport({ scale: 1.5 });
     const canvas = document.createElement("canvas");
     canvas.width = viewport.width;
     canvas.height = viewport.height;
@@ -481,8 +565,12 @@ async function uploadOnePage(pageNum) {
       .promise;
 
     const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.9),
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
     );
+
+    // Cleanup canvas để tránh memory leak
+    canvas.width = 0;
+    canvas.height = 0;
 
     const token = getToken();
     const formData = new FormData();
@@ -499,6 +587,8 @@ async function uploadOnePage(pageNum) {
       },
     );
 
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
     const data = await res.json();
     pageUploadStatus.value[pageNum] = data.status || "done";
 
@@ -507,6 +597,7 @@ async function uploadOnePage(pageNum) {
         ...pageOcrResults.value,
         [pageNum]: data.results,
       };
+      // pageDimensions dùng scale 1.5 làm hệ quy chiếu
       pageDimensions.value = {
         ...pageDimensions.value,
         [pageNum]: { w: viewport.width, h: viewport.height },
@@ -514,6 +605,11 @@ async function uploadOnePage(pageNum) {
     }
   } catch (err) {
     console.error(`[Upload] Lỗi trang ${pageNum}:`, err);
+    if (retryCount < 1) {
+      // Retry 1 lần sau 1.5s
+      await new Promise((r) => setTimeout(r, 1500));
+      return uploadOnePage(pageNum, retryCount + 1);
+    }
     pageUploadStatus.value[pageNum] = "error";
   }
 }
@@ -617,21 +713,25 @@ async function startLoadJob(jobId) {
       return; // Chấm dứt vòng lặp!
     }
     // =========================================================
-    // KỊCH BẢN 2: FILE ẢNH -> LẶP LẠI (POLLING) CHỜ AI XONG
+    // KỊCH BẢN 2: FILE ẢNH -> Dùng SignalR, fallback polling
     // =========================================================
     else {
       ocrMode.value = true;
-      ocrImageUrl.value = data.imageUrl; // Ảnh hiện ra ngay lập tức
+      ocrImageUrl.value = data.imageUrl;
       totalPages.value = 1;
 
-      // Nếu AI chưa xong -> Chờ 2s rồi hỏi lại
       if (data.status === "processing" || data.status === "pending") {
-        ocrLoading.value = true; // Bật lớp mờ mờ trên ảnh
-        setTimeout(() => startLoadJob(jobId), 2000);
+        ocrLoading.value = true;
+
+        // Thử dùng SignalR — không poll nếu kết nối được
+        const signalrOk = await trySetupSignalRForImage(jobId);
+        if (!signalrOk) {
+          // Fallback: polling 2s nếu SignalR không hoạt động
+          setTimeout(() => startLoadJob(jobId), 2000);
+        }
         return;
       }
 
-      // AI quét xong -> Vẽ box chữ
       ocrLoading.value = false;
       if (data.results?.length > 0) {
         ocrResults.value = data.results;
@@ -704,9 +804,8 @@ async function renderPage(pageNum) {
     canvas.style.width = `${Math.floor(viewport.width)}px`;
     canvas.style.height = `${Math.floor(viewport.height)}px`;
 
-    // Cố định hệ quy chiếu lấy kích thước của trang ở scale = 2.0
-    // Toàn bộ tọa độ Google Vision được trả về trên hệ quy chiếu này
-    const ocrViewport = page.getViewport({ scale: 2.0 });
+    // Hệ quy chiếu tọa độ Google Vision: phải khớp với scale upload (1.5)
+    const ocrViewport = page.getViewport({ scale: 1.5 });
     pageDimensions.value = {
       ...pageDimensions.value,
       [pageNum]: { w: ocrViewport.width, h: ocrViewport.height },
@@ -935,9 +1034,8 @@ function getOcrTextStyleForPdf(r, pageNum) {
     w = Math.max(...xs) - x,
     h = Math.max(...ys) - y;
 
-  // SỬA Ở ĐÂY: Không đọc DOM (canvasEl) nữa, dùng trực tiếp biến scale
-  // Vì lúc lưu pageDimensions, ta đang lấy ở scale = 2.0, nên tỷ lệ chuẩn sẽ là:
-  const ratio = scale.value / 2.0;
+  // pageDimensions được lưu ở scale 1.5, nên ratio tính theo đó
+  const ratio = scale.value / 1.5;
 
   x *= ratio;
   y *= ratio;
@@ -1061,6 +1159,11 @@ onBeforeUnmount(() => {
       activeRenderTask.cancel();
     } catch {}
     activeRenderTask = null;
+  }
+  // Cleanup SignalR connection
+  if (signalrConnection) {
+    signalrConnection.stop().catch(() => {});
+    signalrConnection = null;
   }
 });
 // Thêm watcher này để bắt sự kiện khi bấm Zoom (+ / -)

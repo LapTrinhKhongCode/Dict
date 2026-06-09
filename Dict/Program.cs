@@ -65,15 +65,34 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl"); // Lấy từ appsettings
+var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl");
+var allowedOrigins = new[]
+{
+    frontendUrl,
+    "https://dict-six-kappa.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+}.Where(o => !string.IsNullOrEmpty(o)).Select(o => o!.TrimEnd('/')).Distinct().ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAnyOrigin", policy =>
     {
-        policy.WithOrigins(frontendUrl)
-       .AllowAnyMethod()
-       .AllowAnyHeader()
-       .AllowCredentials();
+        if (allowedOrigins.Length == 0)
+        {
+            // Fallback an toàn — không nên xảy ra trên production
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
     });
 });
 builder.Services.AddHttpContextAccessor();
@@ -155,6 +174,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IOcrJobService, OcrJobService>();
+builder.Services.AddSingleton<Google.Cloud.Vision.V1.ImageAnnotatorClient>(_ =>
+    new Google.Cloud.Vision.V1.ImageAnnotatorClientBuilder().Build());
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<IBlobService, BlobService>();
@@ -163,6 +184,7 @@ builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWorkspaceInvitationService, WorkspaceInvitationService>();
 builder.Services.AddScoped<IFileCommentService, FileCommentService>();
+builder.Services.AddScoped<IWordCommentService, WordCommentService>();
 builder.Services.AddSingleton<TrieAutocompleteCache>();
 builder.Services.AddHostedService<TrieLoaderService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
@@ -195,7 +217,6 @@ if (app.Environment.IsDevelopment())
 app.UseStaticFiles();
 //app.UseHttpsRedirection();
 app.UseCors("AllowAnyOrigin");
-app.UseStaticFiles();
 app.UseMiddleware<ApiLoggingMiddleware>();
 // Thứ tự này là CHUẨN XÁC
 app.UseAuthentication();

@@ -231,10 +231,9 @@ public class InferController : ControllerBase
             ocrJob = await _ocrJobService.CreateAsync(new OcrJobCreateDto
             {
                 UserId = userId,
-                Status = "Processing",
+                Status = "processing",
                 DetectedText = ""
             });
-            _logger.LogInformation("Đã tạo OcrJob {JobId} (Ảnh đơn) cho User {UserId}", ocrJob.Id, userId);
 
             // 3. Gọi Python API (Giữ nguyên)
             using var httpClient = _httpClientFactory.CreateClient();
@@ -325,7 +324,7 @@ public class InferController : ControllerBase
 
             await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
             {
-                Status = "Completed",
+                Status = "completed",
                 DetectedText = fullTextBuilder.ToString()
             });
             _logger.LogInformation("Đã xử lý xong ảnh đơn cho Job {JobId}.", ocrJob.Id);
@@ -335,13 +334,12 @@ public class InferController : ControllerBase
         {
             _logger.LogError(ex, "Lỗi khi stream OCR (User: {UserId})", userId);
 
-            // 7. CẬP NHẬT JOB LÀ THẤT BẠI
             if (ocrJob != null)
             {
                 await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
                 {
-                    Status = "Failed",
-                    DetectedText = fullTextBuilder.ToString() + $"\n\nLỖI: {ex.Message}"
+                    Status = "failed",
+                    DetectedText = fullTextBuilder.ToString()
                 });
                 _logger.LogError("Đã đánh dấu Job {JobId} là Failed.", ocrJob.Id);
             }
@@ -383,10 +381,9 @@ public class InferController : ControllerBase
             ocrJob = await _ocrJobService.CreateAsync(new OcrJobCreateDto
             {
                 UserId = userId,
-                Status = "Processing",
+                Status = "processing",
                 DetectedText = ""
             });
-            _logger.LogInformation("Đã tạo OcrJob {JobId} (PDF Stream) cho User {UserId}", ocrJob.Id, userId);
 
             // 3. Mở PDF (Giữ nguyên)
             using var images = new MagickImageCollection();
@@ -485,27 +482,24 @@ public class InferController : ControllerBase
 
             await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
             {
-                Status = "Completed",
+                Status = "completed",
                 DetectedText = fullTextBuilder.ToString()
             });
             _logger.LogInformation("Đã xử lý xong tất cả các trang PDF cho Job {JobId}.", ocrJob.Id);
-            // ================================================
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Lỗi khi xử lý stream PDF (User: {UserId})", userId);
 
-            // === 7. CẬP NHẬT JOB LÀ THẤT BẠI ===
             if (ocrJob != null)
             {
                 await _ocrJobService.UpdateStatusAsync(ocrJob.Id, new OcrJobUpdateStatusDto
                 {
-                    Status = "Failed",
-                    DetectedText = fullTextBuilder.ToString() + $"\n\n{ex.Message}"
+                    Status = "failed",
+                    DetectedText = fullTextBuilder.ToString()
                 });
                 _logger.LogError("Đã đánh dấu Job {JobId} là Failed.", ocrJob.Id);
             }
-            // =================================
 
             if (!HttpContext.Response.HasStarted)
             {

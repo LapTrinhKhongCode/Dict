@@ -15,20 +15,27 @@ export default defineNuxtConfig({
     'pdfjs-dist/web/pdf_viewer.css', 
   ],
 
-  // === ĐÃ SỬA: DÙNG MOCK LOCAL TỰ CHẾ ===
   nitro: {
     alias: {
       papaparse: fileURLToPath(new URL('./papaparse-mock.js', import.meta.url))
-    }
+    },
+    compressPublicAssets: true,
   },
+
   vite: {
-    css: {
-      postcss: {
-        // Giữ cấu hình lờ đi cảnh báo CSS nếu cần
+    build: {
+      rollupOptions: {
+        output: {
+          // Tách các thư viện nặng thành chunk riêng → browser cache hiệu quả hơn
+          manualChunks: {
+            'signalr': ['@microsoft/signalr'],
+            'pdfjs': ['pdfjs-dist'],
+            'wanakana': ['wanakana'],
+          }
+        }
       }
     }
   },
-  // =====================================
 
   icon: {
     customCollections: [{
@@ -36,11 +43,31 @@ export default defineNuxtConfig({
       dir: './app/assets/icons'
     }]
   },
+
   routeRules: {
+    // Tắt SSR cho mọi trang cần auth (jwt từ localStorage → không đọc được server-side)
+    '/': { ssr: false },
+    '/search': { ssr: false },
+    '/search/**': { ssr: false },
+    '/kanji': { ssr: false },
+    '/kanji/**': { ssr: false },
+    '/alphabet': { ssr: false },
+    '/explore': { ssr: false },
+    '/explore/**': { ssr: false },
+    '/reading': { ssr: false },
+    '/reading/**': { ssr: false },
+    '/workspaces': { ssr: false },
+    '/workspaces/**': { ssr: false },
+    '/projects': { ssr: false },
+    '/projects/**': { ssr: false },
+    '/admin': { ssr: false },
+    '/admin/**': { ssr: false },
     '/reader': { ssr: false },
     '/reader/**': { ssr: false },
-    '/': { ssr: false },
+    '/sensei': { ssr: false },
+    // /login và /confirm-account giữ SSR (trang public, không cần auth)
   },
+
   modules: [
     '@nuxt/eslint',
     '@nuxt/fonts',

@@ -11,8 +11,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System; // Cần cho Guid, DateTime
-using Microsoft.AspNetCore.Identity; // <-- THÊM
-using Moq; // <-- THÊM
 using DotNetEnv;
 namespace Dict.Tests.IntegrationTests.Database
 {
@@ -21,9 +19,6 @@ namespace Dict.Tests.IntegrationTests.Database
         private readonly TestApplicationDbContext _context;
         private readonly IDeckService _service;
         private readonly IDbContextTransaction _transaction;
-
-        // 1. THÊM MOCK CHO USER MANAGER
-        private readonly Mock<UserManager<ApplicationUser>> _mockUserManager;
 
         // Chúng ta sẽ tạo 2 user: 1 chủ sở hữu, 1 "kẻ tấn công"
         private ApplicationUser _testUser = null!;
@@ -41,14 +36,7 @@ namespace Dict.Tests.IntegrationTests.Database
 
             _context = new TestApplicationDbContext(options);
 
-            // 2. KHỞI TẠO MOCK USER MANAGER (GIỐNG NHƯ TRONG UserServiceTests)
-            var userStoreMock = new Mock<IUserStore<ApplicationUser>>();
-            _mockUserManager = new Mock<UserManager<ApplicationUser>>(
-                userStoreMock.Object, null, null, null, null, null, null, null, null);
-
-            // 3. KHỞI TẠO SERVICE (ĐÃ CẬP NHẬT)
-            // Truyền cả context THẬT và manager MOCK
-            _service = new DeckService(_context, _mockUserManager.Object);
+            _service = new DeckService(_context);
 
             _transaction = _context.Database.BeginTransaction();
 
@@ -171,12 +159,6 @@ namespace Dict.Tests.IntegrationTests.Database
                     new CardCreateDto { FrontText = "Mặt trước 2", BackText = "Mặt sau 2", Tags = "tag2" }
                 }
             };
-
-            // 4. "DẠY" MOCK MANAGER
-            // Hàm CreateDeckAsync sẽ gọi _userManager.FindByIdAsync,
-            // nên ta phải "dạy" mock cách trả về user thật (đã được seed)
-            _mockUserManager.Setup(m => m.FindByIdAsync(_testUser.Id.ToString()))
-                            .ReturnsAsync(_testUser);
 
             // ----- ACT -----
             var result = await _service.CreateDeckAsync(deckDto, _testUser.Id);
@@ -335,11 +317,6 @@ namespace Dict.Tests.IntegrationTests.Database
             var originalDeck = await CreateValidDeckAsync(_testUser.Id, "Deck Công Khai");
             originalDeck.IsPublic = true; // Đặt là public
             await _context.SaveChangesAsync();
-
-            // "DẠY" MOCK MANAGER
-            // Hàm này sẽ tìm "newOwner" (là attacker)
-            _mockUserManager.Setup(m => m.FindByIdAsync(_attackerUser.Id.ToString()))
-                            .ReturnsAsync(_attackerUser);
 
             // ----- ACT -----
             var result = await _service.SaveDeckForUserAsync(originalDeck.Id, _attackerUser.Id);

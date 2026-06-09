@@ -58,6 +58,44 @@ namespace Dict.Service
 
             watch.Stop();
             _logger.LogInformation($"[SUCCESS] Hệ thống sẵn sàng trong {watch.ElapsedMilliseconds}ms!");
+
+            // --- SCHEDULED RELOAD: mỗi ngày lúc 3 giờ sáng ---
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var now = DateTime.Now;
+                var next3am = now.Date.AddDays(now.Hour >= 3 ? 1 : 0).AddHours(3);
+                var delay = next3am - now;
+                _logger.LogInformation("Trie scheduled reload lúc {Time} (sau {Hours:F1}h)", next3am, delay.TotalHours);
+
+                try { await Task.Delay(delay, stoppingToken); }
+                catch (OperationCanceledException) { break; }
+
+                _logger.LogInformation("Trie scheduled reload bắt đầu...");
+                await ReloadAsync(stoppingToken);
+            }
+        }
+
+        /// <summary>
+        /// Rebuild toàn bộ Trie + KanjiCache từ DB, ghi lại file cache disk.
+        /// Gọi được từ endpoint admin hoặc scheduler.
+        /// </summary>
+        public async Task<(int wordCount, int kanjiCount, long ms)> ReloadAsync(CancellationToken ct = default)
+        {
+            var watch = Stopwatch.StartNew();
+            _trieCache.IsLoaded = false; // tạm đánh dấu đang rebuild
+
+            await BuildFromSqlAsync(ct);
+
+            string binNodesPath = "cache_trie_nodes.bin";
+            string jsonSuggestionsPath = "cache_trie_suggestions.json";
+            string jsonKanjiPath = "cache_kanji.json";
+            await SaveToCacheAsync(binNodesPath, jsonSuggestionsPath, jsonKanjiPath);
+
+            watch.Stop();
+            int wordCount = _trieCache.SuggestionPool.Length;
+            int kanjiCount = _kanjiCache.Data.Count;
+            _logger.LogInformation("Trie reload xong: {Words} words, {Kanji} kanji, {Ms}ms", wordCount, kanjiCount, watch.ElapsedMilliseconds);
+            return (wordCount, kanjiCount, watch.ElapsedMilliseconds);
         }
 
         private async Task LoadFromCacheAsync(string binNodesPath, string jsonSuggestionsPath, string jsonKanjiPath)

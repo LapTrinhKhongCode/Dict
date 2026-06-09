@@ -75,13 +75,16 @@ namespace Dict.Services
         // ── Project CRUD ──────────────────────────────────────────
         public async Task<List<ProjectDto>> GetByWorkspaceAsync(int workspaceId, int userId)
         {
-            await RequireWorkspaceMemberAsync(workspaceId, userId);
+            // Kết hợp auth check + main query trong 1 round-trip
+            var isMember = await _db.WorkspaceMembers
+                .AnyAsync(m => m.WorkspaceId == workspaceId && m.UserId == userId);
+            if (!isMember)
+                throw new UnauthorizedAccessException("Bạn không thuộc workspace này.");
 
             return await _db.Projects
+                .AsNoTracking()
                 .Where(p => p.WorkspaceId == workspaceId)
-                .Include(p => p.CreatedByUser)
-                .Include(p => p.ProjectVocabularies)
-                .Include(p => p.OcrJobs)
+                .OrderByDescending(p => p.CreatedAt)
                 .Select(p => new ProjectDto
                 {
                     Id = p.Id,
@@ -91,25 +94,46 @@ namespace Dict.Services
                     CreatedByUserId = p.CreatedByUserId,
                     CreatedByUserName = p.CreatedByUser.UserName,
                     CreatedAt = p.CreatedAt,
-                    MediaCount = p.OcrJobs.Count,
-                    VocabularyCount = p.ProjectVocabularies.Count,
+                    // COUNT(*) subquery — không load toàn bộ collection vào memory
+                    MediaCount = p.OcrJobs.Count(),
+                    VocabularyCount = p.ProjectVocabularies.Count(),
                 })
-                .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
         }
 
         public async Task<ProjectDto> GetByIdAsync(int projectId, int userId)
         {
-            await RequireMemberAsync(projectId, userId);
-
+            // 1 query duy nhất: fetch project + kiểm tra member cùng lúc
             var project = await _db.Projects
-                .Include(p => p.CreatedByUser)
-                .Include(p => p.ProjectVocabularies)
-                .Include(p => p.OcrJobs)
-                .FirstOrDefaultAsync(p => p.Id == projectId)
+                .AsNoTracking()
+                .Where(p => p.Id == projectId)
+                .Select(p => new
+                {
+                    p.Id, p.Name, p.Description, p.WorkspaceId,
+                    p.CreatedByUserId, p.CreatedAt,
+                    CreatedByUserName = p.CreatedByUser.UserName,
+                    MediaCount = p.OcrJobs.Count(),
+                    VocabularyCount = p.ProjectVocabularies.Count(),
+                    IsMember = p.Workspace.Members.Any(m => m.UserId == userId)
+                })
+                .FirstOrDefaultAsync()
                 ?? throw new KeyNotFoundException("Project không tồn tại.");
 
-            return ToDto(project);
+            if (!project.IsMember)
+                throw new UnauthorizedAccessException("Bạn không thuộc workspace này.");
+
+            return new ProjectDto
+            {
+                Id = project.Id,
+                Name = project.Name,
+                Description = project.Description,
+                WorkspaceId = project.WorkspaceId,
+                CreatedByUserId = project.CreatedByUserId,
+                CreatedByUserName = project.CreatedByUserName,
+                CreatedAt = project.CreatedAt,
+                MediaCount = project.MediaCount,
+                VocabularyCount = project.VocabularyCount,
+            };
         }
 
         public async Task<ProjectDto> CreateAsync(int workspaceId, int userId, CreateProjectDto dto)
@@ -137,9 +161,11 @@ namespace Dict.Services
             var member = await RequireMemberAsync(projectId, userId);
 
             var project = await _db.Projects
-                .Include(p => p.CreatedByUser)
-                .Include(p => p.ProjectVocabularies)
-                .Include(p => p.OcrJobs)
+                .Select(p => new Project
+                {
+                    Id = p.Id, Name = p.Name, Description = p.Description,
+                    WorkspaceId = p.WorkspaceId, CreatedByUserId = p.CreatedByUserId, CreatedAt = p.CreatedAt
+                })
                 .FirstOrDefaultAsync(p => p.Id == projectId)
                 ?? throw new KeyNotFoundException("Project không tồn tại.");
 
@@ -148,9 +174,16 @@ namespace Dict.Services
 
             project.Name = dto.Name ?? project.Name;
             project.Description = dto.Description ?? project.Description;
+            _db.Projects.Attach(project);
+            _db.Entry(project).Property(p => p.Name).IsModified = true;
+            _db.Entry(project).Property(p => p.Description).IsModified = true;
             await _db.SaveChangesAsync();
 
-            return ToDto(project);
+            return new ProjectDto
+            {
+                Id = project.Id, Name = project.Name, Description = project.Description,
+                WorkspaceId = project.WorkspaceId, CreatedByUserId = project.CreatedByUserId, CreatedAt = project.CreatedAt
+            };
         }
 
         public async Task DeleteAsync(int projectId, int userId)
@@ -170,12 +203,23 @@ namespace Dict.Services
         // ── Media ─────────────────────────────────────────────────
         public async Task<List<MediaDtos>> GetMediaAsync(int projectId, int userId)
         {
-            await RequireMemberAsync(projectId, userId);
+            // Kiểm tra project tồn tại và user có quyền, trong 1 query
+            var project = await _db.Projects
+                .AsNoTracking()
+                .Where(p => p.Id == projectId)
+                .Select(p => new { p.WorkspaceId })
+                .FirstOrDefaultAsync()
+                ?? throw new KeyNotFoundException("Project không tồn tại.");
 
-            // Truy vấn trực tiếp bằng ProjectId (Nhanh và tối ưu hơn rất nhiều)
+            var isMember = await _db.WorkspaceMembers
+                .AnyAsync(m => m.WorkspaceId == project.WorkspaceId && m.UserId == userId);
+            if (!isMember)
+                throw new UnauthorizedAccessException("Bạn không có quyền.");
+
             return await _db.MediaStore
+                .AsNoTracking()
                 .Where(m => m.ProjectId == projectId)
-                .Include(m => m.Owner)
+                .OrderByDescending(m => m.CreatedAt)
                 .Select(m => new MediaDtos
                 {
                     Id = m.Id,
@@ -187,7 +231,6 @@ namespace Dict.Services
                     OwnerName = m.Owner.UserName,
                     CreatedAt = m.CreatedAt,
                 })
-                .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync();
         }
 

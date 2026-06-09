@@ -1,5 +1,6 @@
 ﻿using Dict.DTO;
 using Dict.DTO.Admin;
+using Microsoft.EntityFrameworkCore;
 // using Dict.Models.Enum; // <-- XÓA
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authorization;
@@ -23,21 +24,23 @@ namespace Dict.Controllers
         private readonly IAdminService _adminService;
         private readonly ResponseDTO _response;
         private readonly ILogger<AdminController> _logger;
-        private readonly AzureTokenProvider _tokenProvider; // ✨ THÊM: 3. Biến private
-        private readonly IHttpClientFactory _httpClientFactory; // ✨ THÊM: 3. Biến private
+        private readonly AzureTokenProvider _tokenProvider;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
 
-        // ✨ THÊM: 2. Inject service vào constructor
         public AdminController(
             IAdminService adminService,
             ILogger<AdminController> logger,
-            AzureTokenProvider tokenProvider, // Thêm
-            IHttpClientFactory httpClientFactory) // Thêm
+            AzureTokenProvider tokenProvider,
+            IHttpClientFactory httpClientFactory,
+            IConfiguration configuration)
         {
             _adminService = adminService;
             _response = new ResponseDTO();
             _logger = logger;
-            _tokenProvider = tokenProvider; // Thêm
-            _httpClientFactory = httpClientFactory; // Thêm
+            _tokenProvider = tokenProvider;
+            _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -64,12 +67,12 @@ namespace Dict.Controllers
                 // BƯỚC 1: LẤY TOKEN TỰ ĐỘNG
                 string accessToken = await _tokenProvider.GetAccessTokenAsync();
 
-                // BƯỚC 2: CHUẨN BỊ URL
-                // --- [HÃY THAY ID CỦA BẠN VÀO ĐÂY] ---
-                var resourceId = "/subscriptions/3ec380e3-8389-4014-bcf5-481173c45ae7/resourceGroups/DictVM/providers/Microsoft.Compute/virtualMachines/dict";
+                var resourceId = _configuration["AzureAd:VmResourceId"];
                 var metricName = "Percentage CPU";
-                var timeSpan = "PT1H"; // 1 giờ
-                var interval = "PT5M"; // 5 phút
+                var endTime = DateTime.UtcNow;
+                var startTime = endTime.AddHours(-1);
+                var timeSpan = $"{startTime:yyyy-MM-ddTHH:mm:ssZ}/{endTime:yyyy-MM-ddTHH:mm:ssZ}";
+                var interval = "PT5M";
 
                 var url = $"https://management.azure.com{resourceId}/providers/Microsoft.Insights/metrics" +
                           $"?api-version=2018-01-01" +
@@ -116,27 +119,15 @@ namespace Dict.Controllers
         {
             try
             {
-                // BƯỚC 1: LẤY TOKEN TỰ ĐỘNG (Dùng chung)
                 string accessToken = await _tokenProvider.GetAccessTokenAsync();
 
-                // BƯỚC 2: CHUẨN BỊ URL CHO SQL DATABASE
+                var resourceId = _configuration["AzureAd:SqlResourceId"];
+                var metricName = "cpu_percent";
 
-                // --- [HÃY THAY ID CỦA SQL DATABASE VÀO ĐÂY] ---
-                // Lấy từ Portal -> SQL Database -> Properties -> Resource ID
-                var resourceId = "/subscriptions/3ec380e3-8389-4014-bcf5-481173c45ae7/resourceGroups/Dict/providers/Microsoft.Sql/servers/dict/databases/Dict";
-
-                // --- [CHỌN METRIC BẠN MUỐN LẤY] ---
-                // Hầu hết các DB đều dùng `cpu_percent`.
-                // Nếu bạn dùng gói DTU, `dtu_percent` sẽ hữu ích hơn.
-
-                var metricName = "cpu_percent";      // % CPU sử dụng
-                                                     // var metricName = "dtu_percent";       // % DTU sử dụng (nếu dùng gói DTU)
-                                                     // var metricName = "storage_percent";   // % Dung lượng lưu trữ
-                                                     // var metricName = "connections_count"; // Số lượng kết nối
-
-                // (Lấy dữ liệu 1 giờ qua, cách nhau 5 phút)
-                var timeSpan = "PT1H"; // 1 giờ
-                var interval = "PT5M"; // 5 phút
+                var endTime = DateTime.UtcNow;
+                var startTime = endTime.AddHours(-1);
+                var timeSpan = $"{startTime:yyyy-MM-ddTHH:mm:ssZ}/{endTime:yyyy-MM-ddTHH:mm:ssZ}";
+                var interval = "PT5M";
 
                 // Xây dựng URL cuối cùng
                 var url = $"https://management.azure.com{resourceId}/providers/Microsoft.Insights/metrics" +
@@ -589,7 +580,596 @@ namespace Dict.Controllers
                 return StatusCode(500, _response);
             }
         }
-    } 
+
+        // ===== QUẢN LÝ TỪ ĐIỂN (ENTRY) =====
+
+        // GET /api/admin/entries?page=1&pageSize=20&search=
+        [HttpGet("entries")]
+        public async Task<IActionResult> GetEntries(
+            [FromQuery] string? search,
+            [FromQuery] string? type,
+            [FromQuery] string? jlptLevel,      // N1, N2, N3, N4, N5
+            [FromQuery] int? strokeMin,
+            [FromQuery] int? strokeMax,
+            [FromQuery] int? grade,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var query = db.Entries.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(e => e.Label.Contains(search) || (e.ShortMean != null && e.ShortMean.Contains(search)));
+            if (!string.IsNullOrWhiteSpace(type))
+                query = query.Where(e => e.Type == type);
+
+            var total = await query.CountAsync();
+
+            // Left join với bảng Kanji để lấy Meaning, StrokeCount, JlptLevel, Freq, Grade
+            var items = await (
+                from e in query
+                join k in db.Kanji on e.Label equals k.Character into kj
+                from k in kj.DefaultIfEmpty()
+                // Kanji filters — chỉ áp dụng khi type=kanji
+                where (string.IsNullOrWhiteSpace(jlptLevel) || k.JlptLevel == jlptLevel)
+                   && (!strokeMin.HasValue || k.StrokeCount >= strokeMin)
+                   && (!strokeMax.HasValue || k.StrokeCount <= strokeMax)
+                   && (!grade.HasValue || k.Grade == grade)
+                orderby (e.Weight ?? 0), e.Label
+                select new EntryAdminDto
+                {
+                    Id = e.Id,
+                    Label = e.Label,
+                    ShortMean = e.ShortMean,
+                    Phonetic = e.Phonetic,
+                    Romaji = e.Romaji,
+                    Type = e.Type,
+                    EntryCategory = e.EntryCategory,
+                    Weight = e.Weight,
+                    CreatedAt = e.CreatedAt,
+                    UpdatedAt = e.UpdatedAt,
+                    Meaning = k != null ? k.Meaning : null,
+                    StrokeCount = k != null ? k.StrokeCount : null,
+                    JlptLevel = k != null ? k.JlptLevel : null,
+                    Freq = k != null ? k.Freq : null,
+                    Grade = k != null ? k.Grade : null,
+                }
+            ).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            _response.Result = new PagedResult<EntryAdminDto>
+            {
+                Items = items,
+                TotalCount = total,
+                Page = page,
+                PageSize = pageSize,
+            };
+            return Ok(_response);
+        }
+
+        // PUT /api/admin/entries/{id}
+        [HttpPut("entries/{id}")]
+        public async Task<IActionResult> UpdateEntry(int id, [FromBody] UpdateEntryDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var entry = await db.Entries.FindAsync(id);
+            if (entry == null) return NotFound("Không tìm thấy từ.");
+
+            entry.ShortMean = dto.ShortMean;
+            entry.Phonetic = dto.Phonetic;
+            entry.Romaji = dto.Romaji;
+            entry.EntryCategory = dto.EntryCategory;
+            entry.Weight = dto.Weight;
+            entry.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            _response.Result = new EntryAdminDto
+            {
+                Id = entry.Id,
+                Label = entry.Label,
+                ShortMean = entry.ShortMean,
+                Phonetic = entry.Phonetic,
+                Romaji = entry.Romaji,
+                Type = entry.Type,
+                EntryCategory = entry.EntryCategory,
+                Weight = entry.Weight,
+                UpdatedAt = entry.UpdatedAt,
+            };
+            _response.Message = "Đã cập nhật từ điển.";
+            return Ok(_response);
+        }
+
+        // DELETE /api/admin/entries/{id}
+        [HttpDelete("entries/{id}")]
+        public async Task<IActionResult> DeleteEntry(int id,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var entry = await db.Entries.FindAsync(id);
+            if (entry == null) return NotFound("Không tìm thấy từ.");
+
+            db.Entries.Remove(entry);
+            await db.SaveChangesAsync();
+
+            _response.Message = $"Đã xóa từ '{entry.Label}'.";
+            return Ok(_response);
+        }
+
+        // GET /api/admin/entries/{id}/detail — đọc bảng con để edit
+        [HttpGet("entries/{id}/detail")]
+        public async Task<IActionResult> GetEntryDetail(int id,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var entry = await db.Entries
+                .Where(e => e.Id == id)
+                .Include(e => e.Words)
+                    .ThenInclude(w => w.Relations)
+                        .ThenInclude(r => r.RelatedWord)
+                .Include(e => e.Senses.OrderBy(s => s.SenseOrder))
+                    .ThenInclude(s => s.Glosses)
+                .Include(e => e.Senses.OrderBy(s => s.SenseOrder))
+                    .ThenInclude(s => s.Examples)
+                .Include(e => e.ReadingElements)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync();
+
+            if (entry == null) return NotFound();
+
+            // Kanji bảng riêng — nếu là kanji type
+            KanjiAdminDto? kanjiDto = null;
+            if (entry.Type == "kanji")
+            {
+                var kanji = await db.Kanji
+                    .Where(k => k.Character == entry.Label)
+                    .Include(k => k.KanjiExamples.OrderBy(e => e.Id))
+                    .FirstOrDefaultAsync();
+                if (kanji != null)
+                {
+                    kanjiDto = new KanjiAdminDto
+                    {
+                        Id = kanji.Id,
+                        Character = kanji.Character,
+                        StrokeCount = kanji.StrokeCount,
+                        JlptLevel = kanji.JlptLevel,
+                        Meaning = kanji.Meaning,
+                        Freq = kanji.Freq,
+                        Examples = kanji.KanjiExamples?.Select(ex => new KanjiExampleAdminDto
+                        {
+                            Id = ex.Id,
+                            ExampleType = ex.ExampleType,
+                            ReadingGroup = ex.ReadingGroup,
+                            Word = ex.Word,
+                            Meaning = ex.Meaning,
+                            Reading = ex.Reading,
+                            HanViet = ex.HanViet
+                        }).ToList() ?? new()
+                    };
+                }
+            }
+
+            _response.Result = new EntryDetailDto
+            {
+                Id = entry.Id,
+                Label = entry.Label,
+                Type = entry.Type,
+                ShortMean = entry.ShortMean,
+                Phonetic = entry.Phonetic,
+                Romaji = entry.Romaji,
+                EntryCategory = entry.EntryCategory,
+                Weight = entry.Weight,
+                Words = entry.Words?.Select(w => new WordAdminDto
+                {
+                    Id = w.Id,
+                    WordText = w.WordText,
+                    Phonetic = w.Phonetic,
+                    Romaji = w.Romaji,
+                    ShortMean = w.ShortMean,
+                    Weight = w.Weight,
+                    Opposites = w.Relations?
+                        .Where(r => r.RelationType == "opposite" && r.RelatedWord != null)
+                        .Select(r => new WordRelationAdminDto
+                        {
+                            Id = r.Id,
+                            RelatedWordId = r.RelatedWordId,
+                            RelatedWordText = r.RelatedWord.WordText,
+                            RelationType = r.RelationType
+                        }).ToList() ?? new()
+                }).ToList() ?? new(),
+                Senses = entry.Senses?.Select(s => new SenseAdminDto
+                {
+                    Id = s.Id,
+                    Pos = s.Pos,
+                    SenseOrder = s.SenseOrder,
+                    Glosses = s.Glosses?.Select(g => new GlossAdminDto
+                    {
+                        Id = g.Id,
+                        Text = g.Text
+                    }).ToList() ?? new(),
+                    Examples = s.Examples?.Select(ex => new ExampleAdminDto
+                    {
+                        Id = ex.Id,
+                        ContentJp = ex.ContentJp,
+                        ContentTranslated = ex.ContentTranslated,
+                        Transcription = ex.Transcription
+                    }).ToList() ?? new()
+                }).ToList() ?? new(),
+                Kanji = kanjiDto,
+                ReadingElements = entry.ReadingElements?.Select(r => new ReadingElementAdminDto
+                {
+                    Id = r.Id,
+                    Reb = r.Reb,
+                    ReNoKanji = r.ReNoKanji,
+                    RePri = r.RePri
+                }).ToList() ?? new()
+            };
+            return Ok(_response);
+        }
+
+        // PATCH /api/admin/words/{id}
+        [HttpPatch("words/{id}")]
+        public async Task<IActionResult> PatchWord(int id, [FromBody] PatchWordDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var word = await db.Words.FindAsync(id);
+            if (word == null) return NotFound();
+
+            if (dto.WordText != null) word.WordText = dto.WordText;
+            if (dto.Phonetic != null) word.Phonetic = dto.Phonetic;
+            if (dto.Romaji != null) word.Romaji = dto.Romaji;
+            if (dto.ShortMean != null) word.ShortMean = dto.ShortMean;
+            if (dto.Weight.HasValue) word.Weight = dto.Weight;
+            word.UpdatedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+            _response.Message = "Đã cập nhật Word.";
+            return Ok(_response);
+        }
+
+        // PATCH /api/admin/senses/{id}
+        [HttpPatch("senses/{id}")]
+        public async Task<IActionResult> PatchSense(int id, [FromBody] PatchSenseDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var sense = await db.Senses.FindAsync(id);
+            if (sense == null) return NotFound();
+
+            if (dto.Pos != null) sense.Pos = dto.Pos;
+            if (dto.SenseOrder.HasValue) sense.SenseOrder = dto.SenseOrder;
+
+            await db.SaveChangesAsync();
+            _response.Message = "Đã cập nhật Sense.";
+            return Ok(_response);
+        }
+
+        // PATCH /api/admin/glosses/{id}
+        [HttpPatch("glosses/{id}")]
+        public async Task<IActionResult> PatchGloss(int id, [FromBody] PatchGlossDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var gloss = await db.Glosses.FindAsync(id);
+            if (gloss == null) return NotFound();
+
+            if (dto.Text != null) gloss.Text = dto.Text;
+
+            await db.SaveChangesAsync();
+            _response.Message = "Đã cập nhật Gloss.";
+            return Ok(_response);
+        }
+
+        // PATCH /api/admin/examples/{id}
+        [HttpPatch("examples/{id}")]
+        public async Task<IActionResult> PatchExample(int id, [FromBody] PatchExampleDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var ex = await db.Examples.FindAsync(id);
+            if (ex == null) return NotFound();
+
+            if (dto.ContentJp != null) ex.ContentJp = dto.ContentJp;
+            if (dto.ContentTranslated != null) ex.ContentTranslated = dto.ContentTranslated;
+            if (dto.Transcription != null) ex.Transcription = dto.Transcription;
+
+            await db.SaveChangesAsync();
+            _response.Message = "Đã cập nhật Example.";
+            return Ok(_response);
+        }
+
+        // PATCH /api/admin/reading-elements/{id}
+        [HttpPatch("reading-elements/{id}")]
+        public async Task<IActionResult> PatchReadingElement(int id, [FromBody] PatchReadingElementDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var re = await db.ReadingElements.FindAsync(id);
+            if (re == null) return NotFound();
+
+            if (dto.Reb != null) re.Reb = dto.Reb;
+            if (dto.ReNoKanji != null) re.ReNoKanji = dto.ReNoKanji;
+            if (dto.RePri != null) re.RePri = dto.RePri;
+
+            await db.SaveChangesAsync();
+            _response.Message = "Đã cập nhật ReadingElement.";
+            return Ok(_response);
+        }
+
+        // PATCH /api/admin/kanji/{id}
+        [HttpPatch("kanji/{id}")]
+        public async Task<IActionResult> PatchKanji(int id, [FromBody] PatchKanjiDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var kanji = await db.Kanji.FindAsync(id);
+            if (kanji == null) return NotFound();
+
+            if (dto.StrokeCount.HasValue) kanji.StrokeCount = dto.StrokeCount;
+            if (dto.JlptLevel != null) kanji.JlptLevel = dto.JlptLevel;
+            if (dto.Meaning != null) kanji.Meaning = dto.Meaning;
+            if (dto.Freq.HasValue) kanji.Freq = dto.Freq;
+            kanji.UpdatedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+            _response.Message = "Đã cập nhật Kanji.";
+            return Ok(_response);
+        }
+
+        // PATCH /api/admin/kanji-examples/{id}
+        [HttpPatch("kanji-examples/{id}")]
+        public async Task<IActionResult> PatchKanjiExample(int id, [FromBody] PatchKanjiExampleDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var ex = await db.KanjiExamples.FindAsync(id);
+            if (ex == null) return NotFound();
+
+            if (dto.ExampleType != null) ex.ExampleType = dto.ExampleType;
+            if (dto.ReadingGroup != null) ex.ReadingGroup = dto.ReadingGroup;
+            if (dto.Word != null) ex.Word = dto.Word;
+            if (dto.Meaning != null) ex.Meaning = dto.Meaning;
+            if (dto.Reading != null) ex.Reading = dto.Reading;
+            if (dto.HanViet != null) ex.HanViet = dto.HanViet;
+
+            await db.SaveChangesAsync();
+            _response.Message = "Đã cập nhật KanjiExample.";
+            return Ok(_response);
+        }
+
+        // POST /api/admin/entries/{id}/rebuild — rebuild RawJson từ bảng con
+        [HttpPost("entries/{id}/rebuild")]
+        public async Task<IActionResult> RebuildEntry(int id,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!,
+            [FromServices] IJsonBuilderService jsonBuilder = null!,
+            [FromServices] IWordService wordService = null!,
+            [FromServices] Dict.Models.KanjiCache kanjiCache = null!)
+        {
+            var entry = await db.Entries.FindAsync(id);
+            if (entry == null) return NotFound();
+
+            string newJson;
+            if (entry.Type == "kanji")
+            {
+                newJson = await jsonBuilder.RebuildJsonForKanjiAsync(entry.Label);
+                if (!string.IsNullOrEmpty(newJson))
+                {
+                    // Cập nhật DB
+                    entry.RawJson = newJson;
+                    entry.UpdatedAt = DateTime.UtcNow;
+                    await db.SaveChangesAsync();
+
+                    // Cập nhật KanjiCache trong RAM ngay lập tức
+                    if (kanjiCache != null && !string.IsNullOrEmpty(entry.Label))
+                        kanjiCache.Data[entry.Label[0]] = newJson;
+                }
+            }
+            else
+            {
+                newJson = await jsonBuilder.RebuildJsonForWordAsync(entry.Label);
+                if (!string.IsNullOrEmpty(newJson))
+                    // UpsertCacheForLabelAsync đã tự invalidate MemoryCache
+                    await wordService.UpsertCacheForLabelAsync(entry.Label, newJson, "Admin_Rebuild");
+            }
+
+            if (string.IsNullOrEmpty(newJson))
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Rebuild thất bại — không tìm thấy dữ liệu.";
+                return Ok(_response);
+            }
+
+            _response.Message = $"Đã rebuild + invalidate cache cho '{entry.Label}'.";
+            return Ok(_response);
+        }
+
+        // ===== ADD MỚI BẢNG CON =====
+
+        // POST /api/admin/senses/{senseId}/examples
+        [HttpPost("senses/{senseId}/examples")]
+        public async Task<IActionResult> AddExample(int senseId, [FromBody] PatchExampleDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var sense = await db.Senses.FindAsync(senseId);
+            if (sense == null) return NotFound("Sense không tồn tại.");
+
+            var ex = new Dict.Models.Example
+            {
+                SenseId = senseId,
+                ContentJp = dto.ContentJp ?? "",
+                ContentTranslated = dto.ContentTranslated ?? "",
+                Transcription = dto.Transcription ?? ""
+            };
+            db.Examples.Add(ex);
+            await db.SaveChangesAsync();
+
+            _response.Message = "Đã thêm Example mới.";
+            _response.Result = new ExampleAdminDto { Id = ex.Id, ContentJp = ex.ContentJp, ContentTranslated = ex.ContentTranslated, Transcription = ex.Transcription };
+            return Ok(_response);
+        }
+
+        // POST /api/admin/senses/{senseId}/glosses
+        [HttpPost("senses/{senseId}/glosses")]
+        public async Task<IActionResult> AddGloss(int senseId, [FromBody] PatchGlossDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var sense = await db.Senses.FindAsync(senseId);
+            if (sense == null) return NotFound("Sense không tồn tại.");
+
+            var gloss = new Dict.Models.Gloss
+            {
+                SenseId = senseId,
+                Text = dto.Text ?? ""
+            };
+            db.Glosses.Add(gloss);
+            await db.SaveChangesAsync();
+
+            _response.Message = "Đã thêm Gloss mới.";
+            _response.Result = new GlossAdminDto { Id = gloss.Id, Text = gloss.Text };
+            return Ok(_response);
+        }
+
+        // POST /api/admin/entries/{entryId}/senses
+        [HttpPost("entries/{entryId}/senses")]
+        public async Task<IActionResult> AddSense(int entryId, [FromBody] PatchSenseDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var entry = await db.Entries.FindAsync(entryId);
+            if (entry == null) return NotFound("Entry không tồn tại.");
+
+            // auto-assign order = max + 1
+            var maxOrder = await db.Senses.Where(s => s.EntryId == entryId).MaxAsync(s => (int?)s.SenseOrder) ?? 0;
+            var sense = new Dict.Models.Sense
+            {
+                EntryId = entryId,
+                Pos = dto.Pos ?? "",
+                SenseOrder = dto.SenseOrder ?? (maxOrder + 1)
+            };
+            db.Senses.Add(sense);
+            await db.SaveChangesAsync();
+
+            _response.Message = "Đã thêm Sense mới.";
+            _response.Result = new SenseAdminDto { Id = sense.Id, Pos = sense.Pos, SenseOrder = sense.SenseOrder, Glosses = new(), Examples = new() };
+            return Ok(_response);
+        }
+
+        // POST /api/admin/entries/{entryId}/reading-elements
+        [HttpPost("entries/{entryId}/reading-elements")]
+        public async Task<IActionResult> AddReadingElement(int entryId, [FromBody] PatchReadingElementDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var entry = await db.Entries.FindAsync(entryId);
+            if (entry == null) return NotFound();
+
+            var re = new Dict.Models.ReadingElement
+            {
+                EntryId = entryId,
+                Reb = dto.Reb ?? "",
+                ReNoKanji = dto.ReNoKanji,
+                RePri = dto.RePri
+            };
+            db.ReadingElements.Add(re);
+            await db.SaveChangesAsync();
+
+            _response.Message = "Đã thêm ReadingElement mới.";
+            _response.Result = new ReadingElementAdminDto { Id = re.Id, Reb = re.Reb };
+            return Ok(_response);
+        }
+
+        // POST /api/admin/kanji/{kanjiId}/examples
+        [HttpPost("kanji/{kanjiId}/examples")]
+        public async Task<IActionResult> AddKanjiExample(int kanjiId, [FromBody] PatchKanjiExampleDto dto,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var kanji = await db.Kanji.FindAsync(kanjiId);
+            if (kanji == null) return NotFound();
+
+            var ex = new Dict.Models.KanjiExample
+            {
+                KanjiId = kanjiId,
+                ExampleType = dto.ExampleType ?? "on",
+                ReadingGroup = dto.ReadingGroup,
+                Word = dto.Word ?? "",
+                Meaning = dto.Meaning ?? "",
+                Reading = dto.Reading ?? "",
+                HanViet = dto.HanViet
+            };
+            db.KanjiExamples.Add(ex);
+            await db.SaveChangesAsync();
+
+            _response.Message = "Đã thêm KanjiExample mới.";
+            _response.Result = new KanjiExampleAdminDto { Id = ex.Id, ExampleType = ex.ExampleType, Word = ex.Word, Meaning = ex.Meaning, Reading = ex.Reading };
+            return Ok(_response);
+        }
+
+        // POST /api/admin/entries/rebuild-batch?type=word&limit=100 — rebuild hàng loạt
+        [HttpPost("entries/rebuild-batch")]
+        public async Task<IActionResult> RebuildBatch(
+            [FromQuery] string type = "word",
+            [FromQuery] int limit = 100,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!,
+            [FromServices] IJsonBuilderService jsonBuilder = null!,
+            [FromServices] IWordService wordService = null!,
+            [FromServices] Dict.Models.KanjiCache kanjiCache = null!)
+        {
+            var entries = await db.Entries
+                .Where(e => e.Type == type)
+                .OrderBy(e => e.UpdatedAt ?? e.CreatedAt)
+                .Take(limit)
+                .Select(e => new { e.Id, e.Label })
+                .ToListAsync();
+
+            int success = 0, failed = 0;
+
+            foreach (var e in entries)
+            {
+                try
+                {
+                    if (type == "kanji")
+                    {
+                        var json = await jsonBuilder.RebuildJsonForKanjiAsync(e.Label);
+                        if (!string.IsNullOrEmpty(json))
+                        {
+                            var entry = await db.Entries.FindAsync(e.Id);
+                            if (entry != null) { entry.RawJson = json; entry.UpdatedAt = DateTime.UtcNow; }
+                            if (kanjiCache != null && !string.IsNullOrEmpty(e.Label))
+                                kanjiCache.Data[e.Label[0]] = json;
+                            success++;
+                        }
+                        else failed++;
+                    }
+                    else
+                    {
+                        var json = await jsonBuilder.RebuildJsonForWordAsync(e.Label);
+                        if (!string.IsNullOrEmpty(json))
+                        {
+                            // UpsertCacheForLabelAsync tự invalidate MemoryCache
+                            await wordService.UpsertCacheForLabelAsync(e.Label, json, "Batch_Rebuild");
+                            success++;
+                        }
+                        else failed++;
+                    }
+                }
+                catch { failed++; }
+            }
+
+            if (type == "kanji") await db.SaveChangesAsync(); // batch save kanji
+
+            _response.Message = $"Rebuild xong: {success} thành công, {failed} thất bại. Cache đã invalidate.";
+            _response.Result = new { success, failed, total = entries.Count };
+            return Ok(_response);
+        }
+
+        // POST /api/admin/reload-trie — rebuild Trie + KanjiCache ngay lập tức
+        [HttpPost("reload-trie")]
+        public async Task<IActionResult> ReloadTrie(
+            [FromServices] TrieLoaderService trieLoader)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                var (wordCount, kanjiCount, ms) = await trieLoader.ReloadAsync();
+                _response.Message = $"Trie reload thành công: {wordCount:N0} words, {kanjiCount:N0} kanji, mất {ms}ms.";
+                _response.Result = new { wordCount, kanjiCount, ms };
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = $"Reload thất bại: {ex.Message}";
+                return StatusCode(500, _response);
+            }
+        }
+    }
 
     // Bạn cần một DTO mới cho việc cập nhật nhiều Role
     public class AdminUpdateUserRolesDto

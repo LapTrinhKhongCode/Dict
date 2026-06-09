@@ -316,7 +316,7 @@ const getUserIdFromToken = () => {
 
 // Truyền userId hiện tại vào composable để tách biệt lịch sử
 const currentUserId = getUserIdFromToken();
-const { recentSearches, removeSearch, clearSearches } = useRecentSearches(currentUserId)
+const { recentSearches, removeRecentSearch: removeSearch, clearRecentSearches: clearSearches, loadFromStorage: reloadSearches } = useRecentSearches(currentUserId)
 
 // WATCHER: Bắt sự kiện đăng xuất (Token rỗng)
 watch(isAuthenticated, (newVal) => {
@@ -569,7 +569,10 @@ function formatDate(d) {
   // 5. Nếu quá 24h thì hiển thị ngày tháng
   return date.toLocaleDateString('vi-VN');
 }
-onMounted(loadInitialData)
+onMounted(() => {
+  reloadSearches() // reload localStorage data on client (fixes SSR hydration mismatch)
+  loadInitialData()
+})
 </script>
 
 <style scoped>
