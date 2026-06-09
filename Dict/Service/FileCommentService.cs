@@ -49,7 +49,8 @@ namespace Dict.Services
             {
                 Id = comment.Id,
                 UserId = userId,
-                UserName = user?.UserName ?? "Thành viên", // Dự phòng nếu null
+                UserName = user?.UserName ?? "Thành viên",
+                AvatarUrl = user?.AvatarUrl,
                 ParentCommentId = comment.ParentCommentId,
                 Content = comment.Content,
                 PageNumber = comment.PageNumber,
@@ -79,7 +80,8 @@ namespace Dict.Services
                     Id = c.Id,
                     UserId = c.UserId,
                     UserName = c.User.UserName,
-                    Content = c.IsDeleted ? "Bình luận này đã bị xóa." : c.Content, // Xử lý UI
+                    AvatarUrl = c.User.AvatarUrl,
+                    Content = c.IsDeleted ? "Bình luận này đã bị xóa." : c.Content,// Xử lý UI
                     PageNumber = c.PageNumber,
                     AnnotationData = c.AnnotationData,
                     IsDeleted = c.IsDeleted,
@@ -89,6 +91,7 @@ namespace Dict.Services
                         Id = r.Id,
                         UserId = r.UserId,
                         UserName = r.User.UserName,
+                        AvatarUrl = r.User.AvatarUrl,
                         Content = r.IsDeleted ? "Bình luận này đã bị xóa." : r.Content,
                         CreatedAt = r.CreatedAt
                     }).OrderBy(r => r.CreatedAt).ToList()

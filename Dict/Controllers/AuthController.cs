@@ -140,6 +140,37 @@ namespace Dict.Controllers
             }
         }
 
+        [HttpPost("resend-confirmation")]
+        public async Task<IActionResult> ResendConfirmation([FromBody] ForgotPasswordDto dto)
+        {
+            if (string.IsNullOrEmpty(dto.Email))
+            {
+                _response.IsSuccess = false;
+                _response.Message = "Email là bắt buộc.";
+                return BadRequest(_response);
+            }
+            try
+            {
+                var message = await _authService.ResendConfirmationAsync(dto.Email);
+                _response.Message = message;
+                _response.IsSuccess = true;
+                return Ok(_response);
+            }
+            catch (InvalidOperationException opEx)
+            {
+                _response.IsSuccess = false;
+                _response.Message = opEx.Message;
+                return BadRequest(_response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi gửi lại email xác nhận {Email}", dto.Email);
+                _response.IsSuccess = false;
+                _response.Message = "Không thể gửi email. Vui lòng thử lại.";
+                return StatusCode(500, _response);
+            }
+        }
+
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
         {

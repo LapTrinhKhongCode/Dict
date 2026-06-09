@@ -23,21 +23,23 @@ namespace Dict.Controllers
         private readonly IAdminService _adminService;
         private readonly ResponseDTO _response;
         private readonly ILogger<AdminController> _logger;
-        private readonly AzureTokenProvider _tokenProvider; // ✨ THÊM: 3. Biến private
-        private readonly IHttpClientFactory _httpClientFactory; // ✨ THÊM: 3. Biến private
+        private readonly AzureTokenProvider _tokenProvider;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
 
-        // ✨ THÊM: 2. Inject service vào constructor
         public AdminController(
             IAdminService adminService,
             ILogger<AdminController> logger,
-            AzureTokenProvider tokenProvider, // Thêm
-            IHttpClientFactory httpClientFactory) // Thêm
+            AzureTokenProvider tokenProvider,
+            IHttpClientFactory httpClientFactory,
+            IConfiguration configuration)
         {
             _adminService = adminService;
             _response = new ResponseDTO();
             _logger = logger;
-            _tokenProvider = tokenProvider; // Thêm
-            _httpClientFactory = httpClientFactory; // Thêm
+            _tokenProvider = tokenProvider;
+            _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -64,12 +66,12 @@ namespace Dict.Controllers
                 // BƯỚC 1: LẤY TOKEN TỰ ĐỘNG
                 string accessToken = await _tokenProvider.GetAccessTokenAsync();
 
-                // BƯỚC 2: CHUẨN BỊ URL
-                // --- [HÃY THAY ID CỦA BẠN VÀO ĐÂY] ---
-                var resourceId = "/subscriptions/3ec380e3-8389-4014-bcf5-481173c45ae7/resourceGroups/DictVM/providers/Microsoft.Compute/virtualMachines/dict";
+                var resourceId = _configuration["AzureAd:VmResourceId"];
                 var metricName = "Percentage CPU";
-                var timeSpan = "PT1H"; // 1 giờ
-                var interval = "PT5M"; // 5 phút
+                var endTime = DateTime.UtcNow;
+                var startTime = endTime.AddHours(-1);
+                var timeSpan = $"{startTime:yyyy-MM-ddTHH:mm:ssZ}/{endTime:yyyy-MM-ddTHH:mm:ssZ}";
+                var interval = "PT5M";
 
                 var url = $"https://management.azure.com{resourceId}/providers/Microsoft.Insights/metrics" +
                           $"?api-version=2018-01-01" +
@@ -116,27 +118,15 @@ namespace Dict.Controllers
         {
             try
             {
-                // BƯỚC 1: LẤY TOKEN TỰ ĐỘNG (Dùng chung)
                 string accessToken = await _tokenProvider.GetAccessTokenAsync();
 
-                // BƯỚC 2: CHUẨN BỊ URL CHO SQL DATABASE
+                var resourceId = _configuration["AzureAd:SqlResourceId"];
+                var metricName = "cpu_percent";
 
-                // --- [HÃY THAY ID CỦA SQL DATABASE VÀO ĐÂY] ---
-                // Lấy từ Portal -> SQL Database -> Properties -> Resource ID
-                var resourceId = "/subscriptions/3ec380e3-8389-4014-bcf5-481173c45ae7/resourceGroups/Dict/providers/Microsoft.Sql/servers/dict/databases/Dict";
-
-                // --- [CHỌN METRIC BẠN MUỐN LẤY] ---
-                // Hầu hết các DB đều dùng `cpu_percent`.
-                // Nếu bạn dùng gói DTU, `dtu_percent` sẽ hữu ích hơn.
-
-                var metricName = "cpu_percent";      // % CPU sử dụng
-                                                     // var metricName = "dtu_percent";       // % DTU sử dụng (nếu dùng gói DTU)
-                                                     // var metricName = "storage_percent";   // % Dung lượng lưu trữ
-                                                     // var metricName = "connections_count"; // Số lượng kết nối
-
-                // (Lấy dữ liệu 1 giờ qua, cách nhau 5 phút)
-                var timeSpan = "PT1H"; // 1 giờ
-                var interval = "PT5M"; // 5 phút
+                var endTime = DateTime.UtcNow;
+                var startTime = endTime.AddHours(-1);
+                var timeSpan = $"{startTime:yyyy-MM-ddTHH:mm:ssZ}/{endTime:yyyy-MM-ddTHH:mm:ssZ}";
+                var interval = "PT5M";
 
                 // Xây dựng URL cuối cùng
                 var url = $"https://management.azure.com{resourceId}/providers/Microsoft.Insights/metrics" +

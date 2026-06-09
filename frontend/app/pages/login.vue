@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useJwt } from "@/composables/useJwt";
 import { useToast } from "@/composables/useToast";
 import { useRuntimeConfig } from "#imports";
 
-const mode = ref<"login" | "register" | "forgot" | "reset">("login");
+const mode = ref<"login" | "register" | "forgot" | "reset" | "pending">("login");
 const username = ref("");
 const password = ref("");
 const email = ref("");
@@ -128,15 +128,12 @@ async function handleAuth() {
     
     // Đăng ký
     if (mode.value === "register") {
-      success.value = "Đăng ký thành công! Một liên kết xác nhận đã được gửi đến " + email.value;
-      showToast("Vui lòng xác nhận email trước khi đăng nhập", "success");
-      password.value = "";
-      touched.value = false;
-      
-      setTimeout(() => {
-        mode.value = "login";
-        success.value = ""; 
-      }, 5000); 
+      mode.value = "pending"
+      resendCooldown.value = 0
+      resendSuccess.value = ''
+      resendError.value = ''
+      // Tự động bắt đầu cooldown 30s sau khi gửi mail lần đầu
+      startCooldown(30)
     } 
     // Quên mật khẩu
     else if (mode.value === "forgot") {
@@ -194,6 +191,45 @@ function switchMode(newMode: "login" | "register" | "forgot") {
   showNewPassword.value = false;
   showConfirmPassword.value = false;
 }
+
+// ===== RESEND EMAIL =====
+const resendCooldown = ref(0)
+const resending = ref(false)
+const resendSuccess = ref('')
+const resendError = ref('')
+let cooldownTimer: ReturnType<typeof setInterval> | null = null
+
+function startCooldown(seconds = 30) {
+  resendCooldown.value = seconds
+  cooldownTimer = setInterval(() => {
+    resendCooldown.value--
+    if (resendCooldown.value <= 0 && cooldownTimer) clearInterval(cooldownTimer)
+  }, 1000)
+}
+
+async function resendEmail() {
+  if (!email.value || resending.value || resendCooldown.value > 0) return
+  resending.value = true
+  resendSuccess.value = ''
+  resendError.value = ''
+  try {
+    const res = await fetch(`${config.public.apiBaseUrl}/api/Auth/resend-confirmation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.isSuccess) throw new Error(data.message || 'Gửi thất bại.')
+    resendSuccess.value = 'Email xác nhận đã được gửi lại!'
+    startCooldown(30)
+  } catch (err: any) {
+    resendError.value = err.message || 'Không thể gửi. Vui lòng thử lại.'
+  } finally {
+    resending.value = false
+  }
+}
+
+onUnmounted(() => { if (cooldownTimer) clearInterval(cooldownTimer) })
 </script>
 
 <template>
@@ -202,7 +238,7 @@ function switchMode(newMode: "login" | "register" | "forgot") {
       
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white uppercase">
-          {{ mode === "login" ? "Đăng nhập" : mode === "register" ? "Đăng ký" : mode === "forgot" ? "Quên mật khẩu" : "Đặt lại mật khẩu" }}
+          {{ mode === "login" ? "Đăng nhập" : mode === "register" ? "Đăng ký" : mode === "pending" ? "Xác nhận Email" : mode === "forgot" ? "Quên mật khẩu" : "Đặt lại mật khẩu" }}
         </h2>
         
         <button
@@ -214,6 +250,13 @@ function switchMode(newMode: "login" | "register" | "forgot") {
         </button>
         <button
           v-if="mode === 'forgot' || mode === 'reset'"
+          @click="switchMode('login')"
+          class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
+        >
+          Quay lại Đăng nhập
+        </button>
+        <button
+          v-if="mode === 'pending'"
           @click="switchMode('login')"
           class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
         >
@@ -372,7 +415,42 @@ function switchMode(newMode: "login" | "register" | "forgot") {
         {{ error }}
       </div>
 
+      <!-- Màn chờ xác nhận email -->
+      <div v-if="mode === 'pending'" class="text-center py-4 space-y-5">
+        <div class="w-16 h-16 mx-auto rounded-full bg-blue-500/10 flex items-center justify-center">
+          <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="font-semibold text-gray-800 dark:text-white">Kiểm tra hộp thư của bạn!</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Chúng tôi đã gửi link xác nhận tới<br/>
+            <span class="font-medium text-blue-400">{{ email }}</span>
+          </p>
+        </div>
+
+        <div class="border-t border-gray-200 dark:border-neutral-700 pt-4 space-y-2">
+          <p class="text-xs text-gray-400">Không nhận được email?</p>
+          <p v-if="resendSuccess" class="text-green-500 text-xs font-medium">✅ {{ resendSuccess }}</p>
+          <p v-if="resendError" class="text-red-400 text-xs">{{ resendError }}</p>
+          <button
+            @click="resendEmail"
+            :disabled="resendCooldown > 0 || resending"
+            class="w-full py-2 rounded font-medium text-sm transition-all"
+            :class="resendCooldown > 0 || resending
+              ? 'bg-gray-100 dark:bg-neutral-700 text-gray-400 cursor-not-allowed'
+              : 'bg-primary-600 hover:bg-primary-700 text-white'"
+          >
+            <span v-if="resending">Đang gửi...</span>
+            <span v-else-if="resendCooldown > 0">Gửi lại sau {{ resendCooldown }}s</span>
+            <span v-else>Gửi lại email xác nhận</span>
+          </button>
+        </div>
+      </div>
+
       <button
+        v-if="mode !== 'pending'"
         @click="handleAuth"
         :disabled="loading"
         class="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded font-medium disabled:opacity-60 transition-colors"

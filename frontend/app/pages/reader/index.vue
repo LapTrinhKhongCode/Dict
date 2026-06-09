@@ -6,9 +6,47 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
         Quay lại
       </button>
-      <div class="font-bold">{{ pdfName || 'Tài liệu' }}</div>
-      <div class="text-xs px-3 py-1 bg-[#1e3a5f] text-[#5b8dee] rounded-full border border-[#5b8dee]/30 flex items-center gap-2">
-        <div class="w-2 h-2 rounded-full bg-[#5b8dee]"></div> Live
+      <!-- Tên tài liệu — click để đổi tên như Google Docs -->
+      <div class="flex items-center gap-1 min-w-0">
+        <span
+          v-if="!isEditingName"
+          @click="startRename"
+          class="font-bold cursor-text hover:bg-[#21262d] px-2 py-0.5 rounded transition truncate max-w-[200px]"
+          :title="editableName"
+        >{{ editableName || 'Tài liệu' }}</span>
+        <input
+          v-else
+          ref="nameInputRef"
+          v-model="editableName"
+          @blur="saveRename"
+          @keydown.enter.prevent="saveRename"
+          @keydown.esc.prevent="cancelRename"
+          class="font-bold bg-[#0d1117] border border-[#5b8dee] rounded px-2 py-0.5 text-white outline-none text-sm w-[200px]"
+        />
+        <span v-if="renameSaving" class="w-3 h-3 border-2 border-gray-400 border-t-white rounded-full animate-spin shrink-0"></span>
+      </div>
+      <!-- Avatars người đang xem realtime -->
+      <div class="flex items-center gap-2">
+        <TransitionGroup name="viewer-pop" tag="div" class="flex -space-x-2">
+          <div
+            v-for="v in viewers"
+            :key="v.userId"
+            class="relative w-9 h-9 rounded-full border-2 border-red-500 shadow-lg overflow-visible cursor-default shrink-0"
+            :title="v.userName"
+          >
+            <!-- Vòng pulse đỏ -->
+            <span class="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-50"></span>
+            <div class="w-full h-full rounded-full overflow-hidden">
+              <img v-if="v.avatarUrl" :src="v.avatarUrl" :alt="v.userName" class="w-full h-full object-cover" />
+              <div v-else class="w-full h-full flex items-center justify-center text-[13px] font-bold text-white uppercase" :style="{ backgroundColor: v.color }">
+                {{ v.userName.charAt(0) }}
+              </div>
+            </div>
+          </div>
+        </TransitionGroup>
+        <span v-if="viewers.length > 0" class="text-[11px] text-red-400 font-semibold ml-1 whitespace-nowrap">
+          {{ viewers.length }} đang xem
+        </span>
       </div>
     </header>
 
@@ -30,6 +68,13 @@
           <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
           <p>Đang chờ nạp dữ liệu OCR/PDF...</p>
         </div>
+        <!-- Overlay cursor cộng tác — absolute fill, pointer-events none -->
+        <CollabCursorOverlay
+          v-if="fileId"
+          :file-id="Number(fileId)"
+          :current-page="pdfCurrentPage"
+          @viewers-updated="(v) => viewers = v"
+        />
       </section>
 
       <div class="w-1.5 bg-[#161b22] border-x border-[#30363d] cursor-col-resize hover:bg-[#5b8dee] transition-colors z-20" @mousedown="startResize"></div>
@@ -66,14 +111,19 @@
 <script setup>
 definePageMeta({ layout: 'reader', ssr: false })
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useRuntimeConfig } from '#app'
+import { useJwt } from '~/composables/useJwt'
 
 import PdfViewer from '~/components/PdfViewer.vue'
 import FileCommentTab from '~/components/FileCommentTab.vue'
+import CollabCursorOverlay from '~/components/CollabCursorOverlay.vue'
 
 const route = useRoute()
 const router = useRouter()
+const config = useRuntimeConfig()
+const { jwt } = useJwt()
 
 const fileUrl = computed(() => route.query.url || '')
 const jobId = computed(() => route.query.jobId ? Number(route.query.jobId) : null)
@@ -81,12 +131,49 @@ const projectId = computed(() => route.query.projectId ? Number(route.query.proj
 
 const pdfName = computed(() => {
   if (!route.query.name) return 'Tài liệu'
-  try {
-    return decodeURIComponent(route.query.name)
-  } catch (e) {
-    return route.query.name
-  }
+  try { return decodeURIComponent(route.query.name) }
+  catch (e) { return route.query.name }
 })
+
+// Inline rename
+const editableName = ref('')
+const isEditingName = ref(false)
+const renameSaving = ref(false)
+const nameInputRef = ref(null)
+let originalName = ''
+
+watch(pdfName, (v) => { if (!isEditingName.value) editableName.value = v }, { immediate: true })
+
+function startRename() {
+  if (!jobId.value || !projectId.value) return
+  originalName = editableName.value
+  isEditingName.value = true
+  nextTick(() => nameInputRef.value?.select())
+}
+
+function cancelRename() {
+  editableName.value = originalName
+  isEditingName.value = false
+}
+
+async function saveRename() {
+  isEditingName.value = false
+  const name = editableName.value.trim()
+  if (!name || name === originalName || !jobId.value || !projectId.value) return
+  renameSaving.value = true
+  try {
+    await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId.value}/files/${jobId.value}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt.value}` },
+      body: JSON.stringify({ fileName: name })
+    })
+    originalName = name
+  } catch {
+    editableName.value = originalName
+  } finally {
+    renameSaving.value = false
+  }
+}
 
 const pdfData = ref(null) 
 const fileId = ref(null) 
@@ -94,6 +181,7 @@ const leftPanelWidth = ref(60)
 const isAccessDenied = ref(false)
 const pdfViewerRef = ref(null)
 const pdfCurrentPage = ref(1)
+const viewers = ref([])
 
 watch(() => route.query.id, (newId) => {
   if (newId && !fileId.value) {
@@ -136,4 +224,8 @@ const goBack = () => router.back()
   background-color: #0d1117;
   color: #c9d1d9;
 }
+.viewer-pop-enter-active { transition: all 0.2s ease; }
+.viewer-pop-leave-active { transition: all 0.15s ease; }
+.viewer-pop-enter-from { opacity: 0; transform: scale(0.5); }
+.viewer-pop-leave-to { opacity: 0; transform: scale(0.5); }
 </style>

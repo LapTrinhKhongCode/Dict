@@ -65,15 +65,22 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl"); // Lấy từ appsettings
+var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl");
+var allowedOrigins = new[]
+{
+    frontendUrl,
+    "http://localhost:3000",
+    "http://localhost:3001",
+}.Where(o => !string.IsNullOrEmpty(o)).ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAnyOrigin", policy =>
     {
-        policy.WithOrigins(frontendUrl)
-       .AllowAnyMethod()
-       .AllowAnyHeader()
-       .AllowCredentials();
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 builder.Services.AddHttpContextAccessor();

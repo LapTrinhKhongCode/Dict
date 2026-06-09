@@ -7,16 +7,8 @@ namespace Dict.Service
     {
         public string? GetUserId(HubConnectionContext connection)
         {
-            var email = connection.User?.FindFirst("email")?.Value
-                     ?? connection.User?.FindFirst(ClaimTypes.Email)?.Value;
-
-            // THÊM DÒNG NÀY ĐỂ KIỂM TRA TRÊN CONSOLE CỦA BACKEND
-            if (email != null)
-                Console.WriteLine($"[SignalR] User connected with Email: {email}");
-            else
-                Console.WriteLine("[SignalR] Warning: Could not find Email claim for connection!");
-
-            return email?.ToLower();
+            // Dùng userId (số) làm định danh duy nhất — tránh trùng nếu user đổi email
+            return connection.User?.FindFirst("userId")?.Value;
         }
     }
 }

@@ -21,8 +21,11 @@
       </div>
 
       <div v-for="c in comments" :key="c.id" class="flex gap-3">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1f6feb] to-[#58a6ff] text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase shadow-lg">
-          {{ c.userName.charAt(0) }}
+        <div class="w-8 h-8 rounded-lg shrink-0 shadow-lg overflow-hidden">
+          <img v-if="c.avatarUrl" :src="c.avatarUrl" :alt="c.userName" class="w-full h-full object-cover" />
+          <div v-else class="w-full h-full bg-gradient-to-br from-[#1f6feb] to-[#58a6ff] text-white flex items-center justify-center font-bold text-xs uppercase">
+            {{ c.userName.charAt(0) }}
+          </div>
         </div>
 
         <div class="flex-1 min-w-0">
