@@ -1,39 +1,123 @@
 <template>
-  <div class="relative flex h-full">
+  <div class="relative h-full w-14">
 
-    <div class="flex flex-col items-center gap-2 w-14 py-3 bg-gray-200 dark:bg-neutral-900 border-r border-gray-300 dark:border-neutral-700 flex-shrink-0 z-50 relative">
-      <div v-if="loading" class="flex flex-col gap-2 mt-2">
-        <div v-for="i in 3" :key="i"
-          class="w-9 h-9 rounded-xl bg-gray-300 dark:bg-neutral-700 animate-pulse">
-        </div>
-      </div>
-      <template v-else>
-        <button
-          v-for="ws in workspaces" :key="ws.id"
-          @click="selectWorkspace(ws)"
-          :title="ws.name"
+    <!-- Activity Bar: 56px collapsed, expands to 208px on hover ONLY when workspace panel is closed -->
+    <div
+      :class="[
+        'group/bar absolute left-0 top-0 h-full z-50 flex flex-col overflow-hidden',
+        'bg-gray-200 dark:bg-neutral-900 border-r border-gray-300 dark:border-neutral-700',
+        'transition-[width] duration-200 ease-in-out w-14',
+        !activeWs ? 'hover:w-52 hover:shadow-xl' : ''
+      ]"
+    >
+      <!-- Japanese nav items -->
+      <div class="flex flex-col flex-1 gap-0.5 px-2 pt-3">
+        <NuxtLink
+          v-for="item in navItems" :key="item.to"
+          :to="item.to"
+          :title="item.label"
           :class="[
-            'relative w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-150 flex-shrink-0',
-            activeWs?.id === ws.id
-              ? 'bg-blue-500 text-gray-900 rounded-2xl shadow-md scale-105'
-              : 'bg-gray-400 dark:bg-neutral-600 text-white hover:bg-blue-500 dark:hover:bg-blue-600 hover:rounded-2xl'
+            'relative flex items-center gap-3 px-2 py-2 rounded-xl transition-all duration-150 min-w-0',
+            route.path.startsWith(item.to)
+              ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
+              : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-300 dark:hover:bg-neutral-700 hover:text-gray-900 dark:hover:text-white'
           ]"
         >
-          {{ ws.name[0].toUpperCase() }}
-          <span v-if="activeWs?.id === ws.id"
-            class="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-5 bg-gray-900 dark:bg-white rounded-r-full">
+          <span v-if="route.path.startsWith(item.to)"
+            class="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-500 rounded-r-full" />
+          <UIcon :name="item.icon" class="w-5 h-5 flex-shrink-0" />
+          <span class="text-sm font-medium whitespace-nowrap overflow-hidden
+                       opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+            {{ item.label }}
           </span>
-        </button>
-        <div class="w-7 h-px bg-gray-300 dark:bg-neutral-700 my-1"></div>
-        <button @click="showCreate = true" title="Tạo workspace mới"
-          class="w-9 h-9 rounded-xl flex items-center justify-center text-xl font-light text-gray-500 dark:text-neutral-400 bg-gray-300 dark:bg-neutral-700 hover:bg-green-500 hover:text-white hover:rounded-2xl transition-all duration-150"
-        >+</button>
+        </NuxtLink>
+      </div>
+
+      <!-- Divider + Workspace section -->
+      <template v-if="isAuthenticated">
+        <div class="mx-3 my-2 h-px bg-gray-300 dark:bg-neutral-700" />
+
+        <div class="flex flex-col px-2 pb-2 gap-0.5">
+          <!-- Section label -->
+          <div class="flex items-center gap-3 px-2 py-1 mb-0.5 overflow-hidden">
+            <span class="w-5 h-5 flex-shrink-0" />
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-neutral-500 whitespace-nowrap
+                         opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+              Workspace
+            </span>
+          </div>
+
+          <!-- Loading -->
+          <template v-if="loading">
+            <div v-for="i in 3" :key="i" class="h-9 rounded-xl bg-gray-300 dark:bg-neutral-700 animate-pulse mx-1" />
+          </template>
+
+          <template v-else>
+            <button
+              v-for="ws in workspaces" :key="ws.id"
+              @click="selectWorkspace(ws)"
+              :title="ws.name"
+              :class="[
+                'relative flex items-center gap-3 w-full px-2 py-1.5 rounded-xl transition-all duration-150 text-left overflow-hidden',
+                activeWs?.id === ws.id
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 dark:text-neutral-300 hover:bg-gray-300 dark:hover:bg-neutral-700'
+              ]"
+            >
+              <span :class="[
+                'w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0',
+                activeWs?.id === ws.id
+                  ? 'bg-blue-400 text-white'
+                  : 'bg-gray-400 dark:bg-neutral-600 text-white'
+              ]">{{ ws.name[0].toUpperCase() }}</span>
+              <span class="text-sm truncate whitespace-nowrap
+                           opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+                {{ ws.name }}
+              </span>
+              <span v-if="activeWs?.id === ws.id"
+                class="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-300 rounded-r-full" />
+            </button>
+
+            <div class="mx-1 my-1 h-px bg-gray-300 dark:bg-neutral-700" />
+
+            <button @click="showCreate = true" title="Workspace mới"
+              class="flex items-center gap-3 px-2 py-1.5 rounded-xl overflow-hidden
+                     text-gray-500 dark:text-neutral-400
+                     hover:bg-green-100 dark:hover:bg-green-900/30
+                     hover:text-green-600 dark:hover:text-green-400 transition-all"
+            >
+              <UIcon name="i-lucide-plus" class="w-5 h-5 flex-shrink-0" />
+              <span class="text-sm whitespace-nowrap
+                           opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+                Workspace mới
+              </span>
+            </button>
+          </template>
+        </div>
       </template>
+
+      <!-- Admin -->
+      <NuxtLink v-if="isAuthenticated && role === 'ADMIN'" to="/admin" title="Trang Admin"
+        :class="[
+          'flex items-center gap-3 mx-2 px-2 py-2 rounded-xl mb-3 transition-all duration-150 overflow-hidden',
+          route.path.startsWith('/admin')
+            ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
+            : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-300 dark:hover:bg-neutral-700 hover:text-gray-900 dark:hover:text-white'
+        ]"
+      >
+        <UIcon name="i-lucide-settings" class="w-5 h-5 flex-shrink-0" />
+        <span class="text-sm whitespace-nowrap
+                     opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+          Trang Admin
+        </span>
+      </NuxtLink>
     </div>
 
+    <!-- Workspace panel: absolute at left-14, appears when workspace active -->
     <Transition name="slide">
       <div v-if="activeWs"
-        class="absolute left-14 top-0 h-full flex flex-col w-50 bg-gray-100 dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 z-40 shadow-lg overflow-hidden"
+        class="absolute left-14 top-0 h-full flex flex-col w-50
+               bg-gray-100 dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 overflow-hidden z-[45] shadow-lg"
       >
         <div class="px-3 py-3 border-b border-gray-200 dark:border-neutral-700">
           <div class="flex items-center justify-between">
@@ -240,7 +324,16 @@ const router = useRouter()
 const route = useRoute()
 const { getMyWorkspaces, createWorkspace } = useWorkspace()
 const { getProjects, createProject } = useProject()
-const { jwt } = useJwt()
+const { jwt, isAuthenticated, role } = useJwt()
+
+const navItems = [
+  { to: '/search',   icon: 'i-lucide-search',         label: 'Tra cứu' },
+  { to: '/alphabet', icon: 'i-custom-alphabet',        label: 'Bảng chữ cái' },
+  { to: '/kanji',    icon: 'i-custom-kanji',           label: 'Hán tự' },
+  { to: '/explore',  icon: 'i-lucide-layers',          label: 'Flashcard' },
+  { to: '/sensei',   icon: 'i-lucide-message-circle',  label: 'Hội thoại' },
+  { to: '/reading',  icon: 'i-lucide-book-open',       label: 'Luyện đọc' },
+]
 const config = useRuntimeConfig()
 
 const emit = defineEmits<{ 'panel-change': [isOpen: boolean] }>()
@@ -252,7 +345,7 @@ watch(jwt, (newVal) => {
     projects.value = []
     emit('panel-change', false)
   }
-})
+}, { flush: 'post' })
 
 const workspaces = ref<any[]>([])
 const loading = ref(true)
@@ -402,8 +495,7 @@ onMounted(() => {
   
   // 🔥 Lắng nghe sự kiện từ AppNavBar
   $bus.on('workspace-updated', () => {
-    console.log("Sidebar nhận tín hiệu cập nhật...");
-    load(true); // Gọi hàm load lại danh sách Workspace (silent mode)
+    load(true);
   });
 });
 
@@ -414,10 +506,12 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Hiệu ứng trượt cho độ rộng 56 (14rem) */
-.slide-enter-active, .slide-leave-active { transition: all 0.12s ease; }
-.slide-enter-from, .slide-leave-to { width: 0; opacity: 0; overflow: hidden; }
-.slide-enter-to, .slide-leave-from { width: 12rem; }
+.slide-enter-active, .slide-leave-active {
+  transition: max-width 0.15s ease, opacity 0.15s ease;
+  overflow: hidden;
+}
+.slide-enter-from, .slide-leave-to { max-width: 0; opacity: 0; }
+.slide-enter-to, .slide-leave-from { max-width: 200px; }
 
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }

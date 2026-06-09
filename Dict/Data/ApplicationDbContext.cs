@@ -98,6 +98,7 @@ namespace Dict.Data
         public DbSet<WorkspaceMember> WorkspaceMembers { get; set; }
         public DbSet<WorkspaceInvitation> WorkspaceInvitations { get; set; }
         public DbSet<FileComment> FileComments { get; set; }
+        public DbSet<WordComment> WordComments { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

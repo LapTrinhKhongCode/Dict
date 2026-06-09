@@ -172,6 +172,7 @@ builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWorkspaceInvitationService, WorkspaceInvitationService>();
 builder.Services.AddScoped<IFileCommentService, FileCommentService>();
+builder.Services.AddScoped<IWordCommentService, WordCommentService>();
 builder.Services.AddSingleton<TrieAutocompleteCache>();
 builder.Services.AddHostedService<TrieLoaderService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();

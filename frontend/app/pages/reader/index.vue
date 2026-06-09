@@ -34,8 +34,6 @@
             class="relative w-9 h-9 rounded-full border-2 border-red-500 shadow-lg overflow-visible cursor-default shrink-0"
             :title="v.userName"
           >
-            <!-- Vòng pulse đỏ -->
-            <span class="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-50"></span>
             <div class="w-full h-full rounded-full overflow-hidden">
               <img v-if="v.avatarUrl" :src="v.avatarUrl" :alt="v.userName" class="w-full h-full object-cover" />
               <div v-else class="w-full h-full flex items-center justify-center text-[13px] font-bold text-white uppercase" :style="{ backgroundColor: v.color }">

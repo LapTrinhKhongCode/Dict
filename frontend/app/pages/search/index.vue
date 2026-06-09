@@ -198,32 +198,22 @@ const fetchKanjiDataOnly = async (kanjiSearchTerm: string) => {
     if (!res.ok) throw new Error("Kanji data not found");
     const response = await res.json();
 
-    console.log("1. Data từ API:", response);
-
     if (
       response.status === 200 &&
       response.results &&
       response.results.length > 0
     ) {
-      // CHUẨN HÓA MẢNG DỮ LIỆU ĐẦU RA
       const validKanjiList = [];
 
       response.results.forEach((item: any) => {
-        // Trường hợp 1: Dữ liệu chuẩn bị bọc trong results (như chữ 大)
         if (item && item.results && item.results.length > 0) {
           validKanjiList.push(item.results[0]);
-        }
-        // Trường hợp 2: Dữ liệu đã là object Kanji chuẩn, có key "kanji"
-        else if (item && item.kanji) {
+        } else if (item && item.kanji) {
           validKanjiList.push(item);
-        }
-        // Trường hợp 3: Có thể nằm trong key "data"
-        else if (item && item.data && item.data.length > 0) {
+        } else if (item && item.data && item.data.length > 0) {
           validKanjiList.push(item.data[0]);
         }
       });
-
-      console.log("2. Đã gọt vỏ xong:", validKanjiList);
 
       // Nếu gọt xong mà vẫn có mảng hợp lệ thì mới gán
       if (validKanjiList.length > 0) {

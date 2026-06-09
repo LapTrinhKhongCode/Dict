@@ -383,6 +383,9 @@
               <span v-else> Thu gọn </span>
             </button>
           </div>
+
+          <!-- Phần bình luận -->
+          <WordCommentSection v-if="selectedWord" :word-label="selectedWord.word" />
         </div>
 
         <div
@@ -655,6 +658,7 @@ import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
 import { useJwt } from "~/composables/useJwt";
 import ImageModal from "~/components/ImageModal.vue";
 import { useToast } from "@/composables/useToast";
+import WordCommentSection from "~/components/WordCommentSection.vue";
 
 const { showToast } = useToast();
 

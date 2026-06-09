@@ -202,9 +202,9 @@ function handleLogin() {
   router.push("/login");
 }
 async function handleLogout() {
-  await logout();
-  showToast("Logout successful!", "success");
-  router.replace("/login");
+  await router.replace("/login");
+  logout();
+  showToast("Đã đăng xuất!", "success");
 }
 </script>
 
