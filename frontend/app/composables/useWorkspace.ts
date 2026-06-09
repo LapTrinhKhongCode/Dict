@@ -37,14 +37,18 @@ export const useWorkspace = () => {
   // Lấy API base URL từ nuxt.config.ts
   const base = config.public.apiBaseUrl
 
-  // Lấy token mới nhất mỗi lần gọi
+  // Đọc từ localStorage làm primary source để tránh SSR hydration timing issue
+  const getToken = () =>
+    (process.client ? localStorage.getItem('jwt_token') : null) ?? jwt.value ?? ''
+
   const headers = () => ({
-    Authorization: `Bearer ${jwt.value ?? ''}`
+    Authorization: `Bearer ${getToken()}`
   })
 
   // Guard: chưa đăng nhập thì redirect /login
   const guard = () => {
-    if (!isAuthenticated.value) {
+    const token = getToken()
+    if (!token && !isAuthenticated.value) {
       router.push('/login')
       throw new Error('Chưa đăng nhập')
     }

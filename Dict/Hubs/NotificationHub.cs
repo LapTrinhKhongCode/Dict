@@ -55,22 +55,33 @@ namespace Dict.Hubs
         public async Task JoinDocumentRoom(int documentId, string? avatarUrl = null)
         {
             string roomName = $"Document_{documentId}";
+            // Luôn add vào group trước — dù các bước sau có fail, client vẫn nhận được broadcasts
             await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
 
-            var userId = Context.UserIdentifier ?? Context.ConnectionId;
-            var userName = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? userId;
+            try
+            {
+                var userId = Context.UserIdentifier ?? Context.ConnectionId;
+                var userName = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
+                            ?? Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                            ?? userId;
 
-            // Lưu vào tracker
-            var viewers = _documentViewers.GetOrAdd(documentId, _ => new ConcurrentDictionary<string, (string, string?)>());
-            viewers[userId] = (userName, avatarUrl);
-            _connectionMap[Context.ConnectionId] = (documentId, userId);
+                // Lưu vào tracker — dùng named tuple để đảm bảo type nhất quán
+                var viewers = _documentViewers.GetOrAdd(documentId, _ => new ConcurrentDictionary<string, (string UserName, string? AvatarUrl)>());
+                viewers[userId] = (userName, avatarUrl);
+                _connectionMap[Context.ConnectionId] = (documentId, userId);
 
-            // Gửi danh sách hiện tại cho người vừa join (kèm avatarUrl)
-            var currentList = viewers.Select(kv => new { UserId = kv.Key, UserName = kv.Value.UserName, AvatarUrl = kv.Value.AvatarUrl }).ToList();
-            await Clients.Caller.SendAsync("RoomViewers", currentList);
+                // Gửi danh sách hiện tại cho người vừa join
+                var currentList = viewers.Select(kv => new { UserId = kv.Key, kv.Value.UserName, kv.Value.AvatarUrl }).ToList();
+                await Clients.Caller.SendAsync("RoomViewers", currentList);
 
-            // Notify mọi người khác (kèm avatar của người vừa join)
-            await Clients.OthersInGroup(roomName).SendAsync("UserJoined", new { UserId = userId, UserName = userName, AvatarUrl = avatarUrl });
+                // Notify mọi người khác
+                await Clients.OthersInGroup(roomName).SendAsync("UserJoined", new { UserId = userId, UserName = userName, AvatarUrl = avatarUrl });
+            }
+            catch (Exception ex)
+            {
+                // Không throw — client đã join group thành công, chỉ thiếu viewer list
+                Console.Error.WriteLine($"[NotificationHub] JoinDocumentRoom metadata error (doc {documentId}): {ex.Message}");
+            }
         }
 
         /// <summary>Frontend gọi khi đóng file / tắt trang</summary>

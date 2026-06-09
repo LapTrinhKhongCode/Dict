@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRuntimeConfig } from '#app'
 import { useJwt } from '~/composables/useJwt'
 import { useFileComment } from '~/composables/useFileComment'
@@ -157,21 +157,22 @@ function setupSignalR() {
 
   hubConnection = new signalR.HubConnectionBuilder()
     .withUrl(`${config.public.apiBaseUrl}/notificationHub`, {
-      accessTokenFactory: () => token,
-      // Fallback: WebSockets → ServerSentEvents → LongPolling
-      // Cần thiết khi production proxy không forward WebSocket upgrade headers
+      accessTokenFactory: () => localStorage.getItem('jwt_token') || token,
+      // Không dùng skipNegotiation — để SignalR tự negotiate transport phù hợp
       transport: signalR.HttpTransportType.WebSockets
         | signalR.HttpTransportType.ServerSentEvents
         | signalR.HttpTransportType.LongPolling,
-      skipNegotiation: false,
     })
     .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
     .configureLogging(signalR.LogLevel.Warning)
     .build()
 
   hubConnection.on("ReceiveNewComment", (newCmt) => {
-    comments.value.push(newCmt)
-    scrollToBottom()
+    // Dedup: tránh trùng khi optimistic update đã push trước rồi
+    if (!comments.value.find(c => c.id === newCmt.id)) {
+      comments.value.push(newCmt)
+      scrollToBottom()
+    }
   })
 
   hubConnection.on("CommentDeleted", (commentId) => {
@@ -184,9 +185,14 @@ function setupSignalR() {
 
   hubConnection.start()
     .then(() => {
-      hubConnection?.invoke("JoinDocumentRoom", Number(props.fileId)) 
+      return hubConnection?.invoke("JoinDocumentRoom", Number(props.fileId))
     })
-    .catch(err => console.error("SignalR Error:", err))
+    .catch(err => console.warn("SignalR FileComment không kết nối được (realtime off):", err))
+
+  // Retry JoinDocumentRoom sau mỗi lần reconnect thành công
+  hubConnection.onreconnected(() => {
+    hubConnection?.invoke("JoinDocumentRoom", Number(props.fileId)).catch(() => {})
+  })
 }
 
 async function fetchComments() {
@@ -216,6 +222,13 @@ async function submitComment() {
     if (res && res.isSuccess === false) {
       showToast(res.message, "error")
       return
+    }
+    // Optimistic update: push comment ngay sau REST success
+    // (nếu SignalR cũng deliver, dedup handler sẽ bỏ qua bản trùng)
+    const newCmt = res?.result || res
+    if (newCmt?.id && !comments.value.find((c: any) => c.id === newCmt.id)) {
+      comments.value.push(newCmt)
+      scrollToBottom()
     }
     newComment.value = ''
   } catch (error) {
@@ -254,8 +267,27 @@ function scrollToBottom() {
 }
 
 onMounted(() => {
-  fetchComments()
   setupSignalR()
+  // Chỉ fetch nếu jwt đã sẵn sàng, nếu không thì watch jwt sẽ trigger
+  if (jwt.value || localStorage.getItem('jwt_token')) {
+    fetchComments()
+  }
+})
+
+// Watch jwt: nếu mount sớm hơn khi jwt chưa ready → fetch khi token có
+watch(jwt, (newVal) => {
+  if (newVal && comments.value.length === 0 && !loading.value) {
+    fetchComments()
+  }
+})
+
+// fileId thay đổi (ví dụ PdfViewer emit khác id) → reload
+watch(() => props.fileId, (newId, oldId) => {
+  if (!newId || newId === oldId) return
+  fetchComments()
+  if (hubConnection?.state === signalR.HubConnectionState.Connected) {
+    hubConnection.invoke("JoinDocumentRoom", Number(newId)).catch(() => {})
+  }
 })
 
 onUnmounted(() => {

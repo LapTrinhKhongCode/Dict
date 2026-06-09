@@ -84,11 +84,10 @@ function setupSignalR() {
 
   hubConnection = new signalR.HubConnectionBuilder()
     .withUrl(`${config.public.apiBaseUrl}/notificationHub`, {
-      accessTokenFactory: () => token,
+      accessTokenFactory: () => localStorage.getItem('jwt_token') || token,
       transport: signalR.HttpTransportType.WebSockets
         | signalR.HttpTransportType.ServerSentEvents
         | signalR.HttpTransportType.LongPolling,
-      skipNegotiation: false,
     })
     .withAutomaticReconnect([0, 2000, 5000, 10000])
     .configureLogging(signalR.LogLevel.None)

@@ -339,7 +339,9 @@ const config = useRuntimeConfig()
 const emit = defineEmits<{ 'panel-change': [isOpen: boolean] }>()
 
 watch(jwt, (newVal) => {
-  if (!newVal) {
+  if (newVal) {
+    load() // Reload workspaces sau khi đăng nhập
+  } else {
     workspaces.value = []
     activeWs.value = null
     projects.value = []
