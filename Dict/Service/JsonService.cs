@@ -31,7 +31,7 @@ namespace Dict.Service
                     using var doc = JsonDocument.Parse(raw);
                     var root = doc.RootElement;
 
-                    // Tạo signature theo các key cấp 1 (sorted)
+                    // Tạo signature theo các key cấp 1 
                     var keys = string.Join(",", root.EnumerateObject()
                                                     .Select(p => p.Name)
                                                     .OrderBy(k => k));
