@@ -144,6 +144,10 @@ function setupSignalR() {
     showToast(`Bạn có lời mời mới từ ${newInvite.inviterName}!`, "success");
   });
 
+  hubConnection.on("InvitationResponded", (data: any) => {
+    showToast(data.message, data.isAccepted ? "success" : "info");
+  });
+
   hubConnection
     .start()
     .catch((err) => console.error("SignalR Connection Error:", err));

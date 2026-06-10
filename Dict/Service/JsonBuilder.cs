@@ -106,6 +106,25 @@ namespace Dict.Service
                 }
             }
 
+            // --- FALLBACK: borrow senses từ sibling cùng MobileId nếu Senses trống ---
+            foreach (var entry in mainEntries.Where(e => (e.Senses == null || !e.Senses.Any()) && e.MobileId.HasValue))
+            {
+                var sibling = await _db.Entries
+                    .AsNoTrackingWithIdentityResolution()
+                    .Where(e2 => e2.MobileId == entry.MobileId && e2.Id != entry.Id && e2.Senses.Any())
+                    .Include(e2 => e2.Senses).ThenInclude(s => s.Glosses)
+                    .Include(e2 => e2.Senses).ThenInclude(s => s.Examples)
+                    .Include(e2 => e2.Senses).ThenInclude(s => s.SynsetEntries).ThenInclude(se => se.SynonymItems)
+                    .AsSplitQuery()
+                    .FirstOrDefaultAsync();
+                if (sibling != null)
+                {
+                    entry.Senses = sibling.Senses;
+                    _logger.LogInformation("BorrowSenses: entry {Id} ({Label}) borrowed {Count} senses from sibling {SibId} ({SibLabel})",
+                        entry.Id, entry.Label, sibling.Senses.Count, sibling.Id, sibling.Label);
+                }
+            }
+
             // --- ÁNH XẠ VÀ ĐÓNG GÓI ---
 
             // 1. Lấy danh sách Kanji ID cần thiết từ TẤT CẢ các kết quả chính
@@ -165,7 +184,8 @@ namespace Dict.Service
             return JsonConvert.SerializeObject(rootObject, Formatting.Indented, new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Ignore,
-                DefaultValueHandling = DefaultValueHandling.Ignore
+                DefaultValueHandling = DefaultValueHandling.Ignore,
+                StringEscapeHandling = StringEscapeHandling.EscapeNonAscii
             });
         }
 
@@ -248,7 +268,8 @@ namespace Dict.Service
             return JsonConvert.SerializeObject(rootObject, Formatting.Indented, new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Ignore,
-                DefaultValueHandling = DefaultValueHandling.Ignore
+                DefaultValueHandling = DefaultValueHandling.Ignore,
+                StringEscapeHandling = StringEscapeHandling.EscapeNonAscii
             });
         }
 
@@ -354,6 +375,7 @@ namespace Dict.Service
                 ShortMean = mainWordRecord.ShortMean,
                 Weight = mainWordRecord.Weight,
                 MobileId = mainWordRecord.MobileId,
+                EntryId = mainWordRecord.EntryId,
                 Images = entryFromDb.Media?.Select(m => m.Url).ToList() ?? new List<string>(),
                 OppositeWord = mainWordRecord.Relations?.Where(r => r.RelationType == "opposite" && r.RelatedWord != null).Select(r => r.RelatedWord.WordText ?? "").ToList() ?? new List<string>()
             };
@@ -425,6 +447,7 @@ namespace Dict.Service
                 Phonetic = wordRecord.Phonetic ?? "",
                 ShortMean = wordRecord.ShortMean ?? "",
                 MobileId = wordRecord.MobileId,
+                EntryId = entry.Id,
                 Means = entry.Senses?
                             .OrderBy(s => s.SenseOrder)
                             .Select(s => new Dict.Models.JsonModels.Mean

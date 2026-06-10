@@ -607,7 +607,9 @@ namespace Dict.Controllers
             // Left join với bảng Kanji để lấy Meaning, StrokeCount, JlptLevel, Freq, Grade
             var items = await (
                 from e in query
-                join k in db.Kanji on e.Label equals k.Character into kj
+                join k in db.Kanji
+                    on EF.Functions.Collate(e.Label, "DATABASE_DEFAULT")
+                    equals EF.Functions.Collate(k.Character, "DATABASE_DEFAULT") into kj
                 from k in kj.DefaultIfEmpty()
                 // Kanji filters — chỉ áp dụng khi type=kanji
                 where (string.IsNullOrWhiteSpace(jlptLevel) || k.JlptLevel == jlptLevel)
@@ -642,6 +644,57 @@ namespace Dict.Controllers
                 Page = page,
                 PageSize = pageSize,
             };
+            return Ok(_response);
+        }
+
+        // GET /api/admin/entries/{id}/diagnose
+        [AllowAnonymous]
+        [HttpGet("entries/{id}/diagnose")]
+        public async Task<IActionResult> DiagnoseEntry(int id,
+            [FromServices] Dict.Data.ApplicationDbContext db = null!)
+        {
+            var entry = await db.Entries
+                .Where(e => e.Id == id)
+                .Select(e => new {
+                    e.Id, e.Label, e.Type, e.EntryCategory, e.MobileId,
+                    WordCount = e.Words.Count(),
+                    SenseCount = e.Senses.Count(),
+                    GlossCount = e.Senses.SelectMany(s => s.Glosses).Count(),
+                    ExampleCount = e.Senses.SelectMany(s => s.Examples).Count(),
+                    HasRawJson = e.RawJson != null && e.RawJson.Length > 10,
+                    RawJsonSource = e.RawJson != null && e.RawJson.Contains("\"_rev\"") ? "CouchDB_Old" :
+                                   e.RawJson != null && e.RawJson.Length > 10 ? "JsonBuilder" : "Empty",
+                    Words = e.Words.Select(w => new { w.Id, w.WordText, w.Phonetic, w.ShortMean, w.Weight, w.MobileId, w.EntryId }).ToList(),
+                    Senses = e.Senses.OrderBy(s => s.SenseOrder).Select(s => new {
+                        s.Id, s.Pos, s.SenseOrder,
+                        Glosses = s.Glosses.Select(g => new { g.Id, g.Text }).ToList(),
+                        ExampleCount = s.Examples.Count()
+                    }).ToList()
+                })
+                .FirstOrDefaultAsync();
+
+            if (entry == null) return NotFound();
+
+            // Check for sibling entries with same label or mobileId that have senses
+            var siblings = await db.Entries
+                .Where(e => e.Id != id && (e.Label == entry.Label || (entry.MobileId != null && e.MobileId == entry.MobileId)))
+                .Select(e => new {
+                    e.Id, e.Label, e.EntryCategory, e.MobileId,
+                    SenseCount = e.Senses.Count(),
+                    GlossCount = e.Senses.SelectMany(s => s.Glosses).Count(),
+                    RawJsonLen = e.RawJson == null ? 0 : e.RawJson.Length,
+                    RawJsonSource = e.RawJson != null && e.RawJson.Contains("\"_rev\"") ? "CouchDB_Old" :
+                                   e.RawJson != null && e.RawJson.Length > 10 ? "JsonBuilder" : "Empty",
+                })
+                .ToListAsync();
+
+            // Show first 300 chars of RawJson for quick inspection
+            var rawJsonPreview = await db.Entries
+                .Where(e => e.Id == id)
+                .Select(e => e.RawJson == null ? "" : e.RawJson.Substring(0, e.RawJson.Length > 300 ? 300 : e.RawJson.Length))
+                .FirstOrDefaultAsync();
+
+            _response.Result = new { entry, siblings, rawJsonPreview };
             return Ok(_response);
         }
 
@@ -1151,6 +1204,7 @@ namespace Dict.Controllers
 
         // POST /api/admin/reload-trie — rebuild Trie + KanjiCache ngay lập tức
         [HttpPost("reload-trie")]
+        [Microsoft.AspNetCore.Http.Timeouts.RequestTimeout(300)]  // 5 phút
         public async Task<IActionResult> ReloadTrie(
             [FromServices] TrieLoaderService trieLoader)
         {

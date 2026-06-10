@@ -67,6 +67,18 @@
 
         <div v-if="activeTab === 'word'" v-show="!loading && !error">
           <div v-if="selectedWord" class="space-y-6 relative">
+            <!-- Admin edit button -->
+            <a
+              v-if="isAdmin"
+              :href="`/admin/word?id=${selectedWord.entryId}&label=${encodeURIComponent(selectedWord.word)}`"
+              target="_blank"
+              rel="noopener"
+              class="absolute top-0 right-10 z-10 size-9 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-800/60 transition-colors"
+              title="Chỉnh sửa trong Admin"
+              aria-label="Chỉnh sửa trong Admin"
+            >
+              <UIcon name="i-lucide-pencil" class="size-4" />
+            </a>
             <button
               ref="decksButtonRef"
               type="button"
@@ -734,7 +746,11 @@ const visibleSuggestions = computed(() => {
 });
 
 // --- Logic "Lưu vào Deck" ---
-const { isAuthenticated, jwt } = useJwt();
+const { isAuthenticated, jwt, role } = useJwt();
+const isAdmin = computed(() => {
+  const r = role.value ?? (process.client ? localStorage.getItem('user_role') : null)
+  return r?.toLowerCase() === 'admin'
+})
 const decks = ref<any[]>([]);
 const decksLoading = ref(false);
 const saveLoading = ref(false);

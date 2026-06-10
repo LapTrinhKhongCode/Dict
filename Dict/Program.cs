@@ -186,7 +186,10 @@ builder.Services.AddScoped<IWorkspaceInvitationService, WorkspaceInvitationServi
 builder.Services.AddScoped<IFileCommentService, FileCommentService>();
 builder.Services.AddScoped<IWordCommentService, WordCommentService>();
 builder.Services.AddSingleton<TrieAutocompleteCache>();
-builder.Services.AddHostedService<TrieLoaderService>();
+// Đăng ký TrieLoaderService vừa là Singleton (để inject qua [FromServices])
+// vừa là HostedService (để chạy background khi startup)
+builder.Services.AddSingleton<TrieLoaderService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<TrieLoaderService>());
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddSingleton<IUserIdProvider, EmailBasedUserIdProvider>();
 builder.Services.AddSingleton<IRagSearchService, RagSearchService>();

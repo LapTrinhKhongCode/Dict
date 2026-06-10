@@ -24,9 +24,11 @@ namespace Dict.Service
         {
             return _db.Entries
                 .AsNoTracking()
-                // BỎ EF.Functions.Collate, DÙNG == BÌNH THƯỜNG ĐỂ ĂN INDEX 1ms
                 .Where(e => e.Label == term && e.Type == "word")
-                .IncludeAllData() // Sử dụng extension method
+                // Source_Word ưu tiên trước Homophone_Build
+                .OrderBy(e => e.EntryCategory == "Homophone_Build" ? 1 : 0)
+                .ThenBy(e => e.Weight)
+                .IncludeAllData()
                 .FirstOrDefaultAsync();
         }
 

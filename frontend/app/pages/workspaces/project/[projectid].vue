@@ -367,7 +367,7 @@
 <script setup>
 definePageMeta({ layout: 'default', ssr: false })
 
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useJwt } from '~/composables/useJwt'
 
@@ -500,6 +500,7 @@ function showToast(message, type = 'success') {
 const getToken = () => localStorage.getItem('jwt_token') || ''
 
 async function checkAccessAndLoad() {
+  const currentProjectId = route.params.projectid
   const token = getToken()
   if (!token || !isAuthenticated.value) {
     accessDenied.value = true
@@ -509,7 +510,7 @@ async function checkAccessAndLoad() {
 
   isLoading.value = true
   try {
-    const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, {
+    const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${currentProjectId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!projRes.ok) throw new Error('Dự án không tồn tại')
@@ -545,8 +546,9 @@ async function checkAccessAndLoad() {
 }
 
 async function fetchFiles(token) {
+  const currentProjectId = route.params.projectid
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/files`, {
+    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${currentProjectId}/files`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.ok) {
@@ -714,9 +716,9 @@ const formatDate = (dateString) => {
   })
 }
 
-onMounted(() => {
+watch(() => route.params.projectid, () => {
   checkAccessAndLoad()
-})
+}, { immediate: true })
 </script>
 
 <style scoped>

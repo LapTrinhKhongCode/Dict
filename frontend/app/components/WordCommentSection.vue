@@ -109,7 +109,7 @@ async function loadComments() {
   if (!props.wordLabel) return
   loading.value = true
   try {
-    const data: any = await $fetch(`${config.public.apiBase}/api/word-comments`, {
+    const data: any = await $fetch(`${config.public.apiBaseUrl}/api/word-comments`, {
       params: { word: props.wordLabel }
     })
     comments.value = data?.result ?? []
@@ -125,7 +125,7 @@ async function submitComment() {
   if (!content || submitting.value) return
   submitting.value = true
   try {
-    const data: any = await $fetch(`${config.public.apiBase}/api/word-comments`, {
+    const data: any = await $fetch(`${config.public.apiBaseUrl}/api/word-comments`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${jwt.value}` },
       body: { wordLabel: props.wordLabel, content }

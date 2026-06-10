@@ -16,14 +16,34 @@
           </div>
           <div class="ml-auto flex gap-2">
             <button @click="reloadTrie()" :disabled="trieReloading"
-              class="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-xl disabled:opacity-40">
-              {{ trieReloading ? '⏳ Đang reload...' : '🌲 Reload Trie' }}
+              class="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-xl disabled:opacity-40 flex items-center gap-2">
+              <span v-if="trieReloading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              {{ trieReloading ? 'Đang reload...' : '🌲 Reload Trie' }}
             </button>
             <button @click="showBatchModal = true" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-xl">
               🔄 Rebuild Batch
             </button>
           </div>
         </div>
+
+        <!-- TRIE RELOAD PROGRESS OVERLAY -->
+        <Transition name="fade">
+          <div v-if="trieReloading" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center">
+              <div class="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-5"></div>
+              <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Đang Rebuild Trie</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                Đang đọc toàn bộ từ vựng từ SQL Server,<br/>
+                xây dựng cấu trúc Trie và ghi cache...<br/>
+                <span class="font-semibold text-indigo-500">Vui lòng không đóng trang này.</span>
+              </p>
+              <div class="mt-4 flex items-center gap-2 justify-center text-xs text-gray-400">
+                <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                Thời gian ước tính: 1–3 phút
+              </div>
+            </div>
+          </div>
+        </Transition>
 
         <!-- TOOLBAR -->
         <div class="flex gap-3 mb-4 flex-wrap">
@@ -763,7 +783,8 @@ async function reloadTrie() {
   try {
     const res = await $fetch<any>(`${base}/api/admin/reload-trie`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` }
+      headers: { Authorization: `Bearer ${getToken()}` },
+      timeout: 300000  // 5 phút — rebuild Trie có thể mất lâu
     })
     showToast(res.message ?? 'Reload Trie thành công ✓')
   } catch { showToast('Reload Trie thất bại', false) }
@@ -790,7 +811,16 @@ async function runBatch() {
   finally { batchRunning.value = false }
 }
 
-onMounted(fetchEntries)
+onMounted(async () => {
+  await fetchEntries()
+  const route = useRoute()
+  const queryId = route.query.id ? Number(route.query.id) : null
+  const queryLabel = route.query.label ? String(route.query.label) : ''
+  if (queryId) {
+    const fakeEntry: EntryRow = { id: queryId, label: queryLabel, type: 'word' }
+    openEditor(fakeEntry)
+  }
+})
 </script>
 
 <style scoped>
