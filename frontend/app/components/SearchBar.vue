@@ -393,9 +393,14 @@ watch(internalSearchWord, (newValue) => {
   // Tiền xử lý từ khóa bằng wanakana
   const convertedWord = toKana(trimmed);
 
+  // Detect tiếng Việt: có ký tự diacritics đặc trưng hoặc "đ/Đ"
+  // → dùng endpoint /autocomplete-vi thay vì /autocomplete
+  const isVietnamese = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]/.test(trimmed)
+  const cacheKey = isVietnamese ? `vi:${trimmed}` : convertedWord
+
   // --- BƯỚC 2: CHECK CACHE TRƯỚC KHI DEBOUNCE VÀ FETCH ---
-  if (autocompleteCache.has(convertedWord)) {
-    suggestions.value = autocompleteCache.get(convertedWord) || [];
+  if (autocompleteCache.has(cacheKey)) {
+    suggestions.value = autocompleteCache.get(cacheKey) || [];
     if (!showDrawingPad.value) {
       showSuggestions.value = suggestions.value.length > 0;
     }
@@ -411,10 +416,11 @@ watch(internalSearchWord, (newValue) => {
     const signal = abortController.value.signal;
 
     try {
+      const apiPath = isVietnamese
+        ? `/api/Search/autocomplete-vi/${encodeURIComponent(trimmed)}`
+        : `/api/Search/autocomplete/${encodeURIComponent(convertedWord)}`
       const res = await fetch(
-        `${
-          config.public.apiBaseUrl
-        }/api/Search/autocomplete/${encodeURIComponent(convertedWord)}`,
+        `${config.public.apiBaseUrl}${apiPath}`,
         { signal },
       );
       if (!res.ok) throw new Error("Autocomplete fetch failed");
@@ -422,7 +428,7 @@ watch(internalSearchWord, (newValue) => {
       const data = await res.json();
 
       // --- BƯỚC 3: LƯU KẾT QUẢ VÀO CACHE CHO LẦN SAU ---
-      autocompleteCache.set(convertedWord, data || []);
+      autocompleteCache.set(cacheKey, data || []);
 
       suggestions.value = data || [];
 
