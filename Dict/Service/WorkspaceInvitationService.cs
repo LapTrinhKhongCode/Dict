@@ -85,10 +85,9 @@ namespace Dict.Services
             };
 
             // 4. Bắn SignalR (Xử lý Online - Realtime)
-            // Tới bước này thì không quan tâm người ta mời bằng Username hay Email nữa, 
-            // vì mình luôn lấy Email từ DB ra để làm định danh gửi SignalR.
-            var inviteeEmail = invitee.Email.ToLower();
-            await _hubContext.Clients.User(inviteeEmail)
+            // EmailBasedUserIdProvider dùng claim "userId" (số nguyên) làm key,
+            // nên phải truyền userId.ToString() — KHÔNG dùng email.
+            await _hubContext.Clients.User(invitee.Id.ToString())
                 .SendAsync("ReceiveNewInvitation", resultDto);
 
             return resultDto;
@@ -139,14 +138,13 @@ namespace Dict.Services
 
             await _db.SaveChangesAsync();
 
-            var inviterEmail = invite.Inviter.Email.ToLower();
-
+            var inviterIdStr = invite.InviterId.ToString();
             var responseMessage = isAccepted
                 ? $"{invite.Invitee.UserName} đã CHẤP NHẬN tham gia {invite.Workspace.Name}."
                 : $"{invite.Invitee.UserName} đã TỪ CHỐI tham gia {invite.Workspace.Name}.";
 
-            // 3. Gửi qua User dùng Email thay vì ID số
-            await _hubContext.Clients.User(inviterEmail)
+            // 3. Gửi qua User dùng userId (số nguyên) — phải khớp với EmailBasedUserIdProvider
+            await _hubContext.Clients.User(inviterIdStr)
                              .SendAsync("InvitationResponded", new
                              {
                                  InvitationId = invitationId,

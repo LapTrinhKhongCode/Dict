@@ -44,6 +44,9 @@ namespace Dict.Models.JsonModels
 
         [JsonProperty("mobileId")]
         public int? MobileId { get; set; }
+
+        [JsonProperty("entryId")]
+        public int? EntryId { get; set; }
     }
 
     /// <summary>
@@ -81,6 +84,9 @@ namespace Dict.Models.JsonModels
 
         [JsonProperty("mobileId")]
         public int? MobileId { get; set; }
+
+        [JsonProperty("entryId")]
+        public int? EntryId { get; set; }
 
         [JsonProperty("means")]
         public List<Mean> Means { get; set; } = new List<Mean>();

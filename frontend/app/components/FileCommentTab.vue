@@ -112,11 +112,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { useRuntimeConfig } from '#app'
 import { useJwt } from '~/composables/useJwt'
 import { useFileComment } from '~/composables/useFileComment'
 import { useToast } from '~/composables/useToast'
-import * as signalR from '@microsoft/signalr'
+import { useDocumentHub } from '~/composables/useDocumentHub'
 
 const props = defineProps<{
   fileId: number
@@ -125,10 +124,10 @@ const props = defineProps<{
 
 const emit = defineEmits(['jump-to-page'])
 
-const config = useRuntimeConfig()
 const { jwt, userId: currentUserId } = useJwt()
 const { getComments, addComment, deleteComment } = useFileComment()
 const { showToast } = useToast()
+const { onComment, onDelete, offComment, offDelete } = useDocumentHub()
 
 const comments = ref<any[]>([])
 const loading = ref(false)
@@ -137,7 +136,6 @@ const attachPage = ref(true)
 const submitting = ref(false)
 const showDeleteConfirm = ref(false)
 const commentIdToDelete = ref<number | null>(null)
-let hubConnection: signalR.HubConnection | null = null
 
 function formatDate(d: string) {
   if (!d) return ''
@@ -152,47 +150,25 @@ function formatDate(d: string) {
 }
 
 function setupSignalR() {
-  const token = localStorage.getItem('jwt_token') || jwt.value
-  if (!token) return
+  // Dùng shared useDocumentHub — không tạo connection riêng nữa.
+  // CollabCursorOverlay đã connect và join room rồi; chỉ cần đăng ký handler.
+  onComment(handleNewComment)
+  onDelete(handleDeleteComment)
+}
 
-  hubConnection = new signalR.HubConnectionBuilder()
-    .withUrl(`${config.public.apiBaseUrl}/notificationHub`, {
-      accessTokenFactory: () => localStorage.getItem('jwt_token') || token,
-      // Không dùng skipNegotiation — để SignalR tự negotiate transport phù hợp
-      transport: signalR.HttpTransportType.WebSockets
-        | signalR.HttpTransportType.ServerSentEvents
-        | signalR.HttpTransportType.LongPolling,
-    })
-    .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
-    .configureLogging(signalR.LogLevel.Warning)
-    .build()
+function handleNewComment(newCmt: any) {
+  if (!comments.value.find(c => c.id === newCmt.id)) {
+    comments.value.push(newCmt)
+    scrollToBottom()
+  }
+}
 
-  hubConnection.on("ReceiveNewComment", (newCmt) => {
-    // Dedup: tránh trùng khi optimistic update đã push trước rồi
-    if (!comments.value.find(c => c.id === newCmt.id)) {
-      comments.value.push(newCmt)
-      scrollToBottom()
-    }
-  })
-
-  hubConnection.on("CommentDeleted", (commentId) => {
-    const target = comments.value.find(c => c.id === commentId)
-    if (target) {
-      target.isDeleted = true
-      target.content = "Bình luận này đã bị thu hồi."
-    }
-  })
-
-  hubConnection.start()
-    .then(() => {
-      return hubConnection?.invoke("JoinDocumentRoom", Number(props.fileId))
-    })
-    .catch(err => console.warn("SignalR FileComment không kết nối được (realtime off):", err))
-
-  // Retry JoinDocumentRoom sau mỗi lần reconnect thành công
-  hubConnection.onreconnected(() => {
-    hubConnection?.invoke("JoinDocumentRoom", Number(props.fileId)).catch(() => {})
-  })
+function handleDeleteComment(commentId: number) {
+  const target = comments.value.find(c => c.id === commentId)
+  if (target) {
+    target.isDeleted = true
+    target.content = "Bình luận này đã bị thu hồi."
+  }
 }
 
 async function fetchComments() {
@@ -268,33 +244,27 @@ function scrollToBottom() {
 
 onMounted(() => {
   setupSignalR()
-  // Chỉ fetch nếu jwt đã sẵn sàng, nếu không thì watch jwt sẽ trigger
   if (jwt.value || localStorage.getItem('jwt_token')) {
     fetchComments()
   }
 })
 
-// Watch jwt: nếu mount sớm hơn khi jwt chưa ready → fetch khi token có
+// Watch jwt: nếu mount sớm hơn khi jwt chưa ready → fetch khi token có + setup SignalR
 watch(jwt, (newVal) => {
   if (newVal && comments.value.length === 0 && !loading.value) {
     fetchComments()
   }
 })
 
-// fileId thay đổi (ví dụ PdfViewer emit khác id) → reload
+// fileId thay đổi → reload
 watch(() => props.fileId, (newId, oldId) => {
   if (!newId || newId === oldId) return
   fetchComments()
-  if (hubConnection?.state === signalR.HubConnectionState.Connected) {
-    hubConnection.invoke("JoinDocumentRoom", Number(newId)).catch(() => {})
-  }
 })
 
 onUnmounted(() => {
-  if (hubConnection) {
-    hubConnection.invoke("LeaveDocumentRoom", Number(props.fileId)).catch(() => {})
-    hubConnection.stop()
-  }
+  offComment(handleNewComment)
+  offDelete(handleDeleteComment)
 })
 </script>
 

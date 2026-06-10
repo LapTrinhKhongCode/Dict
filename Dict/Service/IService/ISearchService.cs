@@ -23,5 +23,11 @@ namespace Dict.Service.IService
         /// </summary>
         Task<List<Entry>> GetSuggestionEntriesAsync(string term, int limit, List<int>? excludeEntryIds = null);
         Task<List<AutocompleteSuggestionDto>> GetAutocompleteSuggestionsAsync(string term);
+
+        /// <summary>
+        /// Tìm entry theo NGHĨA TIẾNG VIỆT (Gloss.Text), accent-insensitive.
+        /// Xếp theo mức độ liên quan: khớp chính xác > bắt đầu bằng > chứa từ khoá.
+        /// </summary>
+        Task<List<AutocompleteSuggestionDto>> SearchByVietnameseMeaningAsync(string term, int limit = 12);
     }
 }

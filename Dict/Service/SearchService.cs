@@ -24,9 +24,11 @@ namespace Dict.Service
         {
             return _db.Entries
                 .AsNoTracking()
-                // BỎ EF.Functions.Collate, DÙNG == BÌNH THƯỜNG ĐỂ ĂN INDEX 1ms
                 .Where(e => e.Label == term && e.Type == "word")
-                .IncludeAllData() // Sử dụng extension method
+                // Source_Word ưu tiên trước Homophone_Build
+                .OrderBy(e => e.EntryCategory == "Homophone_Build" ? 1 : 0)
+                .ThenBy(e => e.Weight)
+                .IncludeAllData()
                 .FirstOrDefaultAsync();
         }
 
@@ -166,6 +168,62 @@ namespace Dict.Service
                     Meaning = x.ShortMean
                 })
                 .ToListAsync();
+        }
+
+        // Collation dùng cho tìm kiếm tiếng Việt accent-insensitive trên SQL Server
+        private const string VI_COLLATION = "Vietnamese_CI_AI";
+
+        public async Task<List<AutocompleteSuggestionDto>> SearchByVietnameseMeaningAsync(string term, int limit = 12)
+        {
+            if (string.IsNullOrWhiteSpace(term) || term.Length > 100)
+                return new List<AutocompleteSuggestionDto>();
+
+            var clean = term.Trim();
+
+            // Bước 1: Tìm entryId + score từ bảng Glosses (ngôn ngữ "vi", accent-insensitive)
+            // GroupBy entryId để mỗi từ chỉ xuất hiện 1 lần dù có nhiều nghĩa match
+            var ranked = await _db.Glosses
+                .AsNoTracking()
+                .Where(g => g.Language!.Code == "vi" &&
+                            g.Sense!.Entry!.Type == "word" &&
+                            EF.Functions.Like(
+                                EF.Functions.Collate(g.Text, VI_COLLATION),
+                                $"%{clean}%"))
+                .Select(g => new
+                {
+                    EntryId   = (int)g.Sense!.EntryId!,
+                    Label     = g.Sense.Entry!.Label,
+                    Phonetic  = g.Sense.Entry.Phonetic ?? "",
+                    ShortMean = g.Sense.Entry.ShortMean ?? "",
+                    Weight    = g.Sense.Entry.Weight ?? 99999,
+                    // Score: exact=100, startsWith=50, contains=20 — lấy max trong nhóm
+                    Score =
+                        (EF.Functions.Collate(g.Text, VI_COLLATION) == clean ? 100 : 0) +
+                        (EF.Functions.Like(EF.Functions.Collate(g.Text, VI_COLLATION), clean + "%") ? 50 : 0) +
+                        20  // base contains
+                })
+                .GroupBy(x => x.EntryId)
+                .Select(grp => new
+                {
+                    MaxScore  = grp.Max(x => x.Score),
+                    MinWeight = grp.Min(x => x.Weight),
+                    Label     = grp.Min(x => x.Label),    // Min = bất kỳ (group cùng entry)
+                    Phonetic  = grp.Min(x => x.Phonetic),
+                    ShortMean = grp.Min(x => x.ShortMean)
+                })
+                .OrderByDescending(x => x.MaxScore)
+                .ThenBy(x => x.MinWeight)
+                .Take(limit)
+                .Select(x => new AutocompleteSuggestionDto
+                {
+                    Word    = x.Label,
+                    Reading = x.Phonetic,
+                    Meaning = x.ShortMean,
+                    Weight  = x.MinWeight
+                })
+                .ToListAsync();
+
+            return ranked;
         }
     }
 }

@@ -207,7 +207,7 @@
 <script setup>
 definePageMeta({ layout: 'default', ssr: false })
 
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useJwt } from '~/composables/useJwt'
 
@@ -262,12 +262,13 @@ function formatDate(iso) {
 }
 
 async function init() {
+  const currentProjectId = route.params.projectid
   const token = getToken()
   if (!token || !isAuthenticated.value) return router.push('/login')
 
   try {
     // Lấy tên project + kiểm tra quyền
-    const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}`, {
+    const projRes = await fetch(`${config.public.apiBaseUrl}/api/projects/${currentProjectId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!projRes.ok) return router.back()
@@ -288,10 +289,11 @@ async function init() {
 }
 
 async function fetchVocabs() {
+  const currentProjectId = route.params.projectid
   const token = getToken()
   loading.value = true
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/vocabularies`, {
+    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${currentProjectId}/vocabularies`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.ok) {
@@ -403,7 +405,7 @@ async function deleteMany() {
   }
 }
 
-onMounted(init)
+watch(() => route.params.projectid, init, { immediate: true })
 </script>
 
 <style scoped>

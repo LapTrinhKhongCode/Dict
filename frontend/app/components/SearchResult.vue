@@ -363,6 +363,18 @@
             ></div>
             <UIcon v-else name="i-lucide-plus" class="size-6" />
           </button>
+          <!-- Admin edit button -->
+          <a
+            v-if="isAdmin"
+            :href="`/admin/word?id=${selectedItem.entryId}&label=${encodeURIComponent(selectedItem.word)}`"
+            target="_blank"
+            rel="noopener"
+            class="absolute top-4 right-14 z-10 size-9 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-800/60 transition-colors"
+            title="Chỉnh sửa trong Admin"
+            aria-label="Chỉnh sửa trong Admin"
+          >
+            <UIcon name="i-lucide-pencil" class="size-4" />
+          </a>
 
           <div
             v-if="showDecksPanel"
@@ -617,6 +629,12 @@
           </div>
         </div>
 
+        <!-- Comment section -->
+        <WordCommentSection
+          v-if="result.type === 'word' && selectedItem"
+          :word-label="selectedItem.word"
+        />
+
         <div v-if="conjugationResult" class="space-y-6">
           <h2
             class="text-xl font-semibold border-b border-gray-200 dark:border-gray-700 pb-2 text-gray-900 dark:text-white"
@@ -668,6 +686,7 @@ import ConjugationTable from "~/components/ConjugationTable.vue";
 import WordResultModal from "~/components/WordResultModal.vue";
 import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
 import ImageModal from "~/components/ImageModal.vue";
+import WordCommentSection from "~/components/WordCommentSection.vue";
 // ✅ SỬA LỖI: Import đúng composable
 import { useToast } from "@/composables/useToast";
 // ✅ SỬA LỖI: Lấy đúng hàm 'showToast'
@@ -770,7 +789,11 @@ const currentImage = ref("");
 const config = useRuntimeConfig();
 
 // 2. LẤY TOKEN VÀ TRẠNG THÁI ĐĂNG NHẬP
-const { isAuthenticated, jwt } = useJwt();
+const { isAuthenticated, jwt, role } = useJwt();
+const isAdmin = computed(() => {
+  const r = role.value ?? (process.client ? localStorage.getItem('user_role') : null)
+  return r?.toLowerCase() === 'admin'
+})
 
 const decks = ref<any[]>([]);
 const decksLoading = ref(false);

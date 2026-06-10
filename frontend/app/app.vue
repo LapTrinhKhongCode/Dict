@@ -2,7 +2,7 @@
 <template>
   <NuxtLoadingIndicator color="#f0c040" :height="3" />
   <NuxtLayout>
-    <NuxtPage :transition="{ name: 'page', mode: 'out-in' }" />
+    <NuxtPage :transition="{ name: 'page' }" />
   </NuxtLayout>
 
   <ToastDisplay />
@@ -82,17 +82,19 @@ body {
   color: #f5f5f5;
 }
 
-/* Page transition */
-.page-enter-active,
+/* Page transition — no mode, both pages animate simultaneously to avoid blank on rapid nav */
+.page-enter-active {
+  transition: opacity 0.12s ease;
+}
 .page-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.08s ease;
+  position: absolute;
+  width: 100%;
 }
 .page-enter-from {
   opacity: 0;
-  transform: translateY(6px);
 }
 .page-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
 }
 </style>

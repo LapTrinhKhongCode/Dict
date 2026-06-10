@@ -54,13 +54,15 @@ namespace Dict.Controllers
                 }
                 else
                 {
-                    // Nếu chưa đủ 5 lần, ta chỉ ghi nhận thêm 1 lần Miss nữa rồi thôi
-                    // Không tốn CPU để Rebuild, không tốn dung lượng DB để lưu JSON rác
-                    await _wordService.IncrementSearchMissAsync(label);
+                    // Chưa đủ 5 lần — ghi nhận thêm 1 miss rồi trả về NotFound ngay
+                    _ = Task.Run(async () =>
+                    {
+                        using var scope = _serviceProvider.CreateScope();
+                        var svc = scope.ServiceProvider.GetRequiredService<IWordService>();
+                        await svc.IncrementSearchMissAsync(label);
+                    });
                     return NotFound();
                 }
-                json = await _jsonBuilderService.RebuildJsonForWordAsync(label);
-                isRebuilt = true; // Đánh dấu là vừa build
             }
 
             // 3. Kiểm tra lần cuối (nếu build lại vẫn rỗng)

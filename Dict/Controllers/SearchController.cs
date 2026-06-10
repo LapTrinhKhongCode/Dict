@@ -101,6 +101,19 @@ namespace Dict.Controllers
             return Ok(suggestions);
         }
 
+        // =====================================================================
+        // AUTOCOMPLETE TIẾNG VIỆT — tìm theo nghĩa, trả về entry tiếng Nhật
+        // =====================================================================
+        [HttpGet("autocomplete-vi/{term}")]
+        public async Task<ActionResult<List<AutocompleteSuggestionDto>>> SearchByVietnameseMeaning(string term)
+        {
+            if (string.IsNullOrWhiteSpace(term) || term.Length > 100)
+                return Ok(new List<AutocompleteSuggestionDto>());
+
+            var results = await _searchService.SearchByVietnameseMeaningAsync(term.Trim());
+            return Ok(results);
+        }
+
         private bool ContainsTrash(string input)
         {
             return input.Contains("Executed DbCommand") || input.Contains("[Parameters=");

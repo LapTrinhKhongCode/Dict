@@ -54,6 +54,9 @@ namespace Dict.Service
                 .AsNoTracking()
                 .Where(k => k.Type == "word" &&
                             k.Label == label)
+                .Select(k => new { k.Id, k.RawJson, k.EntryCategory })
+                // Source_Word ưu tiên trước Homophone_Build
+                .OrderBy(k => k.EntryCategory == "Homophone_Build" ? 1 : 0)
                 .Select(k => new { k.Id, k.RawJson })
                 .FirstOrDefaultAsync();
 
