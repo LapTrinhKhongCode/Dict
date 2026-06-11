@@ -418,7 +418,8 @@ const penColor = ref('#e53e3e');
 const penWidth = ref(3);
 const annotCanvases = ref({});   // PDF mode: keyed by page number
 const ocrAnnotCanvas = ref(null); // OCR mode
-const annotStrokesMap = ref({});  // { pageNum: [...allStrokes] }
+const annotStrokesMap = ref({});   // { pageNum: [...allStrokes] } — display only (merged from all users)
+const myAnnotStrokesMap = ref({}); // { pageNum: [...myStrokes] } — only current user's strokes (for saving)
 const annotTools = [
   { id: 'pen', icon: '✏️', label: 'Bút vẽ' },
   { id: 'highlight', icon: '🖍️', label: 'Tô màu' },
@@ -1297,13 +1298,21 @@ async function loadAnnotations(pageNum) {
     if (!res.ok) { redrawAnnotCanvas(pageNum); return; }
     const data = await res.json();
     const allStrokes = [];
+    let myStrokes = [];
     for (const entry of data) {
       try {
         const strokes = typeof entry.data === 'string' ? JSON.parse(entry.data) : (entry.data || []);
-        if (Array.isArray(strokes)) allStrokes.push(...strokes);
+        if (Array.isArray(strokes)) {
+          allStrokes.push(...strokes);
+          // Track current user's own strokes separately to avoid saving merged data
+          if (String(entry.userId) === String(currentUserId.value)) {
+            myStrokes = strokes;
+          }
+        }
       } catch {}
     }
     annotStrokesMap.value[pageNum] = allStrokes;
+    myAnnotStrokesMap.value[pageNum] = myStrokes;
     redrawAnnotCanvas(pageNum);
   } catch (err) {
     console.warn('[Annotation] loadAnnotations failed:', err);
@@ -1387,13 +1396,17 @@ function onAnnotPointerUp(e, pageNum) {
     if (props.jobId) {
       broadcastErase(Number(props.jobId), pageNum, annotStrokesMap.value[pageNum] || []);
     }
-    scheduleAnnotSave(pageNum);
+    // Save immediately for erase — no debounce so it persists even if user navigates/F5 right after
+    saveAnnotations(pageNum);
     return;
   }
   if (!annotCurrentStroke || annotCurrentStroke.points.length < 2) { annotCurrentStroke = null; return; }
   const finishedStroke = { ...annotCurrentStroke };
   if (!annotStrokesMap.value[pageNum]) annotStrokesMap.value[pageNum] = [];
   annotStrokesMap.value[pageNum].push(finishedStroke);
+  // Track in myAnnotStrokesMap so save only persists current user's own strokes
+  if (!myAnnotStrokesMap.value[pageNum]) myAnnotStrokesMap.value[pageNum] = [];
+  myAnnotStrokesMap.value[pageNum].push(finishedStroke);
   annotCurrentStroke = null;
   redrawAnnotCanvas(pageNum);
   // Broadcast new stroke to collaborators
@@ -1407,7 +1420,12 @@ function eraseAnnotAt(pos, pageNum) {
   const strokes = annotStrokesMap.value[pageNum];
   if (!strokes) return;
   const ERASE_RADIUS = 0.02; // 2% of page width — scale-independent
-  annotStrokesMap.value[pageNum] = strokes.filter(s => !s.points.some(pt => Math.hypot(pt.x - pos.x, pt.y - pos.y) < ERASE_RADIUS));
+  const keep = s => !s.points.some(pt => Math.hypot(pt.x - pos.x, pt.y - pos.y) < ERASE_RADIUS);
+  annotStrokesMap.value[pageNum] = strokes.filter(keep);
+  // Also remove erased strokes from the current user's own save map
+  if (myAnnotStrokesMap.value[pageNum]) {
+    myAnnotStrokesMap.value[pageNum] = myAnnotStrokesMap.value[pageNum].filter(keep);
+  }
   redrawAnnotCanvas(pageNum);
 }
 
@@ -1419,7 +1437,9 @@ function scheduleAnnotSave(pageNum) {
 
 async function saveAnnotations(pageNum) {
   if (!props.projectId || !props.jobId) return;
-  const strokes = annotStrokesMap.value[pageNum] || [];
+  // Save only THIS user's own strokes — never save merged strokes from all users
+  // (saving merged data causes duplication across reload cycles)
+  const strokes = myAnnotStrokesMap.value[pageNum] || [];
   // Backup to localStorage
   const lsKey = `annot_${props.projectId}_${props.jobId}_${pageNum}`;
   try { localStorage.setItem(lsKey, JSON.stringify(strokes)); } catch {}
@@ -1428,6 +1448,7 @@ async function saveAnnotations(pageNum) {
     const token = getToken();
     await fetch(`${config.public.apiBaseUrl}/api/projects/${props.projectId}/annotations`, {
       method: 'POST',
+      keepalive: true, // Ensures request completes even if user navigates away / presses F5
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ ocrJobId: Number(props.jobId), pageNumber: pageNum, data: JSON.stringify(strokes) }),
     });
@@ -1495,6 +1516,17 @@ onMounted(() => {
   };
   window.addEventListener('keydown', handleCtrlS);
   onBeforeUnmount(() => window.removeEventListener('keydown', handleCtrlS));
+
+  // beforeunload: flush any pending dirty saves so they persist on F5 / navigation
+  // keepalive: true in saveAnnotations ensures requests complete even after page close
+  const handleBeforeUnload = () => {
+    for (const pageNum of annotDirtyPages) {
+      if (annotSaveTimers[pageNum]) { clearTimeout(annotSaveTimers[pageNum]); delete annotSaveTimers[pageNum]; }
+      saveAnnotations(pageNum);
+    }
+  };
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload));
 });
 
 onBeforeUnmount(() => {

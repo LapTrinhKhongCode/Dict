@@ -20,22 +20,7 @@
         @keydown="handleKeydown"
       />
 
-      <button
-        ref="penButtonRef"
-        @click="onPenClick"
-        class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition ml-3"
-        :class="{ 'text-blue-500 dark:text-blue-400': showDrawingPad }"
-      >
-        <UIcon name="i-lucide-pen" class="size-5" />
-      </button>
-
-      <button
-        @click="onImageClick"
-        class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition ml-2"
-        :class="{ 'text-blue-500 dark:text-blue-400': showOcrPad }"
-      >
-        <UIcon name="i-lucide-image" class="size-5" />
-      </button>
+      <!-- Pen & Image buttons hidden (features under development) -->
     </div>
 
     <div
