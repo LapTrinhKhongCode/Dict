@@ -93,6 +93,8 @@
 </template>
 
 <script setup lang="ts">
+definePageMeta({ middleware: 'auth-client' })
+
 import { useJwt } from '~/composables/useJwt';
 
 const { username, email } = useJwt();

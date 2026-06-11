@@ -23,6 +23,12 @@ const cursors = ref<Record<string, CursorPayload & { color: string; lastSeen: nu
 const onNewComment: Array<(cmt: any) => void> = []
 const onCommentDeleted: Array<(id: number) => void> = []
 
+// Annotation stroke callbacks registered by PdfViewer
+type StrokePayload = { userId: string; pageNumber: number; strokeJson: string }
+type ErasePayload  = { userId: string; pageNumber: number; strokesJson: string }
+const onAnnotStroke: Array<(p: StrokePayload) => void> = []
+const onAnnotErase:  Array<(p: ErasePayload) => void>  = []
+
 function getColor(str: string): string {
   const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#e91e63']
   let hash = 0
@@ -73,6 +79,14 @@ function registerHandlers(conn: signalR.HubConnection) {
 
   conn.on('CommentDeleted', (id: number) => {
     onCommentDeleted.forEach(fn => fn(id))
+  })
+
+  conn.on('AnnotationStroke', (data: StrokePayload) => {
+    onAnnotStroke.forEach(fn => fn(data))
+  })
+
+  conn.on('AnnotationErased', (data: ErasePayload) => {
+    onAnnotErase.forEach(fn => fn(data))
   })
 }
 
@@ -137,6 +151,16 @@ export function useDocumentHub() {
     hubConnection.invoke('LeaveCursor', docId).catch(() => {})
   }
 
+  function broadcastStroke(docId: number, pageNum: number, stroke: object) {
+    if (!hubConnection || hubConnection.state !== signalR.HubConnectionState.Connected) return
+    hubConnection.invoke('BroadcastAnnotationStroke', docId, pageNum, JSON.stringify(stroke)).catch(() => {})
+  }
+
+  function broadcastErase(docId: number, pageNum: number, strokes: object[]) {
+    if (!hubConnection || hubConnection.state !== signalR.HubConnectionState.Connected) return
+    hubConnection.invoke('BroadcastAnnotationErase', docId, pageNum, JSON.stringify(strokes)).catch(() => {})
+  }
+
   function onComment(fn: (cmt: any) => void) {
     if (!onNewComment.includes(fn)) onNewComment.push(fn)
   }
@@ -155,6 +179,21 @@ export function useDocumentHub() {
     if (i !== -1) onCommentDeleted.splice(i, 1)
   }
 
+  function onStroke(fn: (p: StrokePayload) => void) {
+    if (!onAnnotStroke.includes(fn)) onAnnotStroke.push(fn)
+  }
+  function offStroke(fn: (p: StrokePayload) => void) {
+    const i = onAnnotStroke.indexOf(fn)
+    if (i !== -1) onAnnotStroke.splice(i, 1)
+  }
+  function onErase(fn: (p: ErasePayload) => void) {
+    if (!onAnnotErase.includes(fn)) onAnnotErase.push(fn)
+  }
+  function offErase(fn: (p: ErasePayload) => void) {
+    const i = onAnnotErase.indexOf(fn)
+    if (i !== -1) onAnnotErase.splice(i, 1)
+  }
+
   return {
     viewers: viewers as Ref<Record<string, ViewerPayload & { color: string }>>,
     cursors: cursors as Ref<Record<string, CursorPayload & { color: string; lastSeen: number }>>,
@@ -162,10 +201,16 @@ export function useDocumentHub() {
     disconnect,
     broadcastCursor,
     leaveCursor,
+    broadcastStroke,
+    broadcastErase,
     onComment,
     onDelete,
     offComment,
     offDelete,
+    onStroke,
+    offStroke,
+    onErase,
+    offErase,
     getColor,
   }
 }

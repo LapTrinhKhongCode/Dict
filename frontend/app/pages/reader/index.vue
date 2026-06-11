@@ -60,7 +60,7 @@
           :project-id="projectId"
           @page-changed="handlePageChanged"
           @media-id-loaded="(id) => fileId = id"
-          @access-denied="handleAccessDenied" 
+          @access-denied="handleAccessDenied"
         />
         <div v-else class="flex flex-col items-center justify-center h-full text-gray-400">
           <div class="w-8 h-8 border-4 border-gray-600 border-t-[#f0c040] rounded-full animate-spin mb-4"></div>
@@ -107,7 +107,7 @@
 </template>
 
 <script setup>
-definePageMeta({ layout: 'reader', ssr: false })
+definePageMeta({ layout: 'reader', ssr: false, middleware: 'auth-client' })
 
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -123,7 +123,7 @@ const router = useRouter()
 const config = useRuntimeConfig()
 const { jwt } = useJwt()
 
-const fileUrl = computed(() => route.query.url || '')
+const fileUrl= computed(() => route.query.url || '')
 const jobId = computed(() => route.query.jobId ? Number(route.query.jobId) : null)
 const projectId = computed(() => route.query.projectId ? Number(route.query.projectId) : null)
 

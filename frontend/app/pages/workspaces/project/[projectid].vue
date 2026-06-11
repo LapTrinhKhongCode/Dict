@@ -74,17 +74,6 @@
       </div>
     </div>
 
-    <!-- Link sang trang từ vựng -->
-    <NuxtLink
-      :to="`/workspaces/project/${projectId}/vocabularies`"
-      class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
-    >
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.75 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-      </svg>
-      Từ vựng dự án
-    </NuxtLink>
-
     <input
       type="file"
       ref="fileInput"
@@ -365,7 +354,7 @@
 </template>
 
 <script setup>
-definePageMeta({ layout: 'default', ssr: false })
+definePageMeta({ layout: 'default', ssr: false, middleware: 'auth-client' })
 
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

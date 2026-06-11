@@ -87,6 +87,7 @@ namespace Dict.Data
         public DbSet<MediaStore> MediaStore { get; set; }
         public DbSet<OcrJob> OcrJobs { get; set; }
         public DbSet<OcrResult> OcrResults { get; set; }
+        public DbSet<Annotation> Annotations { get; set; }
 
         // Stats / caches
         public DbSet<StatsWordFreq> StatsWordFreq { get; set; }
@@ -701,6 +702,19 @@ namespace Dict.Data
                  .WithMany()
                  .HasForeignKey(x => x.AddedBy)
                  .OnDelete(DeleteBehavior.Restrict);
+
+                b.HasOne(x => x.SourceOcrJob)
+                 .WithMany()
+                 .HasForeignKey(x => x.SourceOcrJobId)
+                 .OnDelete(DeleteBehavior.SetNull);
+
+                b.Property(x => x.SourceSentence).HasMaxLength(500);
+
+                // Link to Card for SRS tracking (nullable, SetNull on Card delete)
+                b.HasOne(x => x.LinkedCard)
+                 .WithMany()
+                 .HasForeignKey(x => x.CardId)
+                 .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<Workspace>(b =>

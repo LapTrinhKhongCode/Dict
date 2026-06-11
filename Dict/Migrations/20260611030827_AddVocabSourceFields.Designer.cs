@@ -4,6 +4,7 @@ using Dict.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Dict.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260611030827_AddVocabSourceFields")]
+    partial class AddVocabSourceFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -993,9 +996,6 @@ namespace Dict.Migrations
                     b.Property<int>("AddedBy")
                         .HasColumnType("int");
 
-                    b.Property<int?>("CardId")
-                        .HasColumnType("int");
-
                     b.Property<string>("ContextMeaning")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -1026,8 +1026,6 @@ namespace Dict.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AddedBy");
-
-                    b.HasIndex("CardId");
 
                     b.HasIndex("ProjectId");
 
@@ -2026,11 +2024,6 @@ namespace Dict.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Dict.Models.Card", "LinkedCard")
-                        .WithMany()
-                        .HasForeignKey("CardId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("Dict.Models.Project", "Project")
                         .WithMany("ProjectVocabularies")
                         .HasForeignKey("ProjectId")
@@ -2041,8 +2034,6 @@ namespace Dict.Migrations
                         .WithMany()
                         .HasForeignKey("SourceOcrJobId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("LinkedCard");
 
                     b.Navigation("Project");
 

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ middleware: 'guest-only-client', layout: false })
+
 import { ref, watch, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useJwt } from "@/composables/useJwt";

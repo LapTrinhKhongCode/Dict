@@ -37,6 +37,12 @@
           >
             Xem thêm
           </button>
+          <button
+            @click="emit('go-to-project-notebook')"
+            class="text-sm text-purple-500 hover:text-purple-400 ml-3 font-semibold"
+          >
+            📚 Sổ tay Dự án
+          </button>
         </div>
         <div class="flex flex-wrap flex-col">
           <button
@@ -172,6 +178,7 @@ const emit = defineEmits([
   'go-to-create-deck',
   'go-to-my-decks',
   'go-to-explore',
+  'go-to-project-notebook',
   'show-login-notice',
   'update:my-decks',
   'update:explore-decks'

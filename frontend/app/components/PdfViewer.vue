@@ -120,6 +120,41 @@
       >
         ⟺
       </button>
+      <!-- Annotation Toolbar -->
+      <div class="w-px h-5 bg-[#30363d] mx-1"></div>
+      <div class="flex items-center gap-1">
+        <button
+          v-for="t in annotTools"
+          :key="t.id"
+          @click="selectAnnotTool(t.id)"
+          :title="t.label"
+          :class="['px-2 py-1 rounded text-sm transition', activeTool === t.id ? 'bg-[#f0c040] text-black font-bold' : 'bg-[#21262d] border border-[#30363d] hover:bg-[#30363d]']"
+        >{{ t.icon }}</button>
+        <input
+          v-if="activeTool && activeTool !== 'eraser'"
+          type="color"
+          v-model="penColor"
+          title="Màu bút"
+          class="w-7 h-7 cursor-pointer border-0 rounded bg-transparent"
+        />
+        <select
+          v-if="activeTool"
+          v-model.number="penWidth"
+          class="text-xs bg-[#21262d] border border-[#30363d] rounded px-1 py-0.5 text-[#c9d1d9]"
+        >
+          <option :value="2">Mảnh</option>
+          <option :value="5">Vừa</option>
+          <option :value="10">Dày</option>
+        </select>
+        <!-- Save indicator -->
+        <span
+          v-if="annotSaveStatus"
+          class="text-xs ml-1 transition-opacity"
+          :class="annotSaveStatus === 'saving' ? 'text-yellow-400' : 'text-green-400'"
+        >
+          {{ annotSaveStatus === 'saving' ? '⏳ Đang lưu...' : '✓ Đã lưu' }}
+        </span>
+      </div>
       <button
         @click="exportToSearchablePdf"
         :disabled="isExporting || ocrLoading"
@@ -230,6 +265,16 @@
                 {{ r.wordText }}
               </span>
             </div>
+            <!-- Annotation canvas for OCR mode -->
+            <canvas
+              ref="ocrAnnotCanvas"
+              class="absolute inset-0 z-30"
+              :style="{ pointerEvents: activeTool ? 'auto' : 'none', cursor: activeTool === 'eraser' ? 'cell' : activeTool ? 'crosshair' : 'default' }"
+              @pointerdown="e => onAnnotPointerDown(e, 1)"
+              @pointermove="e => onAnnotPointerMove(e, 1)"
+              @pointerup="e => onAnnotPointerUp(e, 1)"
+              @pointerleave="e => onAnnotPointerUp(e, 1)"
+            ></canvas>
           </div>
         </template>
 
@@ -284,6 +329,16 @@
                     {{ r.wordText }}
                   </span>
                 </div>
+                <!-- Annotation canvas overlay -->
+                <canvas
+                  :ref="el => { if (el) annotCanvases[n] = el; else delete annotCanvases[n]; }"
+                  class="absolute inset-0 z-30"
+                  :style="{ pointerEvents: activeTool ? 'auto' : 'none', cursor: activeTool === 'eraser' ? 'cell' : activeTool ? 'crosshair' : 'default' }"
+                  @pointerdown="e => onAnnotPointerDown(e, n)"
+                  @pointermove="e => onAnnotPointerMove(e, n)"
+                  @pointerup="e => onAnnotPointerUp(e, n)"
+                  @pointerleave="e => onAnnotPointerUp(e, n)"
+                ></canvas>
               </div>
 
               <div
@@ -312,6 +367,7 @@ import {
 } from "vue";
 import { useRuntimeConfig, useRoute, useRouter } from "#imports";
 import { useJwt } from "~/composables/useJwt";
+import { useDocumentHub } from "~/composables/useDocumentHub";
 import { useOcrResultsState } from "~/composables/useLookupState";
 
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
@@ -344,6 +400,7 @@ const route = useRoute();
 const router = useRouter();
 const { isAuthenticated, userId: currentUserId } = useJwt();
 const getToken = () => localStorage.getItem("jwt_token") || "";
+const { connect: hubConnect, broadcastStroke, broadcastErase, onStroke, offStroke, onErase, offErase } = useDocumentHub();
 
 const accessDenied = ref(false);
 
@@ -354,6 +411,26 @@ const gotoPage = ref(1);
 const scale = ref(1.2);
 const viewMode = ref("scroll");
 const defaultPageHeight = ref(800);
+
+// --- Annotation state ---
+const activeTool = ref(null); // 'pen' | 'highlight' | 'eraser' | null
+const penColor = ref('#e53e3e');
+const penWidth = ref(3);
+const annotCanvases = ref({});   // PDF mode: keyed by page number
+const ocrAnnotCanvas = ref(null); // OCR mode
+const annotStrokesMap = ref({});  // { pageNum: [...allStrokes] }
+const annotTools = [
+  { id: 'pen', icon: '✏️', label: 'Bút vẽ' },
+  { id: 'highlight', icon: '🖍️', label: 'Tô màu' },
+  { id: 'eraser', icon: '🧹', label: 'Tẩy' },
+];
+let annotDrawing = false;
+let annotCurrentStroke = null;
+const annotSaveTimers = {};
+const annotLoadedPages = new Set();
+const annotDirtyPages = new Set(); // pages with unsaved changes
+const annotSaveStatus = ref(null); // null | 'saving' | 'saved'
+let annotSaveStatusTimer = null;
 
 const ocrMode = ref(false);
 const ocrImageUrl = ref("");
@@ -836,6 +913,16 @@ async function renderPage(pageNum) {
       });
       await textLayer.render();
     }
+
+    // Annotation canvas: resize and load/redraw after page renders
+    await nextTick();
+    resizeAnnotCanvas(pageNum);
+    if (annotLoadedPages.has(pageNum)) {
+      redrawAnnotCanvas(pageNum);
+    } else {
+      annotLoadedPages.add(pageNum);
+      loadAnnotations(pageNum);
+    }
   } catch (err) {
     if (err?.name !== "RenderingCancelledException")
       console.error(`renderPage lỗi trang ${pageNum}:`, err);
@@ -912,10 +999,27 @@ function setupScrollObserver() {
 }
 
 function handleTextSelection(e) {
-  const text = window.getSelection()?.toString().trim();
+  const selection = window.getSelection();
+  const text = selection?.toString().trim();
   if (text && text.length > 0 && text.length < 500) {
     navigator.clipboard?.writeText(text).catch(() => {});
-    emit("text-selected", { text, x: e.clientX, y: e.clientY });
+    // Try to get surrounding sentence from the text layer container
+    let sourceSentence = text;
+    try {
+      const range = selection.getRangeAt(0);
+      const container = range.startContainer.parentElement?.closest('[data-page-number], .textLayer, .ocr-text-layer') 
+                     || range.startContainer.parentElement;
+      if (container?.textContent) {
+        const full = container.textContent.replace(/\s+/g, ' ').trim();
+        const idx = full.indexOf(text);
+        if (idx >= 0) {
+          const start = Math.max(0, idx - 50);
+          const end = Math.min(full.length, idx + text.length + 80);
+          sourceSentence = full.substring(start, end).trim();
+        }
+      }
+    } catch {}
+    emit("text-selected", { text, x: e.clientX, y: e.clientY, sourceSentence });
   }
 }
 
@@ -978,6 +1082,14 @@ function onOcrImageLoad() {
     ocrNaturalH.value = ocrImgEl.value.naturalHeight || 0;
     ocrDisplayW.value = ocrImgEl.value.offsetWidth || 0;
     ocrDisplayH.value = ocrImgEl.value.offsetHeight || 0;
+    // Resize OCR annotation canvas and load annotations
+    resizeOcrAnnotCanvas();
+    if (!annotLoadedPages.has(1)) {
+      annotLoadedPages.add(1);
+      loadAnnotations(1);
+    } else {
+      redrawAnnotCanvas(1);
+    }
   }, 50);
 }
 
@@ -1147,9 +1259,242 @@ async function exportToSearchablePdf() {
   }
 }
 
+// ---- ANNOTATION FUNCTIONS ----
+function selectAnnotTool(id) {
+  activeTool.value = activeTool.value === id ? null : id;
+}
+
+function resizeAnnotCanvas(pageNum) {
+  const pdfCvs = pageCanvases.value[pageNum];
+  const annotCvs = annotCanvases.value[pageNum];
+  if (!pdfCvs || !annotCvs) return;
+  const w = parseInt(pdfCvs.style.width) || pdfCvs.offsetWidth;
+  const h = parseInt(pdfCvs.style.height) || pdfCvs.offsetHeight;
+  if (!w || !h) return;
+  annotCvs.width = w;
+  annotCvs.height = h;
+}
+
+function resizeOcrAnnotCanvas() {
+  const cvs = ocrAnnotCanvas.value;
+  const img = ocrImgEl.value;
+  if (!cvs || !img) return;
+  const w = img.offsetWidth;
+  const h = img.offsetHeight;
+  if (!w || !h) return;
+  cvs.width = w;
+  cvs.height = h;
+}
+
+async function loadAnnotations(pageNum) {
+  if (!props.projectId || !props.jobId) { redrawAnnotCanvas(pageNum); return; }
+  try {
+    const token = getToken();
+    const res = await fetch(
+      `${config.public.apiBaseUrl}/api/projects/${props.projectId}/annotations?ocrJobId=${props.jobId}&pageNumber=${pageNum}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) { redrawAnnotCanvas(pageNum); return; }
+    const data = await res.json();
+    const allStrokes = [];
+    for (const entry of data) {
+      try {
+        const strokes = typeof entry.data === 'string' ? JSON.parse(entry.data) : (entry.data || []);
+        if (Array.isArray(strokes)) allStrokes.push(...strokes);
+      } catch {}
+    }
+    annotStrokesMap.value[pageNum] = allStrokes;
+    redrawAnnotCanvas(pageNum);
+  } catch (err) {
+    console.warn('[Annotation] loadAnnotations failed:', err);
+    redrawAnnotCanvas(pageNum);
+  }
+}
+
+function redrawAnnotCanvas(pageNum) {
+  const cvs = pageNum === 1 && ocrMode.value ? ocrAnnotCanvas.value : annotCanvases.value[pageNum];
+  if (!cvs) return;
+  const ctx = cvs.getContext('2d');
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  const strokes = annotStrokesMap.value[pageNum] || [];
+  for (const stroke of strokes) drawAnnotStroke(ctx, stroke);
+}
+
+function drawAnnotStroke(ctx, stroke) {
+  if (!stroke.points || stroke.points.length < 2) return;
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
+  ctx.save();
+  if (stroke.tool === 'highlight') {
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = (stroke.width || 0.003) * W * 3;
+  } else {
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = (stroke.width || 0.003) * W;
+  }
+  ctx.strokeStyle = stroke.color || '#e53e3e';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x * W, stroke.points[0].y * H);
+  for (let i = 1; i < stroke.points.length; i++) ctx.lineTo(stroke.points[i].x * W, stroke.points[i].y * H);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function getAnnotPos(e, pageNum) {
+  const cvs = pageNum === 1 && ocrMode.value ? ocrAnnotCanvas.value : annotCanvases.value[pageNum];
+  if (!cvs) return { x: 0, y: 0 };
+  const rect = cvs.getBoundingClientRect();
+  // Normalized 0..1 coordinates relative to the page — scale/DPR independent
+  return {
+    x: (e.clientX - rect.left) / rect.width,
+    y: (e.clientY - rect.top) / rect.height,
+  };
+}
+
+function onAnnotPointerDown(e, pageNum) {
+  if (!activeTool.value) return;
+  e.preventDefault();
+  annotDrawing = true;
+  const pos = getAnnotPos(e, pageNum);
+  if (activeTool.value === 'eraser') { eraseAnnotAt(pos, pageNum); return; }
+  const cvs = pageNum === 1 && ocrMode.value ? ocrAnnotCanvas.value : annotCanvases.value[pageNum];
+  const cssW = cvs ? cvs.getBoundingClientRect().width : 1000;
+  // Store width as fraction of CSS canvas width so it's scale-independent
+  annotCurrentStroke = { tool: activeTool.value, color: penColor.value, width: penWidth.value / cssW, points: [pos], pageNum };
+}
+
+function onAnnotPointerMove(e, pageNum) {
+  if (!annotDrawing || !activeTool.value) return;
+  e.preventDefault();
+  const pos = getAnnotPos(e, pageNum);
+  if (activeTool.value === 'eraser') { eraseAnnotAt(pos, pageNum); return; }
+  if (!annotCurrentStroke) return;
+  annotCurrentStroke.points.push(pos);
+  const cvs = pageNum === 1 && ocrMode.value ? ocrAnnotCanvas.value : annotCanvases.value[pageNum];
+  if (!cvs) return;
+  const ctx = cvs.getContext('2d');
+  redrawAnnotCanvas(pageNum);
+  drawAnnotStroke(ctx, annotCurrentStroke);
+}
+
+function onAnnotPointerUp(e, pageNum) {
+  if (!annotDrawing) return;
+  annotDrawing = false;
+  if (activeTool.value === 'eraser') {
+    // Broadcast the updated strokes (after erase) to collaborators
+    if (props.jobId) {
+      broadcastErase(Number(props.jobId), pageNum, annotStrokesMap.value[pageNum] || []);
+    }
+    scheduleAnnotSave(pageNum);
+    return;
+  }
+  if (!annotCurrentStroke || annotCurrentStroke.points.length < 2) { annotCurrentStroke = null; return; }
+  const finishedStroke = { ...annotCurrentStroke };
+  if (!annotStrokesMap.value[pageNum]) annotStrokesMap.value[pageNum] = [];
+  annotStrokesMap.value[pageNum].push(finishedStroke);
+  annotCurrentStroke = null;
+  redrawAnnotCanvas(pageNum);
+  // Broadcast new stroke to collaborators
+  if (props.jobId) {
+    broadcastStroke(Number(props.jobId), pageNum, finishedStroke);
+  }
+  scheduleAnnotSave(pageNum);
+}
+
+function eraseAnnotAt(pos, pageNum) {
+  const strokes = annotStrokesMap.value[pageNum];
+  if (!strokes) return;
+  const ERASE_RADIUS = 0.02; // 2% of page width — scale-independent
+  annotStrokesMap.value[pageNum] = strokes.filter(s => !s.points.some(pt => Math.hypot(pt.x - pos.x, pt.y - pos.y) < ERASE_RADIUS));
+  redrawAnnotCanvas(pageNum);
+}
+
+function scheduleAnnotSave(pageNum) {
+  annotDirtyPages.add(pageNum);
+  if (annotSaveTimers[pageNum]) clearTimeout(annotSaveTimers[pageNum]);
+  annotSaveTimers[pageNum] = setTimeout(() => saveAnnotations(pageNum), 1500);
+}
+
+async function saveAnnotations(pageNum) {
+  if (!props.projectId || !props.jobId) return;
+  const strokes = annotStrokesMap.value[pageNum] || [];
+  // Backup to localStorage
+  const lsKey = `annot_${props.projectId}_${props.jobId}_${pageNum}`;
+  try { localStorage.setItem(lsKey, JSON.stringify(strokes)); } catch {}
+  annotSaveStatus.value = 'saving';
+  try {
+    const token = getToken();
+    await fetch(`${config.public.apiBaseUrl}/api/projects/${props.projectId}/annotations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ocrJobId: Number(props.jobId), pageNumber: pageNum, data: JSON.stringify(strokes) }),
+    });
+    annotDirtyPages.delete(pageNum);
+    annotSaveStatus.value = 'saved';
+    if (annotSaveStatusTimer) clearTimeout(annotSaveStatusTimer);
+    annotSaveStatusTimer = setTimeout(() => { annotSaveStatus.value = null; }, 2000);
+  } catch (err) {
+    annotSaveStatus.value = null;
+    console.warn('[Annotation] saveAnnotations failed:', err);
+  }
+}
+
+async function saveAllDirtyPages() {
+  if (annotDirtyPages.size === 0) return;
+  const pages = [...annotDirtyPages];
+  await Promise.all(pages.map(p => {
+    if (annotSaveTimers[p]) { clearTimeout(annotSaveTimers[p]); delete annotSaveTimers[p]; }
+    return saveAnnotations(p);
+  }));
+}
+// ---- END ANNOTATION ----
+
 onMounted(() => {
   if (props.jobId) startLoadJob(props.jobId);
   else if (props.fileUrl || props.fileData) loadPdf();
+
+  // Connect to SignalR document room for collaborative drawing
+  if (props.jobId) {
+    hubConnect(Number(props.jobId)).catch(() => {});
+  }
+
+  // Receive strokes drawn by other collaborators
+  const handleRemoteStroke = ({ pageNumber, strokeJson }) => {
+    try {
+      const stroke = JSON.parse(strokeJson);
+      if (!annotStrokesMap.value[pageNumber]) annotStrokesMap.value[pageNumber] = [];
+      annotStrokesMap.value[pageNumber].push(stroke);
+      redrawAnnotCanvas(pageNumber);
+    } catch {}
+  };
+
+  // Receive erase events from other collaborators
+  const handleRemoteErase = ({ pageNumber, strokesJson }) => {
+    try {
+      const strokes = JSON.parse(strokesJson);
+      annotStrokesMap.value[pageNumber] = strokes;
+      redrawAnnotCanvas(pageNumber);
+    } catch {}
+  };
+
+  onStroke(handleRemoteStroke);
+  onErase(handleRemoteErase);
+  onBeforeUnmount(() => {
+    offStroke(handleRemoteStroke);
+    offErase(handleRemoteErase);
+  });
+
+  // Ctrl+S to force-save all dirty annotation pages
+  const handleCtrlS = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveAllDirtyPages();
+    }
+  };
+  window.addEventListener('keydown', handleCtrlS);
+  onBeforeUnmount(() => window.removeEventListener('keydown', handleCtrlS));
 });
 
 onBeforeUnmount(() => {
@@ -1165,6 +1510,8 @@ onBeforeUnmount(() => {
     signalrConnection.stop().catch(() => {});
     signalrConnection = null;
   }
+  // Save any remaining dirty pages before unmounting
+  saveAllDirtyPages();
 });
 // Thêm watcher này để bắt sự kiện khi bấm Zoom (+ / -)
 watch(scale, () => {
@@ -1173,6 +1520,8 @@ watch(scale, () => {
     setTimeout(() => {
       ocrDisplayW.value = ocrImgEl.value.offsetWidth || 0;
       ocrDisplayH.value = ocrImgEl.value.offsetHeight || 0;
+      resizeOcrAnnotCanvas();
+      redrawAnnotCanvas(1);
     }, 50);
   }
 });

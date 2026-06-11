@@ -331,6 +331,7 @@ const navItems = [
   { to: '/alphabet', icon: 'i-custom-alphabet',        label: 'Bảng chữ cái' },
   { to: '/kanji',    icon: 'i-custom-kanji',           label: 'Hán tự' },
   { to: '/explore',  icon: 'i-lucide-layers',          label: 'Flashcard' },
+  { to: '/notebook', icon: 'i-lucide-notebook-pen',    label: 'Sổ tay Dự án' },
   { to: '/sensei',   icon: 'i-lucide-message-circle',  label: 'Hội thoại' },
   { to: '/reading',  icon: 'i-lucide-book-open',       label: 'Luyện đọc' },
 ]

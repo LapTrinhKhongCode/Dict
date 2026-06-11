@@ -17,8 +17,18 @@ namespace Dict.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        public virtual Project Project { get; set; }
+        // Source traceability
+        public int? SourceOcrJobId { get; set; }
+        public int? SourcePage { get; set; }
+        public string? SourceSentence { get; set; }
 
+        public int? CardId { get; set; }
+
+        public virtual Card LinkedCard { get; set; }
+
+        public virtual Project Project { get; set; }
         public virtual ApplicationUser UserAdded { get; set; }
+        [ForeignKey(nameof(SourceOcrJobId))]
+        public virtual OcrJob SourceOcrJob { get; set; }
     }
 }

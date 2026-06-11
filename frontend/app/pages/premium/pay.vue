@@ -94,6 +94,8 @@
 </template>
 
 <script setup lang="ts">
+definePageMeta({ middleware: 'auth-client' })
+
 import { ref, onMounted, onUnmounted } from 'vue';
 import QRCode from 'qrcode';
 import { useJwt } from '~/composables/useJwt';

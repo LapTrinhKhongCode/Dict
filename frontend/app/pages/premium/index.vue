@@ -104,7 +104,9 @@
 </template>
 
 <script setup lang="ts">
-import { useJwt } from '~/composables/useJwt'; // Đảm bảo đường dẫn đúng
+definePageMeta({ middleware: 'auth-client' })
+
+import { useJwt } from '~/composables/useJwt';
 
 const { username, role, jwt } = useJwt();
 

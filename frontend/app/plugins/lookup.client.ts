@@ -203,6 +203,14 @@ const svgSave = `
       font-family: system-ui, sans-serif;
     }
 
+    /* Manual meaning input */
+    #glc-manual-meaning:focus {
+      border-color: #0ea5e9 !important;
+      box-shadow: 0 0 0 2px rgba(14,165,233,0.2);
+    }
+    #glc-save-confirm:hover { background: #0284c7 !important; }
+    #glc-save-cancel:hover { background: #334155 !important; color: #f1f5f9 !important; }
+
     /* Scrollbar đẹp */
     #rag-result-box::-webkit-scrollbar,
     #ai-explain-box::-webkit-scrollbar {
@@ -327,27 +335,129 @@ const svgSave = `
     isTranslateModalVisible.value = true
     console.log('Translate icon clicked: ' + selectedWord.value + isTranslateModalVisible.value)
   })
-saveIcon.addEventListener('click', () => {
-    // 1. Lấy từ đang bôi đen
-    const wordToSave = ragKeyword; 
-    
-    // 2. Lấy nghĩa tốt nhất hiện có (từ RAG kết quả đầu tiên)
+saveIcon.addEventListener('click', async () => {
+    const wordToSave = ragKeyword;
     let meaningToSave = '';
     if (ragContexts && ragContexts.length > 0) {
       meaningToSave = ragContexts[0].meaning || '';
     }
 
-    // 3. Ẩn popup bôi đen hiện tại
-    popupContainer.style.display = 'none';
+    const isReaderPage = route.path === '/reader' && route.query.projectId;
 
-    // 4. Bắn sự kiện ra toàn hệ thống để Vue Component bắt lấy
-    window.dispatchEvent(new CustomEvent('open-vocab-popup', {
-      detail: { 
-        word: wordToSave, 
-        meaning: meaningToSave 
-      }
-    }));
+    // ── Nếu chưa có nghĩa → hiện form nhập trước khi lưu ─────────────────
+    if (!meaningToSave) {
+      ragResultBox.style.display = 'block';
+      aiExplainBox.style.display = 'none';
+      ragResultBox.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="color:#94a3b8;font-size:0.8rem">
+            Không tìm thấy nghĩa cho <b style="color:#f1f5f9">${wordToSave}</b> trong DB.
+            Nhập nghĩa của bạn:
+          </span>
+          <input
+            id="glc-manual-meaning"
+            type="text"
+            placeholder="Nhập nghĩa / ghi chú..."
+            style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;
+                   padding:7px 10px;color:#f1f5f9;font-size:0.85rem;outline:none;"
+            autofocus
+          />
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button id="glc-save-cancel"
+              style="padding:5px 14px;background:#1e293b;color:#94a3b8;border:none;border-radius:6px;
+                     font-size:0.8rem;cursor:pointer;">
+              Bỏ qua
+            </button>
+            <button id="glc-save-confirm"
+              style="padding:5px 14px;background:#0ea5e9;color:#fff;border:none;border-radius:6px;
+                     font-size:0.8rem;font-weight:600;cursor:pointer;">
+              ${isReaderPage ? '📚 Lưu sổ tay' : '🔖 Lưu'}
+            </button>
+          </div>
+        </div>`;
+
+      // Focus input
+      setTimeout(() => {
+        const inp = document.getElementById('glc-manual-meaning') as HTMLInputElement | null;
+        if (inp) inp.focus();
+      }, 50);
+
+      // Handler cancel
+      document.getElementById('glc-save-cancel')?.addEventListener('click', () => {
+        popupContainer.style.display = 'none';
+      });
+
+      // Handler confirm (enter hoặc click)
+      const doSave = async () => {
+        const inp = document.getElementById('glc-manual-meaning') as HTMLInputElement | null;
+        meaningToSave = inp?.value.trim() || '';
+        await performSave(wordToSave, meaningToSave, isReaderPage);
+      };
+
+      document.getElementById('glc-save-confirm')?.addEventListener('click', doSave);
+      document.getElementById('glc-manual-meaning')?.addEventListener('keydown', (e: any) => {
+        if (e.key === 'Enter') doSave();
+        if (e.key === 'Escape') popupContainer.style.display = 'none';
+      });
+      return;
+    }
+
+    await performSave(wordToSave, meaningToSave, isReaderPage);
   })
+
+  async function performSave(wordToSave: string, meaningToSave: string, isReaderPage: any) {
+    // Nếu đang trên trang reader có projectId → lưu thẳng vào API sổ tay
+    if (isReaderPage) {
+      const projectId = route.query.projectId;
+      const jobId = route.query.jobId ? Number(route.query.jobId) : null;
+
+      saveIcon.style.opacity = '0.5';
+      saveIcon.style.pointerEvents = 'none';
+
+      try {
+        const config = useRuntimeConfig();
+        const token = localStorage.getItem('jwt_token') || '';
+        const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId}/vocabularies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            wordText: wordToSave,
+            contextMeaning: meaningToSave,
+            sourceOcrJobId: jobId,
+            sourceSentence: ragContext || wordToSave,
+          }),
+        });
+
+        if (res.ok) {
+          ragResultBox.innerHTML = `<span style="color:#4ade80;font-weight:600">✓ Đã lưu "${wordToSave}" vào sổ tay dự án</span>`;
+          ragResultBox.style.display = 'block';
+          setTimeout(() => { popupContainer.style.display = 'none'; }, 1800);
+        } else if (res.status === 409) {
+          ragResultBox.innerHTML = `<span style="color:#fbbf24">Từ này đã có trong sổ tay.</span>`;
+          ragResultBox.style.display = 'block';
+          setTimeout(() => { popupContainer.style.display = 'none'; }, 1600);
+        } else {
+          ragResultBox.innerHTML = `<span style="color:#f87171">Lỗi lưu từ vựng.</span>`;
+          ragResultBox.style.display = 'block';
+          setTimeout(() => { popupContainer.style.display = 'none'; }, 1600);
+        }
+      } catch {
+        ragResultBox.innerHTML = `<span style="color:#f87171">Lỗi kết nối.</span>`;
+        ragResultBox.style.display = 'block';
+        setTimeout(() => { popupContainer.style.display = 'none'; }, 1600);
+      } finally {
+        saveIcon.style.opacity = '';
+        saveIcon.style.pointerEvents = '';
+      }
+      return;
+    }
+
+    // Ngoài reader page: dispatch event để component bắt (Deck cũ)
+    popupContainer.style.display = 'none';
+    window.dispatchEvent(new CustomEvent('open-vocab-popup', {
+      detail: { word: wordToSave, meaning: meaningToSave }
+    }));
+  }
   // ── Click: AI giải thích (MỚI) ────────────────────────────────────────
   // ── Click: AI giải thích (Cập nhật: Không chặn khi ragContexts rỗng) ──
   aiIcon.addEventListener('click', async () => {
@@ -381,14 +491,75 @@ saveIcon.addEventListener('click', () => {
       if (!res.ok) throw new Error('API lỗi')
       const data = await res.json()
 
-      aiExplainBox.innerHTML = `
-        <div class="ai-word">✨ ${data.word ?? ragKeyword}</div>
-        <div class="ai-meaning">${data.bestMeaning ?? ''}</div>
-        <div class="ai-explain">${data.explanation ?? ''}</div>
-      `
-      aiExplainBox.style.display = 'block'
+      const bestMeaning = data.bestMeaning ?? ''
+      const word = data.word || ragKeyword
+      const explanation = data.explanation ?? ''
+
+      // Kiểm tra kết quả AI có hợp lệ không
+      const isError = !word || bestMeaning === 'Lỗi API' || bestMeaning === 'Lỗi cấu hình Key'
+        || explanation.startsWith('Mã lỗi') || explanation.startsWith('Không tìm thấy')
+
+      const isReaderPage = !isError && route.path === '/reader' && route.query.projectId
+
+      if (isError) {
+        aiExplainBox.innerHTML = `<span style="color:#f87171">⚠ AI không thể giải thích lúc này. Thử lại sau.</span>`
+        aiExplainBox.style.display = 'block'
+      } else {
+        aiExplainBox.innerHTML = `
+          <div class="ai-word">✨ ${word}</div>
+          <div class="ai-meaning">${bestMeaning}</div>
+          <div class="ai-explain">${explanation}</div>
+          ${isReaderPage ? `
+          <button id="ai-save-notebook" style="
+            margin-top:10px;display:inline-flex;align-items:center;gap:5px;
+            padding:5px 12px;background:rgba(99,102,241,0.15);
+            border:1px solid rgba(99,102,241,0.3);border-radius:8px;
+            color:#818cf8;font-size:0.78rem;font-weight:600;cursor:pointer;
+          ">💾 Lưu vào sổ tay</button>` : ''}
+        `
+        aiExplainBox.style.display = 'block'
+
+        if (isReaderPage) {
+          setTimeout(() => {
+            const saveBtn = document.getElementById('ai-save-notebook')
+            if (!saveBtn) return
+            saveBtn.addEventListener('click', async () => {
+              saveBtn.textContent = '⏳ Đang lưu...'
+              saveBtn.setAttribute('disabled', 'true')
+              try {
+                const config2 = useRuntimeConfig()
+                const token = localStorage.getItem('jwt_token') || ''
+                const projectId = route.query.projectId
+                const r = await fetch(`${config2.public.apiBaseUrl}/api/projects/${projectId}/vocabularies`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({
+                    wordText: ragKeyword,
+                    contextMeaning: bestMeaning || explanation.slice(0, 200),
+                    sourceSentence: ragContext || null,
+                    sourceOcrJobId: null,
+                    sourcePageNumber: null,
+                  })
+                })
+                if (r.ok) {
+                  saveBtn.textContent = '✓ Đã lưu sổ tay!'
+                  saveBtn.style.color = '#34d399'
+                  saveBtn.style.borderColor = 'rgba(52,211,153,0.3)'
+                  saveBtn.style.background = 'rgba(52,211,153,0.1)'
+                } else {
+                  saveBtn.textContent = '✗ Lỗi lưu'
+                  saveBtn.removeAttribute('disabled')
+                }
+              } catch {
+                saveBtn.textContent = '✗ Lỗi kết nối'
+                saveBtn.removeAttribute('disabled')
+              }
+            })
+          }, 50)
+        }
+      }
     } catch {
-      aiExplainBox.innerHTML     = `<span style="color:#f87171">Lỗi gọi AI, thử lại sau.</span>`
+      aiExplainBox.innerHTML = `<span style="color:#f87171">Lỗi kết nối AI, thử lại sau.</span>`
       aiExplainBox.style.display = 'block'
     } finally {
       aiLoading.style.display   = 'none'
