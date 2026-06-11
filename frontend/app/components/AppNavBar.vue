@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch, ref, onMounted, onUnmounted } from "vue";
+import { computed, watch, ref, onMounted, onUnmounted, inject } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useRuntimeConfig } from "#app";
 import { useJwt } from "@/composables/useJwt";
@@ -210,6 +210,15 @@ async function handleLogout() {
   logout();
   showToast("Đã đăng xuất!", "success");
 }
+
+// Theme toggle
+const theme = inject("theme") as { value: "dark" | "light" } | undefined;
+const setTheme = inject("setTheme") as ((mode: "dark" | "light") => void) | undefined;
+const isDark = computed(() => theme?.value === "dark");
+function toggleTheme() {
+  const next = isDark.value ? "light" : "dark";
+  setTheme?.(next);
+}
 </script>
 
 <template>
@@ -392,6 +401,15 @@ async function handleLogout() {
       <NuxtLink v-if="isAuthenticated" to="/account">
         <UButton icon="i-lucide-settings" size="xl" variant="ghost" />
       </NuxtLink>
+
+      <!-- Theme toggle -->
+      <UButton
+        :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
+        size="xl"
+        variant="ghost"
+        :title="isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'"
+        @click="toggleTheme"
+      />
     </div>
   </header>
 </template>

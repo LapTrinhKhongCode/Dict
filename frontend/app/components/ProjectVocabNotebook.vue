@@ -1,5 +1,5 @@
 <template>
-  <div class="nb-root" :class="{ 'is-review': reviewMode }">
+  <div class="nb-root" :class="{ 'is-review': reviewMode, 'nb-dark': isDark }">
 
     <!-- ═══════════════════════════════════════════
          REVIEW MODE
@@ -240,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJwt } from '~/composables/useJwt'
 import { useToast } from '~/composables/useToast'
@@ -250,6 +250,10 @@ const router = useRouter()
 const config = useRuntimeConfig()
 const { jwt } = useJwt()
 const { showToast } = useToast()
+
+// Sync dark mode via injected theme from app.vue
+const theme = inject('theme')
+const isDark = computed(() => theme?.value === 'dark')
 
 const vocabs = ref([])
 const loading = ref(false)
@@ -455,7 +459,7 @@ onMounted(loadVocabs)
   --nb-rv-spin-border:    rgba(0,0,0,0.2);
   transition: background 0.3s;
 }
-:global(.dark) .nb-root {
+.nb-dark {
   --nb-bg:        #0f172a;
   --nb-surface:   #1e293b;
   --nb-border:    #334155;
@@ -632,7 +636,7 @@ onMounted(loadVocabs)
   background: rgba(16,185,129,0.12); color: #059669;
   font-size: 11px; font-weight: 600;
 }
-:global(.dark) .review-done-badge { color: #34d399; background: rgba(16,185,129,0.15); }
+.nb-dark .review-done-badge { color: #34d399; background: rgba(16,185,129,0.15); }
 
 .review-progress-wrap {
   width: 100%; max-width: 520px; height: 3px; border-radius: 99px;
