@@ -9,5 +9,5 @@
 </template>
 
 <script setup>
-// Không cần import gì ở đây cả, giữ file này thật sạch
+definePageMeta({ middleware: 'auth-client', ssr: false })
 </script>

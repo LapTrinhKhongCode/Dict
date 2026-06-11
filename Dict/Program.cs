@@ -96,7 +96,11 @@ builder.Services.AddCors(options =>
     });
 });
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 
 // --- Cấu hình Identity và Authentication (KHỐI CHUẨN) ---
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>

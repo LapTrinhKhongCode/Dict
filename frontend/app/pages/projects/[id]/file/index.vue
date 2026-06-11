@@ -281,6 +281,8 @@
 </template>
 
 <script setup>
+definePageMeta({ layout: 'default', ssr: false, middleware: 'auth-client' })
+
 import { ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 

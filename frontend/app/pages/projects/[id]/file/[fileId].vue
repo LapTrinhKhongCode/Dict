@@ -10,6 +10,8 @@
         class="w-full h-full"
         :image-url="imageUrl"
         :results="ocrResults"
+        :project-id="projectId"
+        :ocr-job-id="jobId"
       />
     </div>
 
@@ -59,6 +61,8 @@
 </template>
 
 <script setup>
+definePageMeta({ layout: 'default', ssr: false, middleware: 'auth-client' })
+
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import WorkspaceReader from "~/components/WorkspaceReader.vue";

@@ -52,6 +52,7 @@
       @go-to-create-deck="goToCreateDeck"
       @go-to-my-decks="goToMyDecksList"
       @go-to-explore="goToExploreList"
+      @go-to-project-notebook="goToProjectNotebook"
       @show-login-notice="displayLoginNotice"
       @update:my-decks="updateMyDecks"
       @update:explore-decks="updateExploreDecks"
@@ -99,6 +100,10 @@
       @go-back="goHome"
       @go-to-create-deck="goToCreateDeck"
     />
+    <ProjectVocabNotebook
+      v-else-if="currentView === 'project-notebook'"
+      @go-back="goHome"
+    />
     <ExplorePage
       v-else-if="currentView === 'explore-list'"
       :current-user-id="currentUserId"
@@ -123,6 +128,7 @@ import DeckEditor from '~/components/DeckEditor.vue';
 import DeckCreator from '~/components/DeckCreator.vue';
 import MyDecksPage from '~/components/exlore/MyDecksPage.vue';
 import ExplorePage from '~/components/exlore/ExplorePage.vue';
+import ProjectVocabNotebook from '~/components/ProjectVocabNotebook.vue';
 import { useJwt } from '~/composables/useJwt';
 
 const { jwt, username, isAuthenticated } = useJwt();
@@ -134,7 +140,8 @@ type View =
   | 'edit-deck'
   | 'create-deck'
   | 'my-decks-list'
-  | 'explore-list';
+  | 'explore-list'
+  | 'project-notebook';
 type LearningMode = 'srs' | 'quiz';
 
 const config = useRuntimeConfig();
@@ -261,6 +268,9 @@ function goToMyDecksList() {
 }
 function goToExploreList() {
   currentView.value = 'explore-list';
+}
+function goToProjectNotebook() {
+  currentView.value = 'project-notebook';
 }
 
 async function handleDeckCreated(newDeckId: number) {

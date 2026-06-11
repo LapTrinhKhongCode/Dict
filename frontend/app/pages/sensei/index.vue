@@ -263,8 +263,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRuntimeConfig } from '#app'
 import { useJwt } from '~/composables/useJwt'
 
-definePageMeta({ layout: 'default' })
-
+definePageMeta({ layout: 'default', middleware: 'auth-client' })
 const config = useRuntimeConfig()
 const { jwt, username } = useJwt()
 const apiKey = config.public.geminiApiKey || ''

@@ -471,7 +471,7 @@
 </template>
 
 <script setup lang="ts">
-definePageMeta({ layout: 'admin' })
+definePageMeta({ layout: 'admin', middleware: 'admin-only-client' })
 
 const config = useRuntimeConfig()
 const base = config.public.apiBaseUrl

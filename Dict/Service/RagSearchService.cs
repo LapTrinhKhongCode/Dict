@@ -50,7 +50,7 @@ namespace Dict.Service
                 https: true,        // Bắt buộc true khi lên mây
                 apiKey: qdrantApiKey
             );
-            _httpClient = new HttpClient();
+            _httpClient = new HttpClient(new HttpClientHandler { UseProxy = false });
         }
 
         // =========================================================================
@@ -203,7 +203,21 @@ namespace Dict.Service
                 var requestBody = new
                 {
                     contents = new[] { new { parts = new[] { new { text = prompt } } } },
-                    generationConfig = new { response_mime_type = "application/json" }
+                    generationConfig = new
+                    {
+                        response_mime_type = "application/json",
+                        response_schema = new
+                        {
+                            type = "object",
+                            properties = new
+                            {
+                                word = new { type = "string" },
+                                best_meaning = new { type = "string" },
+                                explanation = new { type = "string" }
+                            },
+                            required = new[] { "word", "best_meaning", "explanation" }
+                        }
+                    }
                 };
 
                 var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
@@ -212,7 +226,10 @@ namespace Dict.Service
                 if (!response.IsSuccessStatusCode)
                 {
                     string errorContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"\n[GEMINI API ERROR] {response.StatusCode} - {errorContent}\n");
+                    var serialized = JsonSerializer.Serialize(requestBody);
+                    Console.WriteLine($"\n[GEMINI API ERROR] Status: {response.StatusCode}");
+                    Console.WriteLine($"[GEMINI REQUEST BODY]: {serialized}");
+                    Console.WriteLine($"[GEMINI ERROR BODY]: {errorContent}\n");
                     return ("", "Lỗi API", $"Mã lỗi {response.StatusCode}");
                 }
 

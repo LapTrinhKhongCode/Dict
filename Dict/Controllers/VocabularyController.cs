@@ -48,6 +48,7 @@ namespace Dict.Controllers
             var vocabs = await _db.ProjectVocabularies
                 .Where(v => v.ProjectId == projectId)
                 .Include(v => v.UserAdded)
+                .Include(v => v.SourceOcrJob).ThenInclude(j => j.Media)
                 .OrderByDescending(v => v.CreatedAt)
                 .Select(v => new VocabDto
                 {
@@ -57,6 +58,11 @@ namespace Dict.Controllers
                     AddedBy = v.AddedBy,
                     AddedByName = v.UserAdded.UserName,
                     CreatedAt = v.CreatedAt,
+                    SourceOcrJobId = v.SourceOcrJobId,
+                    SourcePage = v.SourcePage,
+                    SourceSentence = v.SourceSentence,
+                    SourceFileName = v.SourceOcrJob != null && v.SourceOcrJob.Media != null
+                        ? v.SourceOcrJob.Media.FileName : null,
                 })
                 .ToListAsync();
 
@@ -71,15 +77,30 @@ namespace Dict.Controllers
             var member = await GetMemberAsync(projectId, userId);
             if (member == null) return NotFound("Project khong ton tai hoac ban khong phai thanh vien.");
 
-            var canManage = member.Role == WorkspaceRole.ADMIN || IsSystemPrivileged();
-            if (!canManage) return Forbid();
-
             var existing = await _db.ProjectVocabularies
                 .FirstOrDefaultAsync(v => v.ProjectId == projectId
                     && v.WordText.ToLower() == dto.WordText.ToLower());
             if (existing != null)
             {
                 existing.ContextMeaning = dto.ContextMeaning;
+                // Update source if provided
+                if (dto.SourceOcrJobId.HasValue)
+                {
+                    existing.SourceOcrJobId = dto.SourceOcrJobId;
+                    existing.SourcePage = dto.SourcePage;
+                    existing.SourceSentence = dto.SourceSentence;
+                }
+                // If no card linked yet, create one now
+                if (!existing.CardId.HasValue)
+                {
+                    existing.CardId = await CreateLinkedCardAsync(existing.WordText, existing.ContextMeaning);
+                }
+                else
+                {
+                    // Update the linked card's back text to reflect new meaning
+                    var card = await _db.Cards.FindAsync(existing.CardId);
+                    if (card != null) { card.BackText = existing.ContextMeaning; card.UpdatedAt = DateTime.UtcNow; }
+                }
                 await _db.SaveChangesAsync();
                 return Ok(new VocabDto
                 {
@@ -88,8 +109,13 @@ namespace Dict.Controllers
                     ContextMeaning = existing.ContextMeaning,
                     AddedBy = existing.AddedBy,
                     CreatedAt = existing.CreatedAt,
+                    SourceOcrJobId = existing.SourceOcrJobId,
+                    SourcePage = existing.SourcePage,
+                    SourceSentence = existing.SourceSentence,
                 });
             }
+
+            var newCardId = await CreateLinkedCardAsync(dto.WordText, dto.ContextMeaning);
 
             var vocab = new ProjectVocabulary
             {
@@ -98,6 +124,10 @@ namespace Dict.Controllers
                 ContextMeaning = dto.ContextMeaning,
                 AddedBy = userId,
                 CreatedAt = DateTime.UtcNow,
+                SourceOcrJobId = dto.SourceOcrJobId,
+                SourcePage = dto.SourcePage,
+                SourceSentence = dto.SourceSentence,
+                CardId = newCardId,
             };
 
             _db.ProjectVocabularies.Add(vocab);
@@ -110,7 +140,29 @@ namespace Dict.Controllers
                 ContextMeaning = vocab.ContextMeaning,
                 AddedBy = vocab.AddedBy,
                 CreatedAt = vocab.CreatedAt,
+                SourceOcrJobId = vocab.SourceOcrJobId,
+                SourcePage = vocab.SourcePage,
+                SourceSentence = vocab.SourceSentence,
             });
+        }
+
+        private async Task<int?> CreateLinkedCardAsync(string wordText, string meaning)
+        {
+            try
+            {
+                var card = new Card
+                {
+                    FrontText = wordText,
+                    BackText = meaning ?? "",
+                    DeckId = null,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                };
+                _db.Cards.Add(card);
+                await _db.SaveChangesAsync();
+                return card.Id;
+            }
+            catch { return null; }
         }
 
         // PUT /api/projects/{projectId}/vocabularies/{vocabId}
@@ -120,9 +172,6 @@ namespace Dict.Controllers
             var userId = GetUserId();
             var member = await GetMemberAsync(projectId, userId);
             if (member == null) return NotFound("Project khong ton tai hoac ban khong phai thanh vien.");
-
-            var canManage = member.Role == WorkspaceRole.ADMIN || IsSystemPrivileged();
-            if (!canManage) return Forbid();
 
             var vocab = await _db.ProjectVocabularies
                 .FirstOrDefaultAsync(v => v.Id == vocabId && v.ProjectId == projectId);
@@ -138,6 +187,9 @@ namespace Dict.Controllers
                 ContextMeaning = vocab.ContextMeaning,
                 AddedBy = vocab.AddedBy,
                 CreatedAt = vocab.CreatedAt,
+                SourceOcrJobId = vocab.SourceOcrJobId,
+                SourcePage = vocab.SourcePage,
+                SourceSentence = vocab.SourceSentence,
             });
         }
 
@@ -165,6 +217,121 @@ namespace Dict.Controllers
 
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        // GET /api/projects/{projectId}/vocabularies/{word}/occurrences
+        // Tìm tất cả vị trí trong project chứa từ đó (search OcrResults)
+        [HttpGet("api/projects/{projectId}/vocabularies/{word}/occurrences")]
+        public async Task<IActionResult> GetOccurrences(int projectId, string word)
+        {
+            var userId = GetUserId();
+            var member = await GetMemberAsync(projectId, userId);
+            if (member == null && !IsSystemPrivileged()) return Forbid();
+
+            // Group by OcrJob (file), rồi by page
+            var results = await _db.OcrResults
+                .Where(r => r.OcrJob.ProjectId == projectId
+                         && r.WordText != null
+                         && r.WordText.Contains(word))
+                .Include(r => r.OcrJob).ThenInclude(j => j.Media)
+                .GroupBy(r => new { r.OcrJobId, r.PageNumber })
+                .Select(g => new
+                {
+                    FileId = g.Key.OcrJobId,
+                    Page = g.Key.PageNumber ?? 1,
+                    MatchCount = g.Count(),
+                    FileName = g.First().OcrJob.Media != null
+                        ? g.First().OcrJob.Media.FileName : "Tài liệu",
+                    DetectedText = g.First().OcrJob.DetectedText,
+                })
+                .OrderBy(x => x.FileId).ThenBy(x => x.Page)
+                .ToListAsync();
+
+            // Extract snippet from DetectedText around the word
+            var occurrences = results.Select(r =>
+            {
+                string? snippet = null;
+                if (!string.IsNullOrEmpty(r.DetectedText))
+                {
+                    var idx = r.DetectedText.IndexOf(word, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0)
+                    {
+                        var start = Math.Max(0, idx - 40);
+                        var end = Math.Min(r.DetectedText.Length, idx + word.Length + 60);
+                        snippet = (start > 0 ? "…" : "") +
+                                  r.DetectedText[start..end].Trim() +
+                                  (end < r.DetectedText.Length ? "…" : "");
+                    }
+                }
+                return new VocabOccurrenceDto
+                {
+                    FileId = r.FileId ?? 0,
+                    FileName = r.FileName,
+                    Page = r.Page,
+                    MatchCount = r.MatchCount,
+                    Snippet = snippet,
+                };
+            }).ToList();
+
+            return Ok(occurrences);
+        }
+
+        // GET /api/projects/my-vocabs
+        // Lấy tất cả từ vựng từ tất cả project user đang tham gia
+        [HttpGet("api/projects/my-vocabs")]
+        public async Task<IActionResult> GetMyVocabs()
+        {
+            var userId = GetUserId();
+
+            // Projects user là member (qua workspace membership)
+            var myProjectIds = await _db.WorkspaceMembers
+                .Where(wm => wm.UserId == userId)
+                .SelectMany(wm => _db.Projects
+                    .Where(p => p.WorkspaceId == wm.WorkspaceId)
+                    .Select(p => p.Id))
+                .Distinct()
+                .ToListAsync();
+
+            if (!myProjectIds.Any()) return Ok(new List<MyVocabDto>());
+
+            var vocabs = await _db.ProjectVocabularies
+                .Where(v => myProjectIds.Contains(v.ProjectId))
+                .Include(v => v.Project)
+                .Include(v => v.SourceOcrJob).ThenInclude(j => j.Media)
+                .OrderByDescending(v => v.CreatedAt)
+                .Select(v => new MyVocabDto
+                {
+                    Id = v.Id,
+                    WordText = v.WordText,
+                    ContextMeaning = v.ContextMeaning,
+                    ProjectId = v.ProjectId,
+                    ProjectName = v.Project.Name,
+                    CreatedAt = v.CreatedAt,
+                    SourceOcrJobId = v.SourceOcrJobId,
+                    SourcePage = v.SourcePage,
+                    SourceSentence = v.SourceSentence,
+                    SourceFileName = v.SourceOcrJob != null && v.SourceOcrJob.Media != null
+                        ? v.SourceOcrJob.Media.FileName : null,
+                    CardId = v.CardId,
+                    ReviewReps = v.CardId != null
+                        ? _db.CardStates
+                            .Where(cs => cs.CardId == v.CardId && cs.UserId == userId)
+                            .Select(cs => (int?)cs.Reps).FirstOrDefault()
+                        : null,
+                    DueDate = v.CardId != null
+                        ? _db.CardStates
+                            .Where(cs => cs.CardId == v.CardId && cs.UserId == userId)
+                            .Select(cs => cs.DueDate).FirstOrDefault()
+                        : null,
+                    LastReviewedAt = v.CardId != null
+                        ? _db.CardStates
+                            .Where(cs => cs.CardId == v.CardId && cs.UserId == userId)
+                            .Select(cs => cs.LastReviewedAt).FirstOrDefault()
+                        : null,
+                })
+                .ToListAsync();
+
+            return Ok(vocabs);
         }
     }
 }

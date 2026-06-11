@@ -141,6 +141,34 @@ namespace Dict.Hubs
 
 
         // =========================================================
+        // PHẦN DÀNH CHO VẼ CỘNG TÁC (COLLABORATIVE ANNOTATION)
+        // =========================================================
+
+        /// <summary>
+        /// Frontend gọi mỗi khi hoàn thành một nét vẽ (pointerup).
+        /// Broadcast stroke JSON đến tất cả user khác trong cùng document room.
+        /// </summary>
+        public async Task BroadcastAnnotationStroke(int documentId, int pageNumber, string strokeJson)
+        {
+            var userId = Context.UserIdentifier ?? Context.ConnectionId;
+            var payload = new { UserId = userId, PageNumber = pageNumber, StrokeJson = strokeJson };
+            await Clients.OthersInGroup($"Document_{documentId}")
+                         .SendAsync("AnnotationStroke", payload);
+        }
+
+        /// <summary>
+        /// Frontend gọi sau khi dùng tẩy xong (pointerup với eraser).
+        /// Broadcast toàn bộ danh sách strokes còn lại của trang đó.
+        /// </summary>
+        public async Task BroadcastAnnotationErase(int documentId, int pageNumber, string strokesJson)
+        {
+            var userId = Context.UserIdentifier ?? Context.ConnectionId;
+            var payload = new { UserId = userId, PageNumber = pageNumber, StrokesJson = strokesJson };
+            await Clients.OthersInGroup($"Document_{documentId}")
+                         .SendAsync("AnnotationErased", payload);
+        }
+
+        // =========================================================
         // PHẦN DÀNH CHO HOẠT ĐỘNG CHUNG CỦA WORKSPACE
         // =========================================================
 
