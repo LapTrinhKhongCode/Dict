@@ -154,6 +154,7 @@ namespace Dict.Controllers
                 {
                     FrontText = wordText,
                     BackText = meaning ?? "",
+                    Tags = "",
                     DeckId = null,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
