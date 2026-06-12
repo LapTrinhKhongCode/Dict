@@ -342,7 +342,8 @@ saveIcon.addEventListener('click', async () => {
       meaningToSave = ragContexts[0].meaning || '';
     }
 
-    const isReaderPage = route.path === '/reader' && route.query.projectId;
+    const projectId = route.query.projectId || route.params.projectid || route.params.projectId;
+    const isReaderPage = !!(projectId);
 
     // ── Nếu chưa có nghĩa → hiện form nhập trước khi lưu ─────────────────
     if (!meaningToSave) {
@@ -406,9 +407,9 @@ saveIcon.addEventListener('click', async () => {
   })
 
   async function performSave(wordToSave: string, meaningToSave: string, isReaderPage: any) {
-    // Nếu đang trên trang reader có projectId → lưu thẳng vào API sổ tay
+    // Nếu đang trên trang reader/project có projectId → lưu thẳng vào API sổ tay
     if (isReaderPage) {
-      const projectId = route.query.projectId;
+      const projectId = route.query.projectId || route.params.projectid || route.params.projectId;
       const jobId = route.query.jobId ? Number(route.query.jobId) : null;
 
       saveIcon.style.opacity = '0.5';
@@ -499,7 +500,7 @@ saveIcon.addEventListener('click', async () => {
       const isError = !word || bestMeaning === 'Lỗi API' || bestMeaning === 'Lỗi cấu hình Key'
         || explanation.startsWith('Mã lỗi') || explanation.startsWith('Không tìm thấy')
 
-      const isReaderPage = !isError && route.path === '/reader' && route.query.projectId
+      const isReaderPage = !isError && !!(route.query.projectId || route.params.projectid || route.params.projectId)
 
       if (isError) {
         aiExplainBox.innerHTML = `<span style="color:#f87171">⚠ AI không thể giải thích lúc này. Thử lại sau.</span>`
@@ -529,7 +530,7 @@ saveIcon.addEventListener('click', async () => {
               try {
                 const config2 = useRuntimeConfig()
                 const token = localStorage.getItem('jwt_token') || ''
-                const projectId = route.query.projectId
+                const projectId = route.query.projectId || route.params.projectid || route.params.projectId
                 const r = await fetch(`${config2.public.apiBaseUrl}/api/projects/${projectId}/vocabularies`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

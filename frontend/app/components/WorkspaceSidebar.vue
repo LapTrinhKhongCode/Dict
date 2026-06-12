@@ -332,7 +332,7 @@ const navItems = [
   { to: '/kanji',    icon: 'i-custom-kanji',           label: 'Hán tự' },
   { to: '/explore',  icon: 'i-lucide-layers',          label: 'Flashcard' },
   { to: '/notebook', icon: 'i-lucide-notebook-pen',    label: 'Sổ tay Dự án' },
-  { to: '/sensei',   icon: 'i-lucide-message-circle',  label: 'Hội thoại' },
+  // { to: '/sensei', icon: 'i-lucide-message-circle', label: 'Hội thoại' }, // chưa phát triển
   { to: '/reading',  icon: 'i-lucide-book-open',       label: 'Luyện đọc' },
 ]
 const config = useRuntimeConfig()
