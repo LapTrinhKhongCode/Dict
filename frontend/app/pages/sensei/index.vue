@@ -260,10 +260,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { useRuntimeConfig } from '#app'
+import { useRuntimeConfig, navigateTo } from '#app'
 import { useJwt } from '~/composables/useJwt'
 
-definePageMeta({ layout: 'default', middleware: 'auth-client' })
+// Trang đang phát triển — redirect về trang chủ
+definePageMeta({
+  layout: 'default',
+  middleware: [
+    () => navigateTo('/', { replace: true })
+  ]
+})
 const config = useRuntimeConfig()
 const { jwt, username } = useJwt()
 const apiKey = config.public.geminiApiKey || ''

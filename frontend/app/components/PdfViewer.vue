@@ -1011,12 +1011,49 @@ function handleTextSelection(e) {
       const container = range.startContainer.parentElement?.closest('[data-page-number], .textLayer, .ocr-text-layer') 
                      || range.startContainer.parentElement;
       if (container?.textContent) {
-        const full = container.textContent.replace(/\s+/g, ' ').trim();
-        const idx = full.indexOf(text);
+        // Normalize: xóa space thừa giữa các ký tự (thường xảy ra với OCR)
+        // "故 障 の 回 数" → "故障の回数"
+        let full = container.textContent.replace(/\s+/g, ' ').trim();
+
+        // Thử tìm với text gốc trước, nếu không có thì thử loại bỏ space giữa các ký tự
+        let idx = full.indexOf(text);
+        if (idx < 0) {
+          // OCR mode: full có thể có space giữa từng ký tự → compact lại rồi tìm
+          const fullCompact = full.replace(/ /g, '');
+          const textCompact = text.replace(/ /g, '');
+          const idxCompact = fullCompact.indexOf(textCompact);
+          if (idxCompact >= 0) {
+            // Tính lại idx trong full gốc bằng cách đếm ký tự không phải space
+            let charCount = 0;
+            for (let i = 0; i < full.length; i++) {
+              if (full[i] !== ' ') {
+                if (charCount === idxCompact) { idx = i; break; }
+                charCount++;
+              }
+            }
+          }
+        }
+
         if (idx >= 0) {
-          const start = Math.max(0, idx - 50);
-          const end = Math.min(full.length, idx + text.length + 80);
+          // Ranh giới câu: dấu câu Nhật/Anh + bullet points (・•) + xuống dòng
+          // Tìm điểm bắt đầu: lùi về ranh giới gần nhất trước từ
+          const before = full.substring(0, idx);
+          const lastBreak = before.search(/[。！？\n.!?・•][^。！？\n.!?・•]*$/);
+          const start = lastBreak >= 0 ? lastBreak + 1 : Math.max(0, idx - 60);
+          // Tìm điểm kết thúc: tiến đến ranh giới gần nhất sau từ
+          const afterIdx = idx + text.length;
+          const after = full.substring(afterIdx);
+          const nextBreak = after.search(/[。！？\n.!?・•]/);
+          const end = (nextBreak >= 0 && nextBreak < 150) ? afterIdx + nextBreak + 1 : Math.min(full.length, afterIdx + 100);
           sourceSentence = full.substring(start, end).trim();
+
+          // Nếu ngữ cảnh quá ngắn (caption ảnh, tiêu đề, công thức đứng một mình...)
+          // → mở rộng thêm cả dòng trước và sau để có thêm context
+          if (sourceSentence.replace(/\s/g, '').length < 10 && full.length > 10) {
+            const expandStart = Math.max(0, idx - 120);
+            const expandEnd = Math.min(full.length, afterIdx + 120);
+            sourceSentence = full.substring(expandStart, expandEnd).trim();
+          }
         }
       }
     } catch {}
