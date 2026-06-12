@@ -59,19 +59,21 @@
                 {{ currentCard.sourceFileName || 'Tài liệu' }} · Trang {{ currentCard.sourcePage }}
               </button>
             </div>
-            <div class="card-actions" @click.stop>
-              <button class="card-btn-done" @click="markDone">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
-                Đã nhớ
-              </button>
-              <button class="card-btn-next" @click="nextCard">
-                Tiếp
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </button>
-            </div>
           </div>
 
         </div>
+      </div>
+
+      <!-- Buttons always outside the 3D flip — consistent layout regardless of card height -->
+      <div class="card-actions" @click.stop>
+        <button class="card-btn-done" :disabled="!cardFlipped" @click="markDone">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
+          Đã nhớ
+        </button>
+        <button class="card-btn-next" @click="nextCard">
+          Tiếp
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
       </div>
 
       <Transition name="fade-up">
@@ -121,6 +123,13 @@
           <option value="">Tất cả dự án</option>
           <option v-for="p in projectList" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
+        <button v-if="filtered.length > 0" class="nb-btn-select-all" @click="toggleSelectAll">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="3" width="18" height="18" rx="3"/>
+            <path v-if="allSelected" d="M7 12l4 4 6-7"/>
+          </svg>
+          {{ allSelected ? 'Bỏ chọn' : 'Chọn tất cả' }}
+        </button>
         <Transition name="toolbar-btn">
           <button v-if="selectedIds.length > 0" class="nb-btn-deck" @click="exportToDeck" :disabled="exporting">
             <span v-if="exporting" class="spin-sm"></span>
@@ -291,6 +300,18 @@ const filtered = computed(() => {
   }
   return list
 })
+
+const allSelected = computed(() =>
+  filtered.value.length > 0 && filtered.value.every(v => selectedIds.value.includes(v.id))
+)
+
+function toggleSelectAll() {
+  if (allSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = filtered.value.map(v => v.id)
+  }
+}
 
 function startReview() {
   reviewQueue.value = [...filtered.value]
@@ -475,10 +496,10 @@ onMounted(loadVocabs)
   --nb-rv-ctx-bg:         rgba(255,255,255,0.04);
   --nb-rv-ctx-border:     rgba(255,255,255,0.08);
   --nb-rv-ctx-text:       #cbd5e1;
-  --nb-rv-btn-bg:         rgba(255,255,255,0.06);
-  --nb-rv-btn-border:     rgba(255,255,255,0.1);
-  --nb-rv-btn-text:       #94a3b8;
-  --nb-rv-btn-hover-bg:   rgba(255,255,255,0.1);
+  --nb-rv-btn-bg:         rgba(255,255,255,0.1);
+  --nb-rv-btn-border:     rgba(255,255,255,0.22);
+  --nb-rv-btn-text:       #cbd5e1;
+  --nb-rv-btn-hover-bg:   rgba(255,255,255,0.18);
   --nb-rv-btn-hover-text: #f1f5f9;
   --nb-rv-spin-border:    rgba(255,255,255,0.3);
 }
@@ -561,6 +582,16 @@ onMounted(loadVocabs)
 .nb-btn-deck:hover { opacity: 0.88; }
 .nb-btn-deck:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.nb-btn-select-all {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 14px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+  font-size: 13px; font-weight: 600;
+  background: var(--nb-surface); color: var(--nb-muted);
+  border: 1px solid var(--nb-border);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nb-btn-select-all:hover { color: var(--nb-text); border-color: var(--nb-sky); }
+
 .nb-loading { display: flex; justify-content: center; padding: 80px 0; }
 .nb-spinner {
   width: 28px; height: 28px; border-radius: 50%;
@@ -624,7 +655,7 @@ onMounted(loadVocabs)
 }
 .review-topbar {
   display: flex; align-items: center; justify-content: space-between;
-  width: 100%; max-width: 520px; margin-bottom: 14px;
+  width: 100%; max-width: 680px; margin-bottom: 14px;
 }
 .review-counter { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--nb-rv-counter-muted); }
 .review-counter-cur { font-weight: 700; font-size: 16px; color: var(--nb-rv-counter-cur); }
@@ -639,7 +670,7 @@ onMounted(loadVocabs)
 .nb-dark .review-done-badge { color: #34d399; background: rgba(16,185,129,0.15); }
 
 .review-progress-wrap {
-  width: 100%; max-width: 520px; height: 3px; border-radius: 99px;
+  width: 100%; max-width: 680px; height: 3px; border-radius: 99px;
   background: var(--nb-rv-progress-bg); overflow: hidden; margin-bottom: 32px;
 }
 .review-progress-bar {
@@ -649,16 +680,18 @@ onMounted(loadVocabs)
 }
 
 /* ─── Flip card ──────────────────────────────────────────────────────── */
-.card-scene { width: 100%; max-width: 520px; cursor: pointer; perspective: 1200px; user-select: none; }
+.card-scene { width: 100%; max-width: 680px; cursor: pointer; perspective: 1200px; user-select: none; }
 .card-body {
-  position: relative; width: 100%; min-height: 300px;
+  position: relative; width: 100%;
+  /* grid-stack: both faces occupy same cell → card-body height = tallest face */
+  display: grid; grid-template-areas: "stack";
   transition: transform 0.55s cubic-bezier(0.4,0,0.2,1);
   transform-style: preserve-3d;
 }
 .card-body.flipped { transform: rotateY(180deg); }
 
 .card-face {
-  position: absolute; inset: 0; border-radius: 20px;
+  grid-area: stack; border-radius: 20px;
   backface-visibility: hidden; -webkit-backface-visibility: hidden;
 }
 .card-front {
@@ -674,7 +707,7 @@ onMounted(loadVocabs)
   background: var(--nb-surface); border: 1px solid var(--nb-border);
   box-shadow: 0 4px 24px rgba(0,0,0,0.07);
   transform: rotateY(180deg);
-  display: flex; flex-direction: column; justify-content: space-between;
+  display: flex; flex-direction: column;
   padding: 28px 28px 24px;
 }
 .card-back-top { flex: 1; }
@@ -700,7 +733,7 @@ onMounted(loadVocabs)
 }
 .card-doc-link:hover { opacity: 0.8; }
 
-.card-actions { display: flex; gap: 10px; margin-top: 24px; }
+.card-actions { display: flex; gap: 10px; margin-top: 16px; width: 100%; max-width: 680px; }
 .card-btn-done {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 12px; border-radius: 12px; border: none; cursor: pointer;
@@ -711,6 +744,7 @@ onMounted(loadVocabs)
 }
 .card-btn-done:hover { box-shadow: 0 4px 20px rgba(16,185,129,0.4); }
 .card-btn-done:active { transform: scale(0.97); }
+.card-btn-done:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
 
 .card-btn-next {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;

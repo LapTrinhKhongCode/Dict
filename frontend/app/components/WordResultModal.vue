@@ -95,7 +95,7 @@
             <div
               v-if="showDecksPanel"
               ref="decksPanelRef"
-              class="absolute top-12 right-0 z-20 w-64 rounded-lg shadow-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
+              class="absolute top-12 right-0 z-20 w-64 rounded-lg shadow-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 max-h-96 overflow-y-auto"
             >
               <h4 class="font-medium text-gray-900 dark:text-white mb-2">
                 Lưu vào Deck...
@@ -121,7 +121,7 @@
               </div>
               <ul
                 v-else-if="decks.length > 0"
-                class="space-y-1 max-h-48 overflow-y-auto"
+                class="space-y-1 max-h-36 overflow-y-auto"
               >
                 <li
                   v-for="deck in decks"
@@ -134,6 +134,41 @@
               </ul>
               <div v-else class="text-gray-500 dark:text-gray-400 text-sm">
                 Không tìm thấy deck nào.
+              </div>
+
+              <!-- Create new deck inline -->
+              <div class="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3">
+                <div v-if="!showCreateDeckForm" class="flex">
+                  <button
+                    class="w-full flex items-center gap-2 text-sm text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium py-1"
+                    @click.stop="showCreateDeckForm = true; $nextTick(() => newDeckInputRef?.focus())"
+                  >
+                    <UIcon name="i-lucide-plus" class="size-4" />
+                    Tạo deck mới
+                  </button>
+                </div>
+                <div v-else class="flex gap-2" @click.stop>
+                  <input
+                    v-model="newDeckName"
+                    type="text"
+                    placeholder="Tên deck..."
+                    class="flex-1 text-sm px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-indigo-400"
+                    @keyup.enter="createAndSaveToDeck"
+                    ref="newDeckInputRef"
+                  />
+                  <button
+                    class="text-sm px-3 py-1 rounded bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-50"
+                    :disabled="!newDeckName.trim() || createDeckLoading"
+                    @click="createAndSaveToDeck"
+                  >
+                    <span v-if="createDeckLoading" class="animate-spin inline-block size-3 border-2 border-white border-t-transparent rounded-full"></span>
+                    <span v-else>Tạo</span>
+                  </button>
+                  <button
+                    class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    @click.stop="showCreateDeckForm = false; newDeckName = ''"
+                  >✕</button>
+                </div>
               </div>
             </div>
 
@@ -757,6 +792,10 @@ const saveLoading = ref(false);
 const showDecksPanel = ref(false);
 const decksButtonRef = ref<HTMLElement | null>(null);
 const decksPanelRef = ref<HTMLElement | null>(null);
+const showCreateDeckForm = ref(false);
+const newDeckName = ref('');
+const newDeckInputRef = ref<HTMLInputElement | null>(null);
+const createDeckLoading = ref(false);
 
 const toggleDecksPanel = () => {
   showDecksPanel.value = !showDecksPanel.value;
@@ -841,6 +880,34 @@ const saveToDeck = async (deckId: string) => {
     saveLoading.value = false;
     showDecksPanel.value = false;
     document.removeEventListener("click", handleClickOutside);
+  }
+};
+
+const createAndSaveToDeck = async () => {
+  const name = newDeckName.value.trim();
+  if (!name || createDeckLoading.value) return;
+  if (!isAuthenticated.value) {
+    showToast("Bạn cần đăng nhập", "error");
+    return;
+  }
+  createDeckLoading.value = true;
+  const headers = { Authorization: `Bearer ${jwt.value}`, "Content-Type": "application/json" };
+  try {
+    const res = await $fetch<any>(`${config.public.apiBaseUrl}/api/Decks`, {
+      method: "POST",
+      body: { title: name, description: name },
+      headers,
+    });
+    const newDeck = res.result;
+    decks.value = []; // reset cache so next open re-fetches
+    showCreateDeckForm.value = false;
+    newDeckName.value = '';
+    // save word to the newly created deck
+    await saveToDeck(newDeck.id ?? newDeck.Id);
+  } catch {
+    showToast("Không thể tạo deck, thử lại sau", "error");
+  } finally {
+    createDeckLoading.value = false;
   }
 };
 
