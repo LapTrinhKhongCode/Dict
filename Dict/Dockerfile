@@ -26,7 +26,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-RUN chown app:app /app
+RUN mkdir -p /app/cache && chown app:app /app /app/cache
 # 2. 🔥 THAY ĐỔI QUYẾT ĐỊNH: Bàn giao toàn bộ quyền sở hữu file cho user 'app' ngay lúc copy
 COPY --chown=app:app --from=build /app/publish .
 
