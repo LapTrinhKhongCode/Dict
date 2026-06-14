@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.IdentityModel.Tokens.Jwt;
@@ -18,6 +19,8 @@ using System.Text.RegularExpressions;
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 var builder = WebApplication.CreateBuilder(args);
+// Flush logs immediately — critical for Docker where stdout may be buffered
+builder.Logging.AddConsole(opts => opts.FormatterName = "simple");
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 500MB
@@ -65,7 +68,8 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl");
+var frontendUrl = builder.Configuration.GetValue<string>("FrontendUrl")
+    ?? builder.Configuration.GetValue<string>("CorsOrigins");
 var allowedOrigins = new[]
 {
     frontendUrl,
@@ -73,6 +77,8 @@ var allowedOrigins = new[]
     "http://localhost:3000",
     "http://localhost:3001",
 }.Where(o => !string.IsNullOrEmpty(o)).Select(o => o!.TrimEnd('/')).Distinct().ToArray();
+
+Console.WriteLine($"[CORS] Allowed origins: {string.Join(", ", allowedOrigins)}");
 
 builder.Services.AddCors(options =>
 {
@@ -194,6 +200,9 @@ builder.Services.AddSingleton<TrieAutocompleteCache>();
 // vừa là HostedService (để chạy background khi startup)
 builder.Services.AddSingleton<TrieLoaderService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TrieLoaderService>());
+// Không kill toàn app khi BackgroundService gặp lỗi (Azure SQL cold start gây timeout)
+builder.Services.Configure<HostOptions>(opts =>
+    opts.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddSingleton<IUserIdProvider, EmailBasedUserIdProvider>();
 builder.Services.AddSingleton<IRagSearchService, RagSearchService>();
