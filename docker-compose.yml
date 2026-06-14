@@ -11,8 +11,5 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-vision-key.json
     volumes:
       - ../gcp-vision-key.json:/app/gcp-vision-key.json:ro
-      - trie-cache:/app/cache
+      - ./cache:/app/cache
     restart: unless-stopped
-
-volumes:
-  trie-cache:
