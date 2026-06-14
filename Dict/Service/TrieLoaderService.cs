@@ -40,9 +40,12 @@ namespace Dict.Service
             _logger.LogInformation("Bắt đầu chiến dịch nạp dữ liệu lên RAM (Bản vá lỗi Flattening)...");
             var watch = Stopwatch.StartNew();
 
-            string binNodesPath = "cache_trie_nodes.bin";
-            string jsonSuggestionsPath = "cache_trie_suggestions.json";
-            string jsonKanjiPath = "cache_kanji.json";
+            // Dùng /app/cache/ nếu tồn tại (Docker volume mount), fallback về thư mục hiện tại
+            var cacheDir = Directory.Exists("/app/cache") ? "/app/cache" : ".";
+            string binNodesPath = Path.Combine(cacheDir, "cache_trie_nodes.bin");
+            string jsonSuggestionsPath = Path.Combine(cacheDir, "cache_trie_suggestions.json");
+            string jsonKanjiPath = Path.Combine(cacheDir, "cache_kanji.json");
+            _logger.LogInformation("Cache directory: {Dir}", cacheDir);
 
             if (File.Exists(binNodesPath) && File.Exists(jsonSuggestionsPath) && File.Exists(jsonKanjiPath))
             {
@@ -51,9 +54,25 @@ namespace Dict.Service
             }
             else
             {
-                _logger.LogInformation("Không tìm thấy Cache. Đang xây dựng từ SQL Server...");
-                await BuildFromSqlAsync(stoppingToken);
-                await SaveToCacheAsync(binNodesPath, jsonSuggestionsPath, jsonKanjiPath);
+                // Retry với backoff nếu Azure SQL chưa warm up
+                int attempt = 0;
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    attempt++;
+                    try
+                    {
+                        _logger.LogInformation("Không tìm thấy Cache. Đang xây dựng từ SQL Server (lần thử {Attempt})...", attempt);
+                        await BuildFromSqlAsync(stoppingToken);
+                        await SaveToCacheAsync(binNodesPath, jsonSuggestionsPath, jsonKanjiPath);
+                        break; // thành công → thoát vòng retry
+                    }
+                    catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+                    {
+                        var delay = TimeSpan.FromSeconds(Math.Min(30 * attempt, 120)); // 30s, 60s, 90s, 120s max
+                        _logger.LogWarning(ex, "Kết nối SQL thất bại (lần {Attempt}). Thử lại sau {Delay}s...", attempt, delay.TotalSeconds);
+                        try { await Task.Delay(delay, stoppingToken); } catch (OperationCanceledException) { return; }
+                    }
+                }
             }
 
             watch.Stop();
