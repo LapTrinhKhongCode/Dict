@@ -461,6 +461,7 @@ const pageOcrResults = ref({});
 const pageUploadStatus = ref({});
 const uploadQueue = ref([]);
 const pdfJobId = ref(null);
+const hubMediaId = ref<number | null>(null); // canonical ID dùng cho SignalR room (mediaId từ API)
 let isUploadRunning = false;
 const pageDimensions = ref({});
 
@@ -737,7 +738,10 @@ async function startLoadJob(jobId) {
     if (!res.ok) throw new Error("Load Job thất bại.");
 
     const data = await res.json();
-    if (data.mediaId) emit("media-id-loaded", data.mediaId);
+    if (data.mediaId) {
+      emit("media-id-loaded", data.mediaId);
+      hubMediaId.value = Number(data.mediaId); // lưu lại để dùng cho SignalR
+    }
 
     const isPdf = data.imageUrl?.toLowerCase().includes(".pdf");
 
@@ -1431,7 +1435,7 @@ function onAnnotPointerUp(e, pageNum) {
   if (activeTool.value === 'eraser') {
     // Broadcast the updated strokes (after erase) to collaborators
     if (props.jobId) {
-      broadcastErase(Number(props.jobId), pageNum, annotStrokesMap.value[pageNum] || []);
+      broadcastErase(hubMediaId.value ?? Number(props.jobId), pageNum, annotStrokesMap.value[pageNum] || []);
     }
     // Save immediately for erase — no debounce so it persists even if user navigates/F5 right after
     saveAnnotations(pageNum);
@@ -1448,7 +1452,7 @@ function onAnnotPointerUp(e, pageNum) {
   redrawAnnotCanvas(pageNum);
   // Broadcast new stroke to collaborators
   if (props.jobId) {
-    broadcastStroke(Number(props.jobId), pageNum, finishedStroke);
+    broadcastStroke(hubMediaId.value ?? Number(props.jobId), pageNum, finishedStroke);
   }
   scheduleAnnotSave(pageNum);
 }
@@ -1513,11 +1517,6 @@ onMounted(() => {
   if (props.jobId) startLoadJob(props.jobId);
   else if (props.fileUrl || props.fileData) loadPdf();
 
-  // Connect to SignalR document room for collaborative drawing
-  if (props.jobId) {
-    hubConnect(Number(props.jobId)).catch(() => {});
-  }
-
   // Receive strokes drawn by other collaborators
   const handleRemoteStroke = ({ pageNumber, strokeJson }) => {
     try {
@@ -1565,6 +1564,12 @@ onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload);
   onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload));
 });
+
+// Connect SignalR khi hubMediaId được set (sau khi load job trả về mediaId)
+// Dùng mediaId thay vì jobId để đồng bộ với CollabCursorOverlay
+watch(hubMediaId, (newId) => {
+  if (newId) hubConnect(newId).catch(() => {});
+}, { immediate: true });
 
 onBeforeUnmount(() => {
   if (scrollObserver) scrollObserver.disconnect();
