@@ -5,8 +5,6 @@ WORKDIR /src
 # CHỈ sao chép file dự án chính & restore trực tiếp nó
 COPY Dict/Dict.csproj ./Dict/
 
-RUN dotnet add ./Dict/Dict.csproj package Tokenizers.DotNet.runtime.linux-arm64
-
 RUN dotnet restore ./Dict/Dict.csproj
 
 # Sao chép toàn bộ mã nguồn hiện tại qua

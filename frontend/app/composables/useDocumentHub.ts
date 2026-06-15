@@ -14,6 +14,7 @@ type ViewerPayload = { userId: string; userName: string; avatarUrl?: string }
 // Singleton — one connection per app instance (same tab)
 let hubConnection: signalR.HubConnection | null = null
 let currentDocId: number | null = null
+let connectingPromise: Promise<void> | null = null  // prevent concurrent connect calls
 
 // Reactive state accessible by all consumers
 const viewers = ref<Record<string, ViewerPayload & { color: string }>>({})
@@ -104,29 +105,43 @@ export function useDocumentHub() {
       return
     }
 
-    // Switch room: leave old if needed
-    if (hubConnection && currentDocId && currentDocId !== docId &&
-        hubConnection.state === signalR.HubConnectionState.Connected) {
-      await hubConnection.invoke('LeaveDocumentRoom', currentDocId).catch(() => {})
+    // Prevent concurrent connect calls — wait for ongoing connect to finish
+    if (connectingPromise) {
+      await connectingPromise
+      // After waiting, check again if we're already connected to the right room
+      if (hubConnection && currentDocId === docId &&
+          hubConnection.state !== signalR.HubConnectionState.Disconnected) return
     }
 
-    // Create new connection if needed
-    if (!hubConnection || hubConnection.state === signalR.HubConnectionState.Disconnected) {
-      viewers.value = {}
-      cursors.value = {}
+    connectingPromise = (async () => {
+      // Switch room: leave old if needed
+      if (hubConnection && currentDocId && currentDocId !== docId &&
+          hubConnection.state === signalR.HubConnectionState.Connected) {
+        await hubConnection.invoke('LeaveDocumentRoom', currentDocId).catch(() => {})
+      }
 
-      hubConnection = buildConnection(config.public.apiBaseUrl as string, token)
-      registerHandlers(hubConnection)
+      // Create new connection if needed
+      if (!hubConnection || hubConnection.state === signalR.HubConnectionState.Disconnected) {
+        viewers.value = {}
+        cursors.value = {}
 
-      hubConnection.onreconnected(() => {
-        hubConnection?.invoke('JoinDocumentRoom', docId, avatarUrl ?? null).catch(() => {})
-      })
+        hubConnection = buildConnection(config.public.apiBaseUrl as string, token)
+        registerHandlers(hubConnection)
 
-      await hubConnection.start().catch(() => {})
-    }
+        hubConnection.onreconnected(() => {
+          hubConnection?.invoke('JoinDocumentRoom', docId, avatarUrl ?? null).catch(() => {})
+        })
 
-    currentDocId = docId
-    await hubConnection.invoke('JoinDocumentRoom', docId, avatarUrl ?? null).catch(() => {})
+        await hubConnection.start().catch(() => {})
+      }
+
+      currentDocId = docId
+      if (hubConnection.state === signalR.HubConnectionState.Connected) {
+        await hubConnection.invoke('JoinDocumentRoom', docId, avatarUrl ?? null).catch(() => {})
+      }
+    })()
+
+    try { await connectingPromise } finally { connectingPromise = null }
   }
 
   async function disconnect(docId: number) {
@@ -137,6 +152,7 @@ export function useDocumentHub() {
     hubConnection.stop()
     hubConnection = null
     currentDocId = null
+    connectingPromise = null
     viewers.value = {}
     cursors.value = {}
   }

@@ -81,13 +81,14 @@ watch(() => props.fileId, async (newId) => {
 onMounted(async () => {
   if (props.fileId) await connect(props.fileId, selfAvatarUrl.value ?? null)
   startExpireTimer()
-  overlayRef.value?.parentElement?.addEventListener('mousemove', handleMouseMove)
+  // Dùng window-level listener thay vì parentElement để tránh lỗi hydration trên deploy
+  window.addEventListener('mousemove', handleMouseMove)
 })
 
 onUnmounted(() => {
   if (moveThrottle) clearTimeout(moveThrottle)
   if (expireInterval) clearInterval(expireInterval)
-  overlayRef.value?.parentElement?.removeEventListener('mousemove', handleMouseMove)
+  window.removeEventListener('mousemove', handleMouseMove)
   if (props.fileId) {
     leaveCursor(props.fileId)
     disconnect(props.fileId)
