@@ -2,3 +2,11 @@
 **/obj/
 .vs/
 .vscode/
+**/*.user
+**/*.log
+.git/
+.gitignore
+**/cache_trie_*.bin
+**/cache_trie_*.json
+**/cache_kanji.json
+README.md
