@@ -23,14 +23,13 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🏗️ Rebuild and Run Docker Containers (With Force Pull)
+      - name: 🏗️ Build Docker Image (no downtime)
         run: |
           cd ~/app/Dict
-          git reset --hard HEAD
           git fetch --all
-          git reset --hard origin/main
-          docker compose down
-          docker compose up -d --build
+          git reset --hard origin/${{ github.ref_name }}
+          DOCKER_BUILDKIT=1 docker compose build
+          docker compose up -d
           docker image prune -f
 
       - name: 🎉 Notify Slack - Deployment Success

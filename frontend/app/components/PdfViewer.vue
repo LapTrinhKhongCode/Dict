@@ -461,7 +461,7 @@ const pageOcrResults = ref({});
 const pageUploadStatus = ref({});
 const uploadQueue = ref([]);
 const pdfJobId = ref(null);
-const hubMediaId = ref<number | null>(null); // canonical ID dùng cho SignalR room (mediaId từ API)
+const hubMediaId = ref(null); // canonical ID dùng cho SignalR room (mediaId từ API)
 let isUploadRunning = false;
 const pageDimensions = ref({});
 
