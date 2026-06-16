@@ -97,7 +97,7 @@ namespace Dict.Controllers
 
             var clean = term.Trim();
 
-            var matches = await _db.Entries
+            var rawJsonList = await _db.Entries
                 .AsNoTracking()
                 .Where(e => e.Type == "word"
                          && e.RawJson != null
@@ -110,32 +110,41 @@ namespace Dict.Controllers
                             : 2)
                 .ThenBy(e => e.Weight)
                 .Take(20)
-                .Select(e => new { e.Label, e.Phonetic, e.ShortMean })
+                .Select(e => e.RawJson)
                 .ToListAsync();
 
-            if (!matches.Any())
+            if (!rawJsonList.Any())
                 return NotFound();
 
-            // Build response cùng format GetWordJson — suggestWords cho FE dùng chung
-            var suggestWords = matches.Select(e => new
+            // Lấy word đầu tiên từ mỗi RawJson, gom vào suggestWords
+            var suggestWords = new List<JsonElement>();
+            foreach (var rawJson in rawJsonList)
             {
-                word    = e.Label,
-                phonetic = e.Phonetic ?? "",
-                short_mean = e.ShortMean ?? "",
-                means   = Array.Empty<object>()
-            });
+                try
+                {
+                    using var doc = JsonDocument.Parse(rawJson);
+                    if (doc.RootElement.TryGetProperty("data", out var data) &&
+                        data.TryGetProperty("words", out var words) &&
+                        words.GetArrayLength() > 0)
+                    {
+                        suggestWords.Add(words[0].Clone());
+                    }
+                }
+                catch { /* bỏ qua entry lỗi json */ }
+            }
 
-            var response = new
+            if (!suggestWords.Any())
+                return NotFound();
+
+            return Ok(new
             {
                 status = 200,
                 data   = new
                 {
                     words        = Array.Empty<object>(),
-                    suggestWords = suggestWords
+                    suggestWords
                 }
-            };
-
-            return Ok(response);
+            });
         }
     }
 }
