@@ -144,7 +144,10 @@ namespace Dict.Service
             Event stripeEvent;
             try
             {
-                stripeEvent = EventUtility.ConstructEvent(json, stripeSignature, webhookSecret);
+                stripeEvent = EventUtility.ConstructEvent(
+                    json, stripeSignature, webhookSecret,
+                    throwOnApiVersionMismatch: false  // webhook endpoint dùng API version cũ hơn Stripe.net
+                );
             }
             catch (StripeException ex)
             {
