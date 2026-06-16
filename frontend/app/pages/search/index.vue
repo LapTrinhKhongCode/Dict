@@ -43,34 +43,7 @@
       <!-- Show recent searches when no search has been performed -->
       <RecentSearches v-if="!hasSearched" />
 
-      <!-- VN→JP results list -->
-      <div v-else-if="searchMode === 'vi-ja'" class="space-y-2">
-        <div v-if="loading" class="flex justify-center py-10">
-          <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
-        </div>
-        <div v-else-if="error" class="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 text-center text-gray-500 dark:text-neutral-400">
-          {{ error }}
-        </div>
-        <div v-else-if="viResults.length" class="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 overflow-hidden">
-          <div class="px-4 py-2 border-b border-gray-100 dark:border-neutral-700 text-xs text-gray-400 dark:text-neutral-500">
-            {{ viResults.length }} kết quả cho "<span class="font-medium text-gray-600 dark:text-neutral-300">{{ searchedTerm }}</span>"
-          </div>
-          <button
-            v-for="item in viResults"
-            :key="item.word"
-            @click="router.push({ path: '/search', query: { q: item.word, mode: 'ja-vi' } })"
-            class="w-full flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-neutral-700/50 last:border-0 hover:bg-gray-50 dark:hover:bg-neutral-700/50 transition-colors text-left"
-          >
-            <div class="flex items-center gap-3">
-              <span class="text-lg font-bold text-gray-900 dark:text-white">{{ item.word }}</span>
-              <span class="text-sm text-gray-400 dark:text-neutral-500">{{ item.reading }}</span>
-            </div>
-            <span class="text-sm text-gray-600 dark:text-neutral-400 max-w-xs truncate text-right">{{ item.meaning }}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- JP→VN result (existing) -->
+      <!-- Search results (dùng chung cho cả JP→VN và VN→JP) -->
       <SearchResult
         v-else
         :loading="loading"
@@ -106,7 +79,6 @@ const kanjiResult = ref<any | null>(null);
 const conjugationResult = ref<any | null>(null);
 const selectedWordItem = ref<any | null>(null);
 const searchResultRef = ref(null);
-const viResults = ref<any[]>([]); // VN→JP search results list
 // ---
 
 const loading = ref(false);
@@ -293,49 +265,31 @@ const fetchAll = async (word: string) => {
   kanjiResult.value = null;
   conjugationResult.value = null;
   selectedWordItem.value = null;
-  viResults.value = [];
 
-  if (searchMode.value === 'vi-ja') {
-    // VN→JP: gọi autocomplete-vi và hiển thị list
-    try {
-      const res = await fetch(`${config.public.apiBaseUrl}/api/Search/autocomplete-vi/${encodeURIComponent(word.trim())}`);
-      if (res.ok) {
-        viResults.value = await res.json();
-      }
-    } catch (e: any) {
-      console.error("VN search failed:", e.message);
-    }
-    if (!viResults.value.length) error.value = "Không tìm thấy kết quả.";
-    loading.value = false;
-    return;
-  }
-
-  // 1. Chạy Word Fetch (JP→VN)
   const fetchWordData = async () => {
     try {
-      const conjugation = checkConjugation(word);
-      conjugationResult.value = conjugation;
+      let apiUrl: string;
 
-      const dictionaryForm = getDictionaryForm(word);
-      const apiUrl = `${
-        config.public.apiBaseUrl
-      }/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
+      if (searchMode.value === 'vi-ja') {
+        // VN→JP: gọi endpoint mới, trả về cùng format (suggestWords)
+        apiUrl = `${config.public.apiBaseUrl}/api/Word/SearchByViMeaning/${encodeURIComponent(word.trim())}`;
+      } else {
+        // JP→VN: flow cũ
+        const conjugation = checkConjugation(word);
+        conjugationResult.value = conjugation;
+        const dictionaryForm = getDictionaryForm(word);
+        apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
+      }
+
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error("Word data not found");
       const response = await res.json();
 
-      const hasWordData =
-        response.data && response.data.words && response.data.words.length > 0;
-      const hasSuggestData =
-        response.data &&
-        response.data.suggestWords &&
-        response.data.suggestWords.length > 0;
+      const hasWordData = response.data?.words?.length > 0;
+      const hasSuggestData = response.data?.suggestWords?.length > 0;
 
       if (response.status === 200 && (hasWordData || hasSuggestData)) {
-        wordResult.value = {
-          type: "word",
-          ...response.data,
-        };
+        wordResult.value = { type: "word", ...response.data };
       }
     } catch (e: any) {
       console.error("Word fetch failed:", e.message);
@@ -344,15 +298,14 @@ const fetchAll = async (word: string) => {
 
   await fetchWordData();
 
-  // 2. GỌI KANJI THEO KIỂU LAZY LOAD (Chỉ gọi nếu đang ở sẵn Tab Kanji)
-  if (viewMode.value === "kanji") {
+  // Kanji lazy load chỉ cho JP→VN
+  if (searchMode.value === 'ja-vi' && viewMode.value === "kanji") {
     await loadKanjiIfNeeded();
   }
 
   loading.value = false;
 
-  // Save to recent searches if word result found
-  if (wordResult.value?.words?.[0]) {
+  if (searchMode.value === 'ja-vi' && wordResult.value?.words?.[0]) {
     const firstWord = wordResult.value.words[0];
     addRecentSearch({
       word: firstWord.word,
@@ -361,9 +314,10 @@ const fetchAll = async (word: string) => {
     });
   }
 
-  // Báo lỗi nếu tab Word không có dữ liệu (và không phải đang xem tab Kanji)
   if (!wordResult.value && viewMode.value !== "kanji") {
-    error.value = "Không tìm thấy dữ liệu từ vựng.";
+    error.value = searchMode.value === 'vi-ja'
+      ? "Không tìm thấy từ tiếng Nhật nào."
+      : "Không tìm thấy dữ liệu từ vựng.";
   }
 };
 
@@ -395,7 +349,6 @@ watch(
       wordResult.value = null;
       kanjiResult.value = null;
       conjugationResult.value = null;
-      viResults.value = [];
     }
   },
   { immediate: true },

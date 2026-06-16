@@ -1,8 +1,8 @@
-﻿using Dict.DTO;
+﻿using Dict.Data;
+using Dict.DTO;
 using Dict.Service.IService;
-using Microsoft.AspNetCore.Cors.Infrastructure;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace Dict.Controllers
@@ -17,8 +17,9 @@ namespace Dict.Controllers
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<WordController> _logger;
         private readonly IAdminService _adminService;
+        private readonly ApplicationDbContext _db;
 
-        public WordController(IWordService kanjiService, IJsonBuilderService jsonBuilderService, IServiceProvider serviceProvider, ILogger<WordController> logger, IAdminService adminService)
+        public WordController(IWordService kanjiService, IJsonBuilderService jsonBuilderService, IServiceProvider serviceProvider, ILogger<WordController> logger, IAdminService adminService, ApplicationDbContext db)
         {
             _response = new ResponseDTO();
             _wordService = kanjiService;
@@ -26,6 +27,7 @@ namespace Dict.Controllers
             _serviceProvider = serviceProvider;
             _logger = logger;
             _adminService = adminService;
+            _db = db;
         }
 
         [HttpGet]
@@ -34,7 +36,6 @@ namespace Dict.Controllers
         {
             if (string.IsNullOrWhiteSpace(label) || label.Length > 50)
             {
-                //_logger.LogWarning("Phát hiện request quá dài hoặc rỗng: {Label}", label?.Substring(0, Math.Min(label?.Length ?? 0, 20)));
                 return BadRequest("Từ khóa không hợp lệ (quá dài hoặc rỗng).");
             }
             // 1. Thử lấy từ cache (RawJson)
@@ -46,7 +47,7 @@ namespace Dict.Controllers
             {
                 int missCount = await _wordService.GetSearchMissCountAsync(label);
 
-                if (missCount >= 5) // Ngưỡng Threshold: Chỉ build nếu bị miss từ 5 lần trở lên
+                if (missCount >= 5)
                 {
                     _logger.LogInformation("Từ '{Label}' đã bị miss {Count} lần. Tiến hành Build JSON...", label, missCount);
                     json = await _jsonBuilderService.RebuildJsonForWordAsync(label);
@@ -54,7 +55,6 @@ namespace Dict.Controllers
                 }
                 else
                 {
-                    // Chưa đủ 5 lần — ghi nhận thêm 1 miss rồi trả về NotFound ngay
                     _ = Task.Run(async () =>
                     {
                         using var scope = _serviceProvider.CreateScope();
@@ -65,34 +65,77 @@ namespace Dict.Controllers
                 }
             }
 
-            // 3. Kiểm tra lần cuối (nếu build lại vẫn rỗng)
             if (string.IsNullOrEmpty(json))
-            {
                 return NotFound();
-            }
 
             if (isRebuilt)
             {
-                string categoryMarker = "Homophone_Build";
-
-                // Chạy tác vụ ngầm trong một Scope mới
                 _ = Task.Run(async () =>
                 {
-                    // Tạo một scope service mới
                     using (var scope = _serviceProvider.CreateScope())
                     {
-                        // Lấy một WordService MỚI (nó sẽ có DbContext MỚI)
                         var scopedWordService = scope.ServiceProvider.GetRequiredService<IWordService>();
-
-                        // Dùng service mới này để chạy ngầm
-                        await scopedWordService.UpsertCacheForLabelAsync(label, json, categoryMarker);
+                        await scopedWordService.UpsertCacheForLabelAsync(label, json, "Homophone_Build");
                     }
                 });
             }
 
-            // 5. Parse và trả về
             var doc = JsonDocument.Parse(json);
             return Ok(doc.RootElement);
+        }
+
+        /// <summary>
+        /// Tìm từ Nhật theo nghĩa tiếng Việt (cột ShortMean trong bảng entries).
+        /// Trả về cùng format với GetWordJson — kết quả nằm trong data.suggestWords.
+        /// </summary>
+        [HttpGet]
+        [Route("SearchByViMeaning/{term}")]
+        public async Task<IActionResult> SearchByViMeaning(string term)
+        {
+            if (string.IsNullOrWhiteSpace(term) || term.Length > 100)
+                return BadRequest("Từ khóa không hợp lệ.");
+
+            var clean = term.Trim();
+
+            var matches = await _db.Entries
+                .AsNoTracking()
+                .Where(e => e.Type == "word"
+                         && e.RawJson != null
+                         && e.ShortMean != null
+                         && EF.Functions.Like(
+                             EF.Functions.Collate(e.ShortMean, "Vietnamese_CI_AI"),
+                             $"%{clean}%"))
+                .OrderBy(e => EF.Functions.Collate(e.ShortMean, "Vietnamese_CI_AI") == clean ? 0
+                            : EF.Functions.Like(EF.Functions.Collate(e.ShortMean, "Vietnamese_CI_AI"), clean + "%") ? 1
+                            : 2)
+                .ThenBy(e => e.Weight)
+                .Take(20)
+                .Select(e => new { e.Label, e.Phonetic, e.ShortMean })
+                .ToListAsync();
+
+            if (!matches.Any())
+                return NotFound();
+
+            // Build response cùng format GetWordJson — suggestWords cho FE dùng chung
+            var suggestWords = matches.Select(e => new
+            {
+                word    = e.Label,
+                phonetic = e.Phonetic ?? "",
+                short_mean = e.ShortMean ?? "",
+                means   = Array.Empty<object>()
+            });
+
+            var response = new
+            {
+                status = 200,
+                data   = new
+                {
+                    words        = Array.Empty<object>(),
+                    suggestWords = suggestWords
+                }
+            };
+
+            return Ok(response);
         }
     }
 }
