@@ -100,6 +100,17 @@ const svgSave = `
   const popupContainer = document.createElement('div')
   popupContainer.id = 'global-lookup-container'
   popupContainer.innerHTML = `
+    <div id="glc-drag-handle" title="Kéo để di chuyển" style="
+      display:flex; align-items:center; justify-content:space-between;
+      padding:4px 10px 2px; cursor:grab; background:rgba(255,255,255,0.04);
+      border-bottom:1px solid #2d3448; user-select:none;
+    ">
+      <span style="font-size:11px; color:#6b7280; letter-spacing:1px;">⠿ DI CHUYỂN</span>
+      <span id="glc-close-btn" title="Đóng" style="
+        cursor:pointer; color:#6b7280; font-size:16px; line-height:1;
+        padding:2px 4px; border-radius:4px;
+      ">✕</span>
+    </div>
     <div id="glc-icons">
       <span id="global-lookup-icon"    title="Tra cứu">🔍</span>
       <span id="global-translate-icon" title="Dịch">${svgTranslate}</span>
@@ -128,6 +139,34 @@ const svgSave = `
   })
 
   document.body.appendChild(popupContainer)
+
+  // ── Drag to move ─────────────────────────────────────────────────────
+  const dragHandle = document.getElementById('glc-drag-handle')!
+  let dragging = false, dStartX = 0, dStartY = 0, dLeft = 0, dTop = 0
+  dragHandle.addEventListener('mousedown', (e: MouseEvent) => {
+    dragging = true
+    dStartX = e.clientX; dStartY = e.clientY
+    dLeft = parseInt(popupContainer.style.left) || 0
+    dTop  = parseInt(popupContainer.style.top)  || 0
+    popupContainer.style.position = 'fixed'
+    dragHandle.style.cursor = 'grabbing'
+    e.preventDefault()
+  })
+  document.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!dragging) return
+    const x = Math.max(0, Math.min(window.innerWidth  - popupContainer.offsetWidth,  dLeft + e.clientX - dStartX))
+    const y = Math.max(0, Math.min(window.innerHeight - popupContainer.offsetHeight, dTop  + e.clientY - dStartY))
+    popupContainer.style.left = x + 'px'
+    popupContainer.style.top  = y + 'px'
+  })
+  document.addEventListener('mouseup', () => {
+    if (dragging) { dragging = false; dragHandle.style.cursor = 'grab' }
+  })
+
+  // Close button in drag handle
+  document.getElementById('glc-close-btn')!.addEventListener('click', () => {
+    popupContainer.style.display = 'none'
+  })
 
   // ── Inject CSS ────────────────────────────────────────────────────────
   const styleEl = document.createElement('style')
@@ -623,6 +662,8 @@ saveIcon.addEventListener('click', async () => {
     if (e.clientY + POPUP_H > vh - 16) {
       top = e.clientY + window.scrollY - POPUP_H - 8
     }
+
+    popupContainer.style.position = 'absolute'  // reset về absolute mỗi lần show mới
 
     popupContainer.style.left    = `${left}px`
     popupContainer.style.top     = `${top}px`

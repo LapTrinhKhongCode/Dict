@@ -28,6 +28,13 @@ namespace Dict.Middleware
                 return;
             }
 
+            // Skip logging for Stripe webhook — body must not be consumed before the controller reads it
+            if (context.Request.Path.StartsWithSegments("/api/stripe/webhook"))
+            {
+                await _next(context);
+                return;
+            }
+
             var stopwatch = Stopwatch.StartNew();
 
             string requestBody = "";

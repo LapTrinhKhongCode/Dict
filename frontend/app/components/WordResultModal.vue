@@ -1,22 +1,22 @@
 <template>
   <div
-    class="fixed inset-0 z-60 bg-black bg-opacity-20 flex items-center justify-center"
-    style="background-color: rgba(0, 0, 0, 0.5)"
+    class="fixed inset-0 z-60"
+    style="pointer-events: none;"
     @click.self="$emit('close')"
   >
     <div
-      class="relative bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col"
+      ref="modalRef"
+      class="absolute bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col"
+      :style="modalStyle"
+      style="pointer-events: auto; height: 85vh; max-height: 85vh;"
       @click.stop
     >
-      <button
-        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-3xl font-bold bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-80 rounded-full w-10 h-10 flex items-center justify-center transition leading-none pb-1 z-50"
-        @click="$emit('close')"
+      <!-- Drag handle -->
+      <div
+        class="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing select-none"
+        @mousedown="startDrag"
       >
-        &times;
-      </button>
-
-      <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2" @mousedown.stop>
           <button
             @click="activeTab = 'word'"
             :class="[
@@ -39,6 +39,14 @@
           >
             Hán tự
           </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400 dark:text-gray-500 select-none">⠿ kéo để di chuyển</span>
+          <button
+            class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-2xl font-bold rounded-full w-8 h-8 flex items-center justify-center transition leading-none"
+            @click.stop="$emit('close')"
+            @mousedown.stop
+          >&times;</button>
         </div>
       </div>
       <div
@@ -698,7 +706,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted, watch } from "vue";
+import { ref, onMounted, computed, onUnmounted, watch, nextTick } from "vue";
 import ConjugationTable from "~/components/ConjugationTable.vue";
 import conjugationsData from "~/data/conjugations_normalized.json";
 import KanjiStrokeInResult from "./KanjiStrokeInResult.vue";
@@ -708,6 +716,63 @@ import { useToast } from "@/composables/useToast";
 import WordCommentSection from "~/components/WordCommentSection.vue";
 
 const { showToast } = useToast();
+
+// --- Draggable modal ---
+const modalRef = ref<HTMLElement | null>(null)
+const dragPos = ref({ x: 0, y: 0 })
+const isDragging = ref(false)
+let dragStartX = 0, dragStartY = 0, dragStartLeft = 0, dragStartTop = 0
+
+const modalStyle = computed(() => ({
+  left: dragPos.value.x + 'px',
+  top: dragPos.value.y + 'px',
+  transform: isDragging.value ? 'none' : undefined,
+}))
+
+function initModalPosition() {
+  if (!modalRef.value) return
+  const el = modalRef.value
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  dragPos.value = {
+    x: Math.max(0, (vw - el.offsetWidth) / 2),
+    y: Math.max(0, (vh - el.offsetHeight) / 2),
+  }
+}
+
+function startDrag(e: MouseEvent) {
+  if (!modalRef.value) return
+  isDragging.value = true
+  dragStartX = e.clientX
+  dragStartY = e.clientY
+  dragStartLeft = dragPos.value.x
+  dragStartTop = dragPos.value.y
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+}
+
+function onDrag(e: MouseEvent) {
+  if (!isDragging.value || !modalRef.value) return
+  const dx = e.clientX - dragStartX
+  const dy = e.clientY - dragStartY
+  const maxX = window.innerWidth - modalRef.value.offsetWidth
+  const maxY = window.innerHeight - modalRef.value.offsetHeight
+  dragPos.value = {
+    x: Math.max(0, Math.min(maxX, dragStartLeft + dx)),
+    y: Math.max(0, Math.min(maxY, dragStartTop + dy)),
+  }
+}
+
+function stopDrag() {
+  isDragging.value = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+}
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+})
 
 // --- Props and Emits ---
 const props = defineProps<{
@@ -1087,6 +1152,7 @@ const searchNewWord = (word: string) => {
 
 onMounted(() => {
   fetchData(currentSearchWord.value);
+  nextTick(() => initModalPosition());
 });
 
 watch(currentSearchWord, (newWord, oldWord) => {

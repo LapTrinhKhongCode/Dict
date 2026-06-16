@@ -112,6 +112,7 @@
     v-model="inviteRole"
     class="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors cursor-pointer"
   >
+    <option value="VIEWER">Viewer</option>
     <option value="MEMBER">Member</option>
     <option value="ADMIN">Admin</option>
   </select>
@@ -156,15 +157,17 @@
                   @change="handleRoleChange(m.userId, ($event.target as HTMLSelectElement).value)"
                   class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 cursor-pointer transition-colors"
                 >
+                  <option value="VIEWER">Viewer</option>
                   <option value="MEMBER">Member</option>
                   <option value="ADMIN">Admin</option>
                 </select>
 
                 <span v-else :class="[
-                  'text-x font-semibold px-2.5 py-1 rounded-full',
-                  m.role?.toUpperCase() === 'ADMIN'
-                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                  'text-xs font-semibold px-2.5 py-1 rounded-full',
+                  m.role?.toUpperCase() === 'OWNER' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' :
+                  m.role?.toUpperCase() === 'ADMIN' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                  m.role?.toUpperCase() === 'VIEWER' ? 'bg-gray-100 dark:bg-gray-700 text-gray-500' :
+                  'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
                 ]">{{ m.role }}</span>
 
                 <button
@@ -334,7 +337,7 @@ const accessDenied = ref(false)
 
 const workspace = ref<any>(null)
 const members = ref<any[]>([])
-const tab = ref('members')
+const tab = ref('projects')
 const tabs = [
   { key: 'projects', label: 'Dự án' },
   { key: 'members', label: 'Thành viên' },
@@ -353,11 +356,17 @@ const inviteError = ref('')
 const editForm = ref({ name: '', description: '' })
 const newAdminId = ref<number | ''>('') 
 
-const isAdmin = computed(() => workspace.value?.myRole?.toUpperCase() === 'ADMIN')
+const isAdmin = computed(() => {
+  const role = workspace.value?.myRole?.toUpperCase()
+  return role === 'ADMIN' || role === 'OWNER'
+})
 
 const isSoleAdmin = computed(() => {
   if (!isAdmin.value) return false
-  const adminCount = members.value.filter(m => m.role?.toUpperCase() === 'ADMIN').length
+  const adminCount = members.value.filter(m => {
+    const r = m.role?.toUpperCase()
+    return r === 'ADMIN' || r === 'OWNER'
+  }).length
   return adminCount === 1
 })
 

@@ -7,27 +7,24 @@ namespace Dict.Models
 {
     public class ApplicationUser : IdentityUser<int>
     {
-
-        /// <summary>
-        /// Trường tùy chỉnh để khóa/mở tài khoản bằng tay (Admin ban).
-        /// Identity có LockoutEnd, nhưng IsActive rõ ràng hơn cho mục đích này.
-        /// </summary>
         public bool IsActive { get; set; } = true;
-
-        /// <summary>
-        /// Đường dẫn avatar tùy chỉnh.
-        /// </summary>
         public string AvatarUrl { get; set; }
-
-        /// <summary>
-        /// Ngày tạo tài khoản.
-        /// </summary>
         public DateTime? CreatedAt { get; set; }
-
-        /// <summary>
-        /// Ngày cập nhật thông tin.
-        /// </summary>
         public DateTime? UpdatedAt { get; set; }
+
+        // ── Stripe Billing ────────────────────────────────────────────────
+        /// <summary>Stripe Customer ID (cus_xxx) — tạo khi user đăng ký hoặc lần đầu checkout</summary>
+        public string? StripeCustomerId { get; set; }
+
+        /// <summary>Stripe Subscription ID (sub_xxx) — null nếu chưa subscribe</summary>
+        public string? StripeSubscriptionId { get; set; }
+
+        /// <summary>Plan hiện tại: FREE | PREMIUM</summary>
+        public string PersonalTier { get; set; } = "FREE";
+
+        /// <summary>Ngày hết hạn Premium — null nếu FREE hoặc lifetime</summary>
+        public DateTime? PremiumExpiresAt { get; set; }
+        // ─────────────────────────────────────────────────────────────────
 
         public virtual ICollection<Deck> Decks { get; set; }
         public virtual ICollection<CardState> CardStates { get; set; }
@@ -43,5 +40,10 @@ namespace Dict.Models
             MediaStore = new HashSet<MediaStore>();
             OcrJobs = new HashSet<OcrJob>();
         }
+
+        // Helper
+        public bool IsPremiumActive() =>
+            PersonalTier == "PREMIUM" &&
+            (PremiumExpiresAt == null || PremiumExpiresAt > DateTime.UtcNow);
     }
 }

@@ -6,7 +6,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'https://localhost:7084',
-      geminiApiKey: process.env.NUXT_PUBLIC_GEMINI_API_KEY || ''
+      geminiApiKey: process.env.NUXT_PUBLIC_GEMINI_API_KEY || '',
+      stripePriceMonthly: process.env.NUXT_PUBLIC_STRIPE_PRICE_MONTHLY || '',
+      stripePriceYearly: process.env.NUXT_PUBLIC_STRIPE_PRICE_YEARLY || '',
+      stripePriceOrgTeam: process.env.NUXT_PUBLIC_STRIPE_PRICE_ORG_TEAM || '',
+      stripePriceOrgEnterprise: process.env.NUXT_PUBLIC_STRIPE_PRICE_ORG_ENTERPRISE || '',
     }
   },
   devtools: { enabled: true },

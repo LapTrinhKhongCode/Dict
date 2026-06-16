@@ -10,8 +10,8 @@
         !activeWs ? 'hover:w-52 hover:shadow-xl' : ''
       ]"
     >
-      <!-- Japanese nav items -->
-      <div class="flex flex-col flex-1 gap-0.5 px-2 pt-3">
+      <!-- Japanese nav items (cố định trên) -->
+      <div class="flex flex-col gap-0.5 px-2 pt-3 flex-shrink-0">
         <NuxtLink
           v-for="item in navItems" :key="item.to"
           :to="item.to"
@@ -33,19 +33,19 @@
         </NuxtLink>
       </div>
 
-      <!-- Divider + Workspace section -->
+      <!-- Divider + Workspace section (scrollable, flex-1) -->
       <template v-if="isAuthenticated">
-        <div class="mx-3 my-2 h-px bg-gray-300 dark:bg-neutral-700" />
+        <div class="mx-3 my-2 h-px bg-gray-300 dark:bg-neutral-700 flex-shrink-0" />
 
-        <div class="flex flex-col px-2 pb-2 gap-0.5">
-          <!-- Section label -->
-          <div class="flex items-center gap-3 px-2 py-1 mb-0.5 overflow-hidden">
-            <span class="w-5 h-5 flex-shrink-0" />
+        <div class="flex flex-col flex-1 overflow-y-auto px-2 pb-2 gap-0.5 min-h-0 scrollbar-none justify-end">
+          <!-- Section label → link sang /workspaces -->
+          <NuxtLink to="/workspaces" class="flex items-center gap-3 px-2 py-1 mb-0.5 overflow-hidden rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors cursor-pointer group/ws-label">
+            <UIcon name="i-lucide-layout-grid" class="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-neutral-500 group-hover/ws-label:text-gray-700 dark:group-hover/ws-label:text-white transition-colors" />
             <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-neutral-500 whitespace-nowrap
-                         opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+                         opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150 group-hover/ws-label:text-gray-700 dark:group-hover/ws-label:text-white">
               Workspace
             </span>
-          </div>
+          </NuxtLink>
 
           <!-- Loading -->
           <template v-if="loading">
@@ -53,64 +53,125 @@
           </template>
 
           <template v-else>
-            <button
-              v-for="ws in workspaces" :key="ws.id"
-              @click="selectWorkspace(ws)"
-              :title="ws.name"
-              :class="[
-                'relative flex items-center gap-3 w-full px-2 py-1.5 rounded-xl transition-all duration-150 text-left overflow-hidden',
-                activeWs?.id === ws.id
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 dark:text-neutral-300 hover:bg-gray-300 dark:hover:bg-neutral-700'
-              ]"
-            >
-              <span :class="[
-                'w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0',
-                activeWs?.id === ws.id
-                  ? 'bg-blue-400 text-white'
-                  : 'bg-gray-400 dark:bg-neutral-600 text-white'
-              ]">{{ ws.name[0].toUpperCase() }}</span>
-              <span class="text-sm truncate whitespace-nowrap
-                           opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
-                {{ ws.name }}
-              </span>
-              <span v-if="activeWs?.id === ws.id"
-                class="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-300 rounded-r-full" />
-            </button>
+            <!-- Personal workspaces — label cố định, list scroll riêng -->
+            <div v-if="workspaces.filter(w => w.ownerType !== 'ORGANIZATION').length > 0" class="flex flex-col min-h-0">
+              <!-- Label CÁ NHÂN — cố định -->
+              <div class="flex items-center gap-2 px-2 py-1 flex-shrink-0 overflow-hidden">
+                <UIcon name="i-lucide-home" class="w-3 h-3 flex-shrink-0 text-gray-400 dark:text-neutral-500" />
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-neutral-500 whitespace-nowrap
+                             opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">Cá nhân</span>
+              </div>
+              <!-- List scroll — max 3 items hiển thị -->
+              <div class="overflow-y-auto scrollbar-none flex flex-col gap-0.5" style="max-height: calc(3 * 36px);">
+                <button v-for="ws in workspaces.filter(w => w.ownerType !== 'ORGANIZATION')" :key="ws.id"
+                  @click="selectWorkspace(ws)" :title="ws.name"
+                  :class="[
+                    'relative flex items-center gap-3 w-full px-2 py-1.5 rounded-xl transition-all duration-150 text-left overflow-hidden flex-shrink-0',
+                    activeWs?.id === ws.id ? 'bg-blue-500 text-white' : 'text-gray-600 dark:text-neutral-300 hover:bg-gray-300 dark:hover:bg-neutral-700'
+                  ]">
+                  <span :class="['w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0', activeWs?.id === ws.id ? 'bg-blue-400 text-white' : 'bg-gray-400 dark:bg-neutral-600 text-white']">
+                    {{ ws.name[0].toUpperCase() }}
+                  </span>
+                  <span class="text-sm truncate whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">{{ ws.name }}</span>
+                  <span v-if="activeWs?.id === ws.id" class="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-300 rounded-r-full" />
+                </button>
+              </div>
+            </div>
 
-            <div class="mx-1 my-1 h-px bg-gray-300 dark:bg-neutral-700" />
+            <!-- Org workspaces — mỗi org: label cố định, list scroll riêng -->
+            <template v-for="orgGroup in orgWorkspaceGroups" :key="orgGroup.orgName">
+              <div v-if="orgGroup.workspaces.length > 0" class="mt-1 flex flex-col min-h-0">
+                <!-- Label Org — cố định -->
+                <div class="flex items-center gap-2 px-2 py-1 flex-shrink-0 overflow-hidden">
+                  <UIcon name="i-lucide-building-2" class="w-3 h-3 flex-shrink-0 text-indigo-400 dark:text-indigo-500" />
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-indigo-400 dark:text-indigo-500 whitespace-nowrap truncate
+                               opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">{{ orgGroup.orgName }}</span>
+                  <span class="text-[9px] px-1 rounded font-bold opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150"
+                    :class="orgGroup.orgPlan === 'TEAM' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : orgGroup.orgPlan === 'ENTERPRISE' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-500'">
+                    {{ orgGroup.orgPlan }}
+                  </span>
+                </div>
+                <!-- List scroll — max 3 items -->
+                <div class="overflow-y-auto scrollbar-none flex flex-col gap-0.5" style="max-height: calc(3 * 36px);">
+                  <button v-for="ws in orgGroup.workspaces" :key="ws.id"
+                    @click="selectWorkspace(ws)" :title="ws.name"
+                    :class="[
+                      'relative flex items-center gap-3 w-full px-2 py-1.5 rounded-xl transition-all duration-150 text-left overflow-hidden flex-shrink-0',
+                      activeWs?.id === ws.id ? 'bg-indigo-500 text-white' : 'text-gray-600 dark:text-neutral-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                    ]">
+                    <span :class="['w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0', activeWs?.id === ws.id ? 'bg-indigo-400 text-white' : 'bg-indigo-400 text-white']">
+                      {{ ws.name[0].toUpperCase() }}
+                    </span>
+                    <span class="text-sm truncate whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">{{ ws.name }}</span>
+                    <span v-if="activeWs?.id === ws.id" class="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-5 bg-indigo-300 rounded-r-full" />
+                  </button>
+                </div>
+              </div>
+            </template>
 
-            <button @click="showCreate = true" title="Workspace mới"
-              class="flex items-center gap-3 px-2 py-1.5 rounded-xl overflow-hidden
+            <div class="mx-1 my-1 h-px bg-gray-300 dark:bg-neutral-700 flex-shrink-0" />
+
+            <button @click="showCreate = true; fetchSidebarOrgs()" title="Workspace mới"
+              class="flex items-center gap-3 px-2 py-1.5 rounded-xl overflow-hidden flex-shrink-0
                      text-gray-500 dark:text-neutral-400
                      hover:bg-green-100 dark:hover:bg-green-900/30
                      hover:text-green-600 dark:hover:text-green-400 transition-all"
             >
               <UIcon name="i-lucide-plus" class="w-5 h-5 flex-shrink-0" />
-              <span class="text-sm whitespace-nowrap
-                           opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
-                Workspace mới
-              </span>
+              <span class="text-sm whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">Workspace mới</span>
             </button>
           </template>
         </div>
       </template>
 
-      <!-- Admin -->
-      <NuxtLink v-if="isAuthenticated && role === 'ADMIN'" to="/admin" title="Trang Admin"
-        :class="[
-          'flex items-center gap-3 mx-2 px-2 py-2 rounded-xl mb-3 transition-all duration-150 overflow-hidden',
-          route.path.startsWith('/admin')
-            ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
-            : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-300 dark:hover:bg-neutral-700 hover:text-gray-900 dark:hover:text-white'
-        ]"
-      >
-        <UIcon name="i-lucide-settings" class="w-5 h-5 flex-shrink-0" />
-        <span class="text-sm whitespace-nowrap
-                     opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
-          Trang Admin
-        </span>
-      </NuxtLink>
+      <!-- Bottom items — ngay dưới workspace section, không có mt-auto -->
+      <div class="flex flex-col pb-2 flex-shrink-0">
+        <div class="mx-3 my-1 h-px bg-gray-300 dark:bg-neutral-700" />
+        <!-- Premium upgrade CTA (chỉ hiện với FREE user) -->
+        <NuxtLink v-if="isAuthenticated && !isPremium" to="/premium" title="Nâng cấp Premium"
+          :class="[
+            'flex items-center gap-3 mx-2 px-2 py-2 rounded-xl mb-1 transition-all duration-150 overflow-hidden',
+            route.path.startsWith('/premium')
+              ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-400'
+              : 'text-yellow-500 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
+          ]"
+        >
+          <UIcon name="i-lucide-zap" class="w-5 h-5 flex-shrink-0" />
+          <span class="text-sm font-semibold whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+            Nâng cấp Premium ✨
+          </span>
+        </NuxtLink>
+
+        <!-- Organization management -->
+        <NuxtLink v-if="isAuthenticated" to="/org" title="Tổ chức"
+          :class="[
+            'flex items-center gap-3 mx-2 px-2 py-2 rounded-xl mb-1 transition-all duration-150 overflow-hidden',
+            route.path.startsWith('/org')
+              ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
+              : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-300 dark:hover:bg-neutral-700 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <UIcon name="i-lucide-building-2" class="w-5 h-5 flex-shrink-0" />
+          <span class="text-sm whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+            Tổ chức
+          </span>
+        </NuxtLink>
+
+        <!-- Admin / Moderator -->
+        <NuxtLink v-if="isAuthenticated && (role === 'ADMIN' || role === 'MODERATOR')" to="/admin" title="Quản trị"
+          :class="[
+            'flex items-center gap-3 mx-2 px-2 py-2 rounded-xl mb-1 transition-all duration-150 overflow-hidden',
+            route.path.startsWith('/admin')
+              ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
+              : 'text-gray-500 dark:text-neutral-400 hover:bg-gray-300 dark:hover:bg-neutral-700 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <UIcon :name="role === 'ADMIN' ? 'i-lucide-shield' : 'i-lucide-pencil-ruler'" class="w-5 h-5 flex-shrink-0" />
+          <span class="text-sm whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150">
+            {{ role === 'ADMIN' ? 'Admin Panel' : 'Moderator Panel' }}
+          </span>
+        </NuxtLink>
+      </div>
     </div>
 
     <!-- Workspace panel: absolute at left-14, appears when workspace active -->
@@ -125,7 +186,7 @@
               <p class="font-semibold text-gray-900 dark:text-white text-sm truncate">{{ activeWs.name }}</p>
               <span :class="[
                 'text-xs px-1.5 py-0.5 rounded font-medium',
-                activeWs.myRole === 'Admin'
+                activeWs.myRole === 'ADMIN'
                   ? 'text-yellow-700 dark:text-yellow-400'
                   : 'text-blue-600 dark:text-blue-400'
               ]">{{ activeWs.myRole }}</span>
@@ -175,7 +236,7 @@
             </button>
 
             <button
-              v-if="activeWs?.myRole === 'Admin'"
+              v-if="activeWs?.myRole === 'ADMIN'"
               @click.stop="confirmDeleteProject(p)"
               title="Xóa dự án"
               class="opacity-0 group-hover:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
@@ -258,6 +319,20 @@
                   class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors placeholder-gray-400 dark:placeholder-gray-500 resize-none"
                   placeholder="Mô tả ngắn..."></textarea>
               </div>
+              <!-- Thuộc Org (nếu user có org) -->
+              <div v-if="sidebarOrgs.length > 0">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Thuộc tổ chức</label>
+                <select v-model="wsForm.organizationId"
+                  class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500">
+                  <option :value="undefined">🏠 Cá nhân</option>
+                  <option v-for="org in sidebarOrgs" :key="org.id" :value="org.id">
+                    🏢 {{ org.name }} — {{ org.orgPlan }}
+                  </option>
+                </select>
+                <p v-if="wsForm.organizationId" class="text-xs text-indigo-500 mt-1">
+                  ✓ Tất cả thành viên tổ chức sẽ được thêm tự động
+                </p>
+              </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
               <button @click="showCreate = false"
@@ -325,6 +400,28 @@ const route = useRoute()
 const { getMyWorkspaces, createWorkspace } = useWorkspace()
 const { getProjects, createProject } = useProject()
 const { jwt, isAuthenticated, role } = useJwt()
+const config = useRuntimeConfig()
+
+// Check Premium status
+const isPremium = ref(false)
+async function checkPremium() {
+  if (!jwt.value) return
+  try {
+    const res = await $fetch<any>(`${config.public.apiBaseUrl}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${jwt.value}` }
+    })
+    isPremium.value = res?.result?.isPremiumActive === true
+  } catch { isPremium.value = false }
+}
+onMounted(() => {
+  checkPremium()
+  window.addEventListener('premium-activated', checkPremium)
+})
+watch(jwt, () => checkPremium())
+// Refresh khi user navigate về từ /premium/success
+watch(() => route.path, (path) => {
+  if (path === '/' || path.startsWith('/premium')) checkPremium()
+})
 
 const navItems = [
   { to: '/search',   icon: 'i-lucide-search',         label: 'Tra cứu' },
@@ -335,7 +432,6 @@ const navItems = [
   // { to: '/sensei', icon: 'i-lucide-message-circle', label: 'Hội thoại' }, // chưa phát triển
   { to: '/reading',  icon: 'i-lucide-book-open',       label: 'Luyện đọc' },
 ]
-const config = useRuntimeConfig()
 
 const emit = defineEmits<{ 'panel-change': [isOpen: boolean] }>()
 
@@ -354,13 +450,36 @@ const workspaces = ref<any[]>([])
 const loading = ref(true)
 const activeWs = ref<any>(null)
 
+const orgWorkspaceGroups = computed(() => {
+  const map = new Map<number, { orgName: string; orgPlan: string; workspaces: any[] }>()
+  for (const ws of workspaces.value.filter(w => w.ownerType === 'ORGANIZATION')) {
+    if (!map.has(ws.organizationId)) {
+      map.set(ws.organizationId, { orgName: ws.orgName ?? 'Tổ chức', orgPlan: ws.orgPlan ?? 'FREE', workspaces: [] })
+    }
+    map.get(ws.organizationId)!.workspaces.push(ws)
+  }
+  return [...map.values()]
+})
+
 const projects = ref<any[]>([])
 const loadingProjects = ref(false)
 const activeProjectId = ref<number | null>(null)
 
 const showCreate = ref(false)
 const creatingWs = ref(false)
-const wsForm = ref({ name: '', description: '' })
+const wsForm = ref({ name: '', description: '', organizationId: undefined as number | undefined })
+const sidebarOrgs = ref<any[]>([])
+
+// Fetch orgs để hiện dropdown trong modal tạo workspace
+async function fetchSidebarOrgs() {
+  if (!jwt.value) return
+  try {
+    const res = await $fetch<any>(`${config.public.apiBaseUrl}/api/organizations/my`, {
+      headers: { Authorization: `Bearer ${jwt.value}` }
+    }).catch(() => null)
+    sidebarOrgs.value = (res?.result ?? []).filter((o: any) => o.myRole === 'OWNER' || o.myRole === 'ADMIN')
+  } catch { sidebarOrgs.value = [] }
+}
 
 const showCreateProject = ref(false)
 const creatingProject = ref(false)
@@ -446,7 +565,7 @@ async function handleCreateWs() {
     const ws = await createWorkspace(wsForm.value)
     workspaces.value.push(ws)
     showCreate.value = false
-    wsForm.value = { name: '', description: '' }
+    wsForm.value = { name: '', description: '', organizationId: undefined }
     await selectWorkspace(ws)
   } finally { creatingWs.value = false }
 }
@@ -520,6 +639,8 @@ onUnmounted(() => {
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 
 .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.15) transparent; }
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-thin::-webkit-scrollbar { width: 3px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
 </style>
