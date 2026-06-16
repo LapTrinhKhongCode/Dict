@@ -43,7 +43,34 @@
       <!-- Show recent searches when no search has been performed -->
       <RecentSearches v-if="!hasSearched" />
 
-      <!-- Show search results after a search is made -->
+      <!-- VN→JP results list -->
+      <div v-else-if="searchMode === 'vi-ja'" class="space-y-2">
+        <div v-if="loading" class="flex justify-center py-10">
+          <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-gray-400" />
+        </div>
+        <div v-else-if="error" class="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 text-center text-gray-500 dark:text-neutral-400">
+          {{ error }}
+        </div>
+        <div v-else-if="viResults.length" class="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 overflow-hidden">
+          <div class="px-4 py-2 border-b border-gray-100 dark:border-neutral-700 text-xs text-gray-400 dark:text-neutral-500">
+            {{ viResults.length }} kết quả cho "<span class="font-medium text-gray-600 dark:text-neutral-300">{{ searchedTerm }}</span>"
+          </div>
+          <button
+            v-for="item in viResults"
+            :key="item.word"
+            @click="router.push({ path: '/search', query: { q: item.word, mode: 'ja-vi' } })"
+            class="w-full flex items-center justify-between px-4 py-3 border-b border-gray-50 dark:border-neutral-700/50 last:border-0 hover:bg-gray-50 dark:hover:bg-neutral-700/50 transition-colors text-left"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-lg font-bold text-gray-900 dark:text-white">{{ item.word }}</span>
+              <span class="text-sm text-gray-400 dark:text-neutral-500">{{ item.reading }}</span>
+            </div>
+            <span class="text-sm text-gray-600 dark:text-neutral-400 max-w-xs truncate text-right">{{ item.meaning }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- JP→VN result (existing) -->
       <SearchResult
         v-else
         :loading="loading"
@@ -77,8 +104,9 @@ const searchWord = ref((route.query.q as string) || "");
 const wordResult = ref<any | null>(null);
 const kanjiResult = ref<any | null>(null);
 const conjugationResult = ref<any | null>(null);
-const selectedWordItem = ref<any | null>(null); // State để nhận từ được chọn từ SearchResult
+const selectedWordItem = ref<any | null>(null);
 const searchResultRef = ref(null);
+const viResults = ref<any[]>([]); // VN→JP search results list
 // ---
 
 const loading = ref(false);
@@ -87,6 +115,9 @@ const searchedTerm = ref(searchWord.value);
 const hasSearched = ref(false);
 const config = useRuntimeConfig();
 const { addRecentSearch } = useRecentSearches();
+
+// --- Search mode from URL ---
+const searchMode = computed(() => (route.query.mode as string) === 'vi-ja' ? 'vi-ja' : 'ja-vi');
 
 // --- Computed properties to drive the UI ---
 const viewMode = computed(() => {
@@ -251,7 +282,7 @@ const handleSelectionChange = async (item: any) => {
   }
 };
 
-// --- Main API Fetch Logic (ĐÃ SỬA ÁP DỤNG LAZY LOAD) ---
+// --- Main API Fetch Logic ---
 const fetchAll = async (word: string) => {
   if (!word) return;
 
@@ -261,9 +292,25 @@ const fetchAll = async (word: string) => {
   wordResult.value = null;
   kanjiResult.value = null;
   conjugationResult.value = null;
-  selectedWordItem.value = null; // Reset selection on new search
+  selectedWordItem.value = null;
+  viResults.value = [];
 
-  // 1. Chạy Word Fetch (Word Fetch phải chạy trước)
+  if (searchMode.value === 'vi-ja') {
+    // VN→JP: gọi autocomplete-vi và hiển thị list
+    try {
+      const res = await fetch(`${config.public.apiBaseUrl}/api/Search/autocomplete-vi/${encodeURIComponent(word.trim())}`);
+      if (res.ok) {
+        viResults.value = await res.json();
+      }
+    } catch (e: any) {
+      console.error("VN search failed:", e.message);
+    }
+    if (!viResults.value.length) error.value = "Không tìm thấy kết quả.";
+    loading.value = false;
+    return;
+  }
+
+  // 1. Chạy Word Fetch (JP→VN)
   const fetchWordData = async () => {
     try {
       const conjugation = checkConjugation(word);
@@ -320,7 +367,7 @@ const fetchAll = async (word: string) => {
   }
 };
 
-// --- MODIFIED: onSearch và Watcher (Giữ nguyên) ---
+// --- onSearch: lưu mode vào URL ---
 const onSearch = (term: string, mode: 'ja-vi' | 'vi-ja' = 'ja-vi') => {
   const trimmedWord = term.trim();
   if (!trimmedWord) return;
@@ -329,7 +376,7 @@ const onSearch = (term: string, mode: 'ja-vi' | 'vi-ja' = 'ja-vi') => {
 
   router.push({
     path: "/search",
-    query: { q: convertedWord, view: viewMode.value },
+    query: { q: convertedWord, view: viewMode.value, mode },
   });
 };
 
@@ -348,6 +395,7 @@ watch(
       wordResult.value = null;
       kanjiResult.value = null;
       conjugationResult.value = null;
+      viResults.value = [];
     }
   },
   { immediate: true },
