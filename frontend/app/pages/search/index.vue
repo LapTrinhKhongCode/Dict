@@ -321,11 +321,11 @@ const fetchAll = async (word: string) => {
 };
 
 // --- MODIFIED: onSearch và Watcher (Giữ nguyên) ---
-const onSearch = (term: string) => {
+const onSearch = (term: string, mode: 'ja-vi' | 'vi-ja' = 'ja-vi') => {
   const trimmedWord = term.trim();
   if (!trimmedWord) return;
 
-  const convertedWord = toKana(trimmedWord);
+  const convertedWord = mode === 'ja-vi' ? toKana(trimmedWord) : trimmedWord;
 
   router.push({
     path: "/search",

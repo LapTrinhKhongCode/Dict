@@ -1,5 +1,5 @@
 <template>
-  <div class="relative h-full w-14">
+  <div class="relative h-full w-14" @mouseleave="onSidebarMouseLeave">
 
     <!-- Activity Bar: 56px collapsed, expands to 208px on hover ONLY when workspace panel is closed -->
     <div
@@ -9,6 +9,7 @@
         'transition-[width] duration-200 ease-in-out w-14',
         !activeWs ? 'hover:w-52 hover:shadow-xl' : ''
       ]"
+      @mouseenter="activeWs ? collapsePanel() : null"
     >
       <!-- Japanese nav items (cố định trên) -->
       <div class="flex flex-col gap-0.5 px-2 pt-3 flex-shrink-0">
@@ -248,9 +249,7 @@
           </div>
         </div>
 
-        <button @click="activeWs = null; emit('panel-change', false)"
-          class="mx-3 mb-3 py-1.5 text-xs text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 border border-gray-200 dark:border-neutral-700 rounded-lg transition-colors"
-        >Thu gọn</button>
+        <!-- Nút thu gọn ẩn đi — tự thu khi chuột rời vùng sidebar -->
       </div>
     </Transition>
 
@@ -551,6 +550,15 @@ async function loadProjects(workspaceId: number) {
 
 function goToWorkspace() {
   if (activeWs.value) router.push(`/workspaces/${activeWs.value.id}`)
+}
+
+function collapsePanel() {
+  activeWs.value = null
+  emit('panel-change', false)
+}
+
+function onSidebarMouseLeave() {
+  collapsePanel()
 }
 
 function goToProject(projectId: number) {

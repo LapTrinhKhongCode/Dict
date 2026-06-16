@@ -145,7 +145,7 @@
 
     <div>
       <p class="text-xs font-bold text-gray-500 dark:text-[#8b949e] uppercase tracking-wider mb-3">Thao tác nhanh</p>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div @click="$router.push('/explore')" class="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl p-4 flex justify-between items-start cursor-pointer shadow-sm hover:bg-gray-50 dark:hover:bg-[#21262d] transition-colors group">
           <div>
             <svg class="w-5 h-5 text-gray-400 dark:text-[#8b949e] mb-2 group-hover:text-blue-500 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
@@ -157,13 +157,35 @@
           </div>
         </div>
 
-        <div @click="$router.push('/sensei')" class="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl p-4 flex justify-between items-start cursor-pointer shadow-sm hover:bg-gray-50 dark:hover:bg-[#21262d] transition-colors group">
+        <div @click="$router.push('/reading')" class="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl p-4 flex justify-between items-start cursor-pointer shadow-sm hover:bg-gray-50 dark:hover:bg-[#21262d] transition-colors group">
           <div>
-            <svg class="w-5 h-5 text-gray-400 dark:text-[#8b949e] mb-2 group-hover:text-green-500 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-            <p class="font-bold text-gray-900 dark:text-white text-sm">Chat với Sensei</p>
-            <p class="text-xs text-gray-500 dark:text-[#8b949e] mt-1">Hỏi đáp & luyện tập hội thoại</p>
+            <svg class="w-5 h-5 text-gray-400 dark:text-[#8b949e] mb-2 group-hover:text-purple-500 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.75 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+            <p class="font-bold text-gray-900 dark:text-white text-sm">Luyện đọc</p>
+            <p class="text-xs text-gray-500 dark:text-[#8b949e] mt-1">Đọc hiểu & mở rộng từ vựng</p>
           </div>
-          <div class="w-6 h-6 rounded-full bg-gray-100 dark:bg-[#30363d] flex items-center justify-center text-gray-600 dark:text-[#c9d1d9] group-hover:bg-green-100 dark:group-hover:bg-green-900/30 transition-colors">
+          <div class="w-6 h-6 rounded-full bg-gray-100 dark:bg-[#30363d] flex items-center justify-center text-gray-600 dark:text-[#c9d1d9] group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 transition-colors">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+          </div>
+        </div>
+
+        <div @click="$router.push('/notebook')" class="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl p-4 flex justify-between items-start cursor-pointer shadow-sm hover:bg-gray-50 dark:hover:bg-[#21262d] transition-colors group">
+          <div>
+            <svg class="w-5 h-5 text-gray-400 dark:text-[#8b949e] mb-2 group-hover:text-amber-500 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            <p class="font-bold text-gray-900 dark:text-white text-sm">Sổ tay từ vựng</p>
+            <p class="text-xs text-gray-500 dark:text-[#8b949e] mt-1">Xem & ôn từ đã lưu từ tài liệu</p>
+          </div>
+          <div class="w-6 h-6 rounded-full bg-gray-100 dark:bg-[#30363d] flex items-center justify-center text-gray-600 dark:text-[#c9d1d9] group-hover:bg-amber-100 dark:group-hover:bg-amber-900/30 transition-colors">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+          </div>
+        </div>
+
+        <div @click="$router.push('/workspaces')" class="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl p-4 flex justify-between items-start cursor-pointer shadow-sm hover:bg-gray-50 dark:hover:bg-[#21262d] transition-colors group">
+          <div>
+            <svg class="w-5 h-5 text-gray-400 dark:text-[#8b949e] mb-2 group-hover:text-indigo-500 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            <p class="font-bold text-gray-900 dark:text-white text-sm">Workspace</p>
+            <p class="text-xs text-gray-500 dark:text-[#8b949e] mt-1">Quản lý tài liệu & dự án OCR</p>
+          </div>
+          <div class="w-6 h-6 rounded-full bg-gray-100 dark:bg-[#30363d] flex items-center justify-center text-gray-600 dark:text-[#c9d1d9] group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 transition-colors">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
           </div>
         </div>

@@ -3,17 +3,34 @@
     <div
       class="flex items-center border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-2xl px-3 py-2 w-full"
     >
+      <!-- Search icon -->
       <button
         @click="onSearch"
-        class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition mr-3"
+        class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition mr-2"
       >
         <UIcon name="i-lucide-search" class="size-5" />
       </button>
+
+      <!-- Search direction toggle — bên trái, ngay sau icon search -->
+      <button
+        @click.stop="toggleSearchMode"
+        :title="searchMode === 'ja-vi' ? 'Nhật → Việt (bấm để đổi)' : 'Việt → Nhật (bấm để đổi)'"
+        class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-all flex-shrink-0 mr-2"
+        :class="searchMode === 'vi-ja'
+          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'"
+      >
+        <span v-if="searchMode === 'ja-vi'">JP → VN</span>
+        <span v-else>VN → JP</span>
+      </button>
+
+      <div class="w-px h-4 bg-gray-200 dark:bg-gray-600 mr-2 flex-shrink-0" />
+
       <input
         v-model="internalSearchWord"
         type="text"
         maxlength="50"
-        placeholder="日本語, にほんご, nihongo..."
+        :placeholder="searchMode === 'vi-ja' ? 'Nhập nghĩa tiếng Việt...' : '日本語, にほんご, nihongo...'"
         class="flex-grow bg-transparent outline-none text-base text-gray-900 dark:text-white"
         @keyup.enter="onSearch"
         @focus="onInputFocus"
@@ -303,7 +320,7 @@ const props = defineProps({
     default: null,
   },
 });
-const emit = defineEmits(["update:modelValue", "search"]);
+const emit = defineEmits(["update:modelValue", "search", "search-mode-change"]);
 const autocompleteCache = new Map<string, any[]>();
 const config = useRuntimeConfig();
 const colorMode = useColorMode(); // <-- THÊM DÒNG NÀY
@@ -311,6 +328,14 @@ const colorMode = useColorMode(); // <-- THÊM DÒNG NÀY
 // --- Internal State ---
 const internalSearchWord = ref(props.modelValue);
 const suggestions = ref<any[]>([]);
+// 'ja-vi' | 'vi-ja' — không còn 'auto'
+const searchMode = ref<'ja-vi' | 'vi-ja'>('ja-vi')
+
+function toggleSearchMode() {
+  searchMode.value = searchMode.value === 'ja-vi' ? 'vi-ja' : 'ja-vi'
+  autocompleteCache.clear()
+  if (internalSearchWord.value?.trim()) onInput()
+}
 const showSuggestions = ref(false);
 const searchContainer = ref<HTMLDivElement | null>(null);
 let debounceTimer: any = null;
@@ -375,12 +400,11 @@ watch(internalSearchWord, (newValue) => {
     return;
   }
 
-  // Tiền xử lý từ khóa bằng wanakana
-  const convertedWord = toKana(trimmed);
+  // Determine search direction từ mode (không còn auto detect)
+  const isVietnamese = searchMode.value === 'vi-ja'
 
-  // Detect tiếng Việt: có ký tự diacritics đặc trưng hoặc "đ/Đ"
-  // → dùng endpoint /autocomplete-vi thay vì /autocomplete
-  const isVietnamese = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]/.test(trimmed)
+  // toKana chỉ áp dụng khi tìm JP→VN, không áp dụng khi tìm VN→JP
+  const convertedWord = isVietnamese ? trimmed : toKana(trimmed);
   const cacheKey = isVietnamese ? `vi:${trimmed}` : convertedWord
 
   // --- BƯỚC 2: CHECK CACHE TRƯỚC KHI DEBOUNCE VÀ FETCH ---
@@ -475,7 +499,7 @@ const onSearch = () => {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
-  emit("search", internalSearchWord.value.trim());
+  emit("search", internalSearchWord.value.trim(), searchMode.value);
 };
 
 const onSelectSuggestion = (suggestion: any) => {
@@ -487,7 +511,7 @@ const onSelectSuggestion = (suggestion: any) => {
   showSuggestions.value = false;
   selectedIndex.value = -1;
 
-  emit("search", suggestion.word);
+  emit("search", suggestion.word, searchMode.value);
 };
 
 const handleClickOutside = (event: MouseEvent) => {

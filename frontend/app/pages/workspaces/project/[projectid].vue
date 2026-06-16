@@ -522,7 +522,7 @@ async function checkAccessAndLoad() {
       return
     }
 
-    isAdmin.value = currentMember.role === 'Admin'
+    isAdmin.value = ['ADMIN', 'OWNER'].includes(currentMember.role?.toUpperCase())
 
     await fetchFiles(token)
 
