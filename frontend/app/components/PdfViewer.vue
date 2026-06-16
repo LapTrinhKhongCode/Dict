@@ -1310,11 +1310,15 @@ function resizeAnnotCanvas(pageNum) {
   const pdfCvs = pageCanvases.value[pageNum];
   const annotCvs = annotCanvases.value[pageNum];
   if (!pdfCvs || !annotCvs) return;
-  const w = parseInt(pdfCvs.style.width) || pdfCvs.offsetWidth;
-  const h = parseInt(pdfCvs.style.height) || pdfCvs.offsetHeight;
+  // Dùng pixel size thực của PDF canvas (đã nhân DPR) để annotation khớp pixel-perfect
+  const w = pdfCvs.width || pdfCvs.offsetWidth;
+  const h = pdfCvs.height || pdfCvs.offsetHeight;
   if (!w || !h) return;
   annotCvs.width = w;
   annotCvs.height = h;
+  // CSS size phải khớp với PDF canvas để overlay đúng
+  annotCvs.style.width = pdfCvs.style.width || `${pdfCvs.offsetWidth}px`;
+  annotCvs.style.height = pdfCvs.style.height || `${pdfCvs.offsetHeight}px`;
 }
 
 function resizeOcrAnnotCanvas() {
@@ -1377,10 +1381,10 @@ function drawAnnotStroke(ctx, stroke) {
   ctx.save();
   if (stroke.tool === 'highlight') {
     ctx.globalAlpha = 0.35;
-    ctx.lineWidth = (stroke.width || 0.003) * W * 3;
+    ctx.lineWidth = (stroke.width || 0.003) * H * 3;
   } else {
     ctx.globalAlpha = 1;
-    ctx.lineWidth = (stroke.width || 0.003) * W;
+    ctx.lineWidth = (stroke.width || 0.003) * H;
   }
   ctx.strokeStyle = stroke.color || '#e53e3e';
   ctx.lineCap = 'round';
@@ -1410,9 +1414,9 @@ function onAnnotPointerDown(e, pageNum) {
   const pos = getAnnotPos(e, pageNum);
   if (activeTool.value === 'eraser') { eraseAnnotAt(pos, pageNum); return; }
   const cvs = pageNum === 1 && ocrMode.value ? ocrAnnotCanvas.value : annotCanvases.value[pageNum];
-  const cssW = cvs ? cvs.getBoundingClientRect().width : 1000;
-  // Store width as fraction of CSS canvas width so it's scale-independent
-  annotCurrentStroke = { tool: activeTool.value, color: penColor.value, width: penWidth.value / cssW, points: [pos], pageNum };
+  // Lưu width như fraction của canvas height — bất biến với DPR và zoom của mỗi user
+  const refH = cvs ? cvs.height : 1000;
+  annotCurrentStroke = { tool: activeTool.value, color: penColor.value, width: penWidth.value / refH, points: [pos], pageNum };
 }
 
 function onAnnotPointerMove(e, pageNum) {

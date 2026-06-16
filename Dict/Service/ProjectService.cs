@@ -1,4 +1,4 @@
-﻿using Dict.Data;
+using Dict.Data;
 using Dict.DTO;
 using Dict.Models;
 using Dict.Service.IService;
@@ -38,6 +38,21 @@ namespace Dict.Services
                 .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == userId)
                 ?? throw new UnauthorizedAccessException("Bạn không thuộc workspace này.");
         }
+
+        /// <summary>VIEWER không được tạo/sửa/xóa bất cứ thứ gì</summary>
+        private static void RequireNotViewer(WorkspaceMember member)
+        {
+            if (member.Role == WorkspaceRole.VIEWER)
+                throw new UnauthorizedAccessException("Viewer không có quyền chỉnh sửa. Liên hệ Admin để được nâng quyền.");
+        }
+
+        /// <summary>
+        /// OWNER/ADMIN: full quyền trên mọi project
+        /// MEMBER: chỉ sửa/xóa project/file của mình
+        /// VIEWER: chỉ xem
+        /// </summary>
+        private static bool IsOwnerOrAdmin(WorkspaceMember m) =>
+            m.Role == WorkspaceRole.OWNER || m.Role == WorkspaceRole.ADMIN;
 
         private static ProjectDto ToDto(Project p) => new()
         {
@@ -138,7 +153,10 @@ namespace Dict.Services
 
         public async Task<ProjectDto> CreateAsync(int workspaceId, int userId, CreateProjectDto dto)
         {
-            await RequireWorkspaceMemberAsync(workspaceId, userId);
+            var wsMember = await _db.WorkspaceMembers
+                .FirstOrDefaultAsync(m => m.WorkspaceId == workspaceId && m.UserId == userId)
+                ?? throw new UnauthorizedAccessException("Bạn không thuộc workspace này.");
+            RequireNotViewer(wsMember);
 
             var project = new Project
             {
@@ -159,6 +177,7 @@ namespace Dict.Services
         public async Task<ProjectDto> UpdateAsync(int projectId, int userId, UpdateProjectDto dto)
         {
             var member = await RequireMemberAsync(projectId, userId);
+            RequireNotViewer(member);
 
             var project = await _db.Projects
                 .Select(p => new Project
@@ -169,8 +188,9 @@ namespace Dict.Services
                 .FirstOrDefaultAsync(p => p.Id == projectId)
                 ?? throw new KeyNotFoundException("Project không tồn tại.");
 
-            if (project.CreatedByUserId != userId && member.Role != "Admin")
-                throw new UnauthorizedAccessException("Chỉ người tạo hoặc Admin mới sửa được.");
+            // OWNER/ADMIN: sửa mọi project | MEMBER: chỉ sửa project của mình
+            if (project.CreatedByUserId != userId && !IsOwnerOrAdmin(member))
+                throw new UnauthorizedAccessException("Chỉ người tạo, Owner hoặc Admin mới sửa được.");
 
             project.Name = dto.Name ?? project.Name;
             project.Description = dto.Description ?? project.Description;
@@ -189,12 +209,14 @@ namespace Dict.Services
         public async Task DeleteAsync(int projectId, int userId)
         {
             var member = await RequireMemberAsync(projectId, userId);
+            RequireNotViewer(member);
 
             var project = await _db.Projects.FindAsync(projectId)
                 ?? throw new KeyNotFoundException("Project không tồn tại.");
 
-            if (project.CreatedByUserId != userId && member.Role != "Admin")
-                throw new UnauthorizedAccessException("Chỉ người tạo hoặc Admin mới xóa được.");
+            // OWNER/ADMIN: xóa mọi project | MEMBER: chỉ xóa project của mình
+            if (project.CreatedByUserId != userId && !IsOwnerOrAdmin(member))
+                throw new UnauthorizedAccessException("Chỉ người tạo, Owner hoặc Admin mới xóa được.");
 
             _db.Projects.Remove(project);
             await _db.SaveChangesAsync();
@@ -236,7 +258,8 @@ namespace Dict.Services
 
         public async Task<MediaDtos> UploadMediaAsync(int projectId, int userId, IFormFile file)
         {
-            await RequireMemberAsync(projectId, userId);
+            var member = await RequireMemberAsync(projectId, userId);
+            RequireNotViewer(member); // VIEWER không được upload
 
             var project = await _db.Projects.FindAsync(projectId)
                 ?? throw new KeyNotFoundException("Project không tồn tại.");
@@ -321,8 +344,11 @@ namespace Dict.Services
                 .FirstOrDefaultAsync(m => m.WorkspaceId == media.WorkspaceId && m.UserId == userId)
                 ?? throw new UnauthorizedAccessException("Bạn không có quyền.");
 
-            if (media.OwnerId != userId && member.Role != "Admin")
-                throw new UnauthorizedAccessException("Chỉ người upload hoặc Admin mới xóa được.");
+            RequireNotViewer(member);
+
+            // OWNER/ADMIN: xóa mọi file | MEMBER: chỉ xóa file của mình
+            if (media.OwnerId != userId && !IsOwnerOrAdmin(member))
+                throw new UnauthorizedAccessException("Chỉ người upload, Owner hoặc Admin mới xóa được.");
 
             // Xóa file trên Azure Blob
             if (!string.IsNullOrEmpty(media.StorageUrl))

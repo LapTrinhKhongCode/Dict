@@ -35,6 +35,7 @@ namespace Dict.Service
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthService> _logger;
         private readonly IMemoryCache _cache;
+        private readonly ApplicationDbContext _db;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
@@ -44,7 +45,8 @@ namespace Dict.Service
             IEmailService emailService,
             IConfiguration configuration,
             ILogger<AuthService> logger,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            ApplicationDbContext db)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -54,6 +56,7 @@ namespace Dict.Service
             _configuration = configuration;
             _logger = logger;
             _cache = cache;
+            _db = db;
         }
 
         // ==========================================
@@ -143,6 +146,29 @@ namespace Dict.Service
             var result = await _userManager.ConfirmEmailAsync(user, token);
             if (!result.Succeeded)
                 throw new InvalidOperationException("Link xác nhận không hợp lệ hoặc đã hết hạn.");
+
+            // ✅ Tạo personal workspace ngay tại đây (đúng layer)
+            var hasWorkspace = _db.WorkspaceMembers.Any(wm => wm.UserId == user.Id);
+            if (!hasWorkspace)
+            {
+                var ws = new Workspace
+                {
+                    Name = $"Personal - {user.UserName}",
+                    Description = "Không gian làm việc cá nhân",
+                    OwnerType = "PERSONAL",
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.Workspaces.Add(ws);
+                await _db.SaveChangesAsync();
+                _db.WorkspaceMembers.Add(new WorkspaceMember
+                {
+                    WorkspaceId = ws.Id,
+                    UserId = user.Id,
+                    Role = WorkspaceRole.OWNER   // OWNER, không phải ADMIN
+                });
+                await _db.SaveChangesAsync();
+                _logger.LogInformation("Created personal workspace for user {UserId}", user.Id);
+            }
 
             var roles = await _userManager.GetRolesAsync(user);
             var loginToken = _jwtService.GenerateToken(user, roles);
@@ -298,6 +324,11 @@ namespace Dict.Service
         {
             _logger.LogInformation("User {UserId} logged out at {Timestamp}", userId, DateTime.UtcNow);
             await Task.CompletedTask;
+        }
+
+        public async Task<ApplicationUser?> GetUserByIdAsync(int userId)
+        {
+            return await _userManager.FindByIdAsync(userId.ToString());
         }
 
         private string? ValidatePassword(string password)

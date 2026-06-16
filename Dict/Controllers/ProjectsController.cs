@@ -1,4 +1,4 @@
-﻿using Dict.Data;
+using Dict.Data;
 using Dict.DTO;
 using Dict.Models;
 using iText.IO.Font;
@@ -128,7 +128,7 @@ public class ProjectsController : ControllerBase
         var isAdmin = await _context.WorkspaceMembers
             .AnyAsync(wm => wm.WorkspaceId == job.Project.WorkspaceId
                          && wm.UserId == userId
-                         && wm.Role == "Admin");
+                         && wm.Role == WorkspaceRole.ADMIN);
 
         if (!isAdmin)
         {

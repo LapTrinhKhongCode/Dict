@@ -98,11 +98,37 @@ namespace Dict.Data
         public DbSet<Workspace> Workspaces { get; set; }
         public DbSet<WorkspaceMember> WorkspaceMembers { get; set; }
         public DbSet<WorkspaceInvitation> WorkspaceInvitations { get; set; }
+        public DbSet<Organization> Organizations { get; set; }
+        public DbSet<OrganizationMember> OrganizationMembers { get; set; }
         public DbSet<FileComment> FileComments { get; set; }
         public DbSet<WordComment> WordComments { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // OrganizationMember: composite PK
+            modelBuilder.Entity<OrganizationMember>()
+                .HasKey(om => new { om.OrganizationId, om.UserId });
+
+            modelBuilder.Entity<OrganizationMember>()
+                .HasOne(om => om.Organization)
+                .WithMany(o => o.Members)
+                .HasForeignKey(om => om.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OrganizationMember>()
+                .HasOne(om => om.User)
+                .WithMany()
+                .HasForeignKey(om => om.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Workspace → Organization (optional FK)
+            modelBuilder.Entity<Workspace>()
+                .HasOne(w => w.Organization)
+                .WithMany(o => o.Workspaces)
+                .HasForeignKey(w => w.OrganizationId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // 2. Cấu hình WorkspaceInvitation: Chặn xóa User kéo theo xóa lời mời
             modelBuilder.Entity<WorkspaceInvitation>()
                 .HasOne(wi => wi.Invitee)

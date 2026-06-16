@@ -30,30 +30,21 @@ namespace Dict.Data
                 var logger = loggerFactory.CreateLogger("DbSeeder"); // Tạo logger với tên
                 // =======================
 
-                // 2. TẠO CÁC ROLE CƠ BẢN
-                // (Chúng ta thêm "Moderator" và "Premium" luôn vì đằng nào cũng cần)
-                string[] roleNames = { "Admin", "Moderator", "User", "Premium" };
+                // 2. TẠO CÁC ROLE CƠ BẢN — dùng UPPERCASE nhất quán với Role enum
+                string[] roleNames = { "ADMIN", "MODERATOR", "USER", "PREMIUM_USER" };
 
                 foreach (var roleName in roleNames)
                 {
                     if (!await roleManager.RoleExistsAsync(roleName))
                     {
-                        // === SỬA LỖI CS1729 ===
-                        // Dùng constructor rỗng và gán thuộc tính Name
-                        // thay vì new ApplicationRole(roleName)
                         await roleManager.CreateAsync(new ApplicationRole { Name = roleName });
-                        // ========================
-
                         logger.LogInformation($"Role '{roleName}' đã được tạo.");
                     }
                 }
 
                 // 3. TẠO TÀI KHOẢN ADMIN ĐẦU TIÊN
-
-                // === CẤU HÌNH ADMIN ACCOUNT ===
                 var adminEmail = "admin@dict.com";
-                var adminPass = "SuperPassword123!"; // <<< CẢNH BÁO: HÃY ĐỔI MẬT KHẨU NÀY
-                // ==============================
+                var adminPass = "SuperPassword123!";
 
                 var adminUser = await userManager.FindByEmailAsync(adminEmail);
 
@@ -61,28 +52,42 @@ namespace Dict.Data
                 {
                     adminUser = new ApplicationUser
                     {
-                        UserName = "admin", // Bạn có thể đổi username
+                        UserName = "admin",
                         Email = adminEmail,
-                        EmailConfirmed = true, // Xác thực email luôn
+                        EmailConfirmed = true,
                         IsActive = true,
                         CreatedAt = DateTime.UtcNow,
-                        AvatarUrl = "" // (Tùy chọn)
+                        AvatarUrl = ""
                     };
 
-                    // Tạo user mới với mật khẩu
                     var result = await userManager.CreateAsync(adminUser, adminPass);
 
                     if (result.Succeeded)
                     {
-                        // Gán 2 vai trò: "Admin" (để quản lý) và "User" (để có thể dùng các tính năng)
-                        await userManager.AddToRolesAsync(adminUser, new[] { "Admin", "User" });
-                        logger.LogInformation($"Tài khoản Admin '{adminEmail}' đã được tạo và gán role 'Admin' + 'User'.");
+                        await userManager.AddToRolesAsync(adminUser, new[] { "ADMIN", "USER" });
+                        logger.LogInformation($"Tài khoản Admin '{adminEmail}' đã được tạo và gán role 'ADMIN' + 'USER'.");
                     }
                     else
                     {
-                        // Log lỗi nếu tạo thất bại
                         var errors = string.Join(", ", result.Errors.Select(e => e.Description));
                         logger.LogError($"LỖI: Không thể tạo tài khoản Admin: {errors}");
+                    }
+                }
+                else
+                {
+                    // Migrate existing admin: đổi role cũ Capitalize → UPPERCASE nếu cần
+                    var existingRoles = await userManager.GetRolesAsync(adminUser);
+                    if (existingRoles.Contains("Admin") && !existingRoles.Contains("ADMIN"))
+                    {
+                        await userManager.RemoveFromRoleAsync(adminUser, "Admin");
+                        await userManager.AddToRoleAsync(adminUser, "ADMIN");
+                        logger.LogInformation("Migrated admin role: Admin → ADMIN");
+                    }
+                    if (existingRoles.Contains("User") && !existingRoles.Contains("USER"))
+                    {
+                        await userManager.RemoveFromRoleAsync(adminUser, "User");
+                        await userManager.AddToRoleAsync(adminUser, "USER");
+                        logger.LogInformation("Migrated admin role: User → USER");
                     }
                 }
             }

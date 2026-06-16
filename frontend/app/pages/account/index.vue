@@ -38,6 +38,10 @@
           <nav class="space-y-2">
             <button @click="selectTab('general')" :class="['nav-button', { active: currentTab === 'general' }]">Giới thiệu chung</button>
             <button @click="selectTab('security')" :class="['nav-button', { active: currentTab === 'security' }]">Bảo mật</button>
+            <button @click="selectTab('subscription')" :class="['nav-button', { active: currentTab === 'subscription' }]">
+              Plan & Billing
+              <span v-if="me?.isPremiumActive" class="ml-auto text-xs bg-yellow-400 text-gray-900 font-bold px-1.5 py-0.5 rounded-full">PRO</span>
+            </button>
             <button @click="selectTab('theme')" :class="['nav-button', { active: currentTab === 'theme' }]">Đổi nền</button>
           </nav>
         </div>
@@ -144,6 +148,94 @@
           </div>
         </section>
 
+        <section v-if="currentTab === 'subscription'" class="bg-white dark:bg-gray-800 rounded-lg p-6 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
+          <h2 class="text-2xl font-bold text-black dark:text-white mb-6">Plan & Billing</h2>
+
+          <div v-if="meLoading" class="flex justify-center py-8"><div class="w-8 h-8 border-4 border-gray-300 border-t-indigo-500 rounded-full animate-spin"/></div>
+
+          <div v-else class="space-y-6">
+            <!-- Current plan badge -->
+            <div class="flex items-center gap-4 p-4 rounded-xl" :class="me?.isPremiumActive ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700' : 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600'">
+              <div class="text-3xl">{{ me?.isPremiumActive ? '✨' : '🆓' }}</div>
+              <div>
+                <p class="font-bold text-lg" :class="me?.isPremiumActive ? 'text-yellow-700 dark:text-yellow-400' : 'text-gray-700 dark:text-gray-300'">
+                  {{ me?.isPremiumActive ? 'Premium' : 'Free' }}
+                </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  <template v-if="me?.isPremiumActive">
+                    Hết hạn: {{ me.premiumExpiresAt ? new Date(me.premiumExpiresAt).toLocaleDateString('vi-VN') : 'Trọn đời' }}
+                  </template>
+                  <template v-else>
+                    Đang dùng gói miễn phí
+                  </template>
+                </p>
+              </div>
+            </div>
+
+            <!-- Usage bars -->
+            <div v-if="!meLoading" class="space-y-3">
+              <div>
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-gray-600 dark:text-gray-400">OCR tháng này</span>
+                  <span class="font-medium" :class="ocrUnlimited ? 'text-green-500' : (ocrUsed >= ocrLimit ? 'text-red-500' : 'text-gray-700 dark:text-gray-300')">
+                    {{ ocrUnlimited ? '∞ Không giới hạn' : `${ocrUsed} / ${ocrLimit}` }}
+                  </span>
+                </div>
+                <div v-if="!ocrUnlimited" class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div class="h-2 rounded-full transition-all"
+                    :class="ocrUsed >= ocrLimit ? 'bg-red-500' : ocrUsed >= ocrLimit * 0.8 ? 'bg-yellow-500' : 'bg-green-500'"
+                    :style="{ width: Math.min(100, (ocrUsed / ocrLimit) * 100) + '%' }"
+                  />
+                </div>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">Upload file tối đa</span>
+                <span class="font-medium text-gray-700 dark:text-gray-300">{{ maxFileMb }}MB</span>
+              </div>
+            </div>
+
+            <!-- Feature comparison -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <th class="text-left py-3 text-gray-600 dark:text-gray-400 font-semibold">Tính năng</th>
+                    <th class="text-center py-3 text-gray-600 dark:text-gray-400 font-semibold">Free</th>
+                    <th class="text-center py-3 text-yellow-600 dark:text-yellow-400 font-semibold">Premium ✨</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                  <tr v-for="f in features" :key="f.label">
+                    <td class="py-3 text-gray-700 dark:text-gray-300">{{ f.label }}</td>
+                    <td class="text-center py-3">
+                      <span v-if="f.free === true" class="text-green-500">✓</span>
+                      <span v-else-if="f.free === false" class="text-gray-300 dark:text-gray-600">✗</span>
+                      <span v-else class="text-xs text-gray-500">{{ f.free }}</span>
+                    </td>
+                    <td class="text-center py-3">
+                      <span v-if="f.premium === true" class="text-yellow-500 font-bold">✓</span>
+                      <span v-else-if="f.premium === false" class="text-gray-300">✗</span>
+                      <span v-else class="text-xs text-yellow-600 dark:text-yellow-400 font-semibold">{{ f.premium }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-3 pt-2">
+              <NuxtLink v-if="!me?.isPremiumActive" to="/premium"
+                class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors text-sm">
+                ⚡ Nâng cấp Premium
+              </NuxtLink>
+              <button v-else @click="openPortal" :disabled="portalLoading"
+                class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors text-sm font-medium">
+                {{ portalLoading ? 'Đang mở...' : 'Quản lý subscription' }}
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section v-if="currentTab === 'theme'" class="bg-white dark:bg-gray-800 rounded-lg p-6 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
           <h2 class="text-2xl font-bold text-black dark:text-white mb-6">Đổi nền</h2>
           <div class="space-y-6">
@@ -213,12 +305,54 @@ const { username, email, avatarUrl, role, jwt } = useJwt();
 const config = useRuntimeConfig();
 const BASE_URL = config.public.apiBaseUrl || "https://localhost:7084";
 
-type Tab = "general" | "security" | "theme";
+type Tab = "general" | "security" | "subscription" | "theme";
 const currentTab = ref<Tab>("general");
 
 const isSaving = ref(false);
 const isChangingPassword = ref(false);
 const { showToast } = useToast();
+
+// ── Subscription ─────────────────────────────────────────────────────
+const me = ref<any>(null)
+const meLoading = ref(true)
+const portalLoading = ref(false)
+const { ocrUsed, ocrLimit, ocrUnlimited, maxFileMb, fetchUsage } = usePlanLimit()
+
+const features = [
+  { label: 'Tra cứu từ điển', free: true, premium: true },
+  { label: 'Flashcard / SRS', free: true, premium: true },
+  { label: 'OCR tài liệu', free: '20 lần/tháng', premium: 'Không giới hạn' },
+  { label: 'Upload file', free: '10MB', premium: '500MB' },
+  { label: 'Workspace cộng tác', free: true, premium: true },
+  { label: 'AI giải thích', free: '10 lần/ngày', premium: 'Không giới hạn' },
+  { label: 'Lịch sử tìm kiếm', free: true, premium: true },
+  { label: 'Xuất PDF annotation', free: false, premium: true },
+  { label: 'Hỗ trợ ưu tiên', free: false, premium: true },
+]
+
+async function fetchMe() {
+  meLoading.value = true
+  try {
+    const res = await $fetch<any>(`${BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${jwt.value}` }
+    })
+    me.value = res?.result
+  } catch { me.value = null }
+  finally { meLoading.value = false }
+}
+
+async function openPortal() {
+  portalLoading.value = true
+  try {
+    const res = await $fetch<any>(`${BASE_URL}/api/stripe/portal`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jwt.value}` }
+    })
+    window.location.href = res.result.url
+  } catch { showToast('Không thể mở trang billing', 'error') }
+  finally { portalLoading.value = false }
+}
+// ─────────────────────────────────────────────────────────────────────
 
 // OTP States
 const isSendingOtp = ref(false);
@@ -244,6 +378,8 @@ const isDarkMode = ref<boolean>(true);
 
 onMounted(() => {
   isDarkMode.value = !!(theme?.value === "dark");
+  fetchMe();
+  fetchUsage();
 });
 
 function toggleTheme() {

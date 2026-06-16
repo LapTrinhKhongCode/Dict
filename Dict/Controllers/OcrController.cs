@@ -38,6 +38,7 @@ public class InferController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _pythonApiBaseUrl;
     private readonly ICurrentUserService _currentUserService;
+    private readonly Dict.Service.PlanLimitService _planLimit;
     // Định nghĩa form nhận file
     public class UploadForm
     {
@@ -110,14 +111,15 @@ public class InferController : ControllerBase
     public InferController(
         ILogger<InferController> logger,
         IOcrProcessingService ocrProcessingService,
-        IHttpClientFactory httpClientFactory, IConfiguration configuration, IOcrJobService ocrJobService, ICurrentUserService currentUserService)
-        
+        IHttpClientFactory httpClientFactory, IConfiguration configuration, IOcrJobService ocrJobService,
+        ICurrentUserService currentUserService, Dict.Service.PlanLimitService planLimit)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _ocrProcessingService = ocrProcessingService;
         _ocrJobService = ocrJobService;
         _currentUserService = currentUserService;
+        _planLimit = planLimit;
         _response = new ResponseDTO();
         _pythonApiBaseUrl = configuration["ServiceUrls:PythonApiBaseUrl"]
                             ?? "http://127.0.0.1:8000";
@@ -208,26 +210,44 @@ public class InferController : ControllerBase
         }
     }
     [HttpPost("stream")]
-    [Authorize] // 1. BẮT BUỘC [Authorize] để lấy GetUserId()
+    [Authorize]
     public async Task StreamOcr(IFormFile file)
     {
         if (file == null || file.Length == 0)
         {
-            HttpContext.Response.StatusCode = 400; // BadRequest
+            HttpContext.Response.StatusCode = 400;
             await HttpContext.Response.WriteAsync("No file uploaded.");
             return;
         }
+
+        // ── Plan limit checks ────────────────────────────────────────────
+        int userId = 0;
+        try { userId = GetUserId(); } catch { HttpContext.Response.StatusCode = 401; return; }
+
+        var (fileSizeOk, fileSizeErr) = await _planLimit.CheckFileSizeAsync(userId, file.Length);
+        if (!fileSizeOk)
+        {
+            HttpContext.Response.StatusCode = 402;
+            await HttpContext.Response.WriteAsync(fileSizeErr!);
+            return;
+        }
+        var (ocrOk, ocrErr) = await _planLimit.CheckOcrQuotaAsync(userId);
+        if (!ocrOk)
+        {
+            HttpContext.Response.StatusCode = 402;
+            await HttpContext.Response.WriteAsync(ocrErr!);
+            return;
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         OcrJobDto ocrJob = null;
         var fullTextBuilder = new StringBuilder();
         var resultsBatch = new List<CreateOcrResultDto>();
         const int BATCH_SIZE = 20;
-        int userId = 0;
 
         try
         {
-            // 2. Lấy UserId và Tạo Job trong DB
-            userId = GetUserId();
+            // Tạo Job trong DB
             ocrJob = await _ocrJobService.CreateAsync(new OcrJobCreateDto
             {
                 UserId = userId,
@@ -354,30 +374,49 @@ public class InferController : ControllerBase
 
 
     [HttpPost("pdf-stream")]
-    [Authorize] // 1. BẮT BUỘC [Authorize]
+    [Authorize]
     public async Task StreamPdfOcr(IFormFile file)
     {
         if (file == null || file.Length == 0 || file.ContentType != "application/pdf")
         {
-            HttpContext.Response.StatusCode = 400; // BadRequest
+            HttpContext.Response.StatusCode = 400;
             await HttpContext.Response.WriteAsync("Vui lòng tải lên một file PDF hợp lệ.");
             return;
         }
+
+        // ── Plan limit checks ────────────────────────────────────────────
+        int userId = 0;
+        try { userId = GetUserId(); } catch { HttpContext.Response.StatusCode = 401; return; }
+
+        var (fileSizeOk, fileSizeErr) = await _planLimit.CheckFileSizeAsync(userId, file.Length);
+        if (!fileSizeOk)
+        {
+            HttpContext.Response.StatusCode = 402;
+            await HttpContext.Response.WriteAsync(fileSizeErr!);
+            return;
+        }
+        var (ocrOk, ocrErr) = await _planLimit.CheckOcrQuotaAsync(userId);
+        if (!ocrOk)
+        {
+            HttpContext.Response.StatusCode = 402;
+            await HttpContext.Response.WriteAsync(ocrErr!);
+            return;
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         HttpContext.Response.ContentType = "text/event-stream";
         HttpContext.Response.StatusCode = 200;
 
         int pageIndex = 1;
-        OcrJobDto ocrJob = null; // Biến để lưu Job DTO
-        var fullTextBuilder = new StringBuilder(); // Biến để lưu Full Text
-        var resultsBatch = new List<CreateOcrResultDto>(); // Biến để "tích" kết quả
-        const int BATCH_SIZE = 20; // Ghi xuống DB sau mỗi 20 dòng
-        int userId = 0;
+        OcrJobDto ocrJob = null;
+        var fullTextBuilder = new StringBuilder();
+        var resultsBatch = new List<CreateOcrResultDto>();
+        const int BATCH_SIZE = 20;
 
         try
         {
-            // 2. Lấy UserId và Tạo Job
-            userId = GetUserId();
+            // Tạo Job
+
             ocrJob = await _ocrJobService.CreateAsync(new OcrJobCreateDto
             {
                 UserId = userId,
@@ -629,7 +668,14 @@ public class InferController : ControllerBase
             if (userId == 0 || workspaceId == 0)
                 return Unauthorized(new { error = "Token không hợp lệ." });
 
-            // GỌI HÀM MỚI CHỈ UPLOAD LÊN AZURE
+            // Plan limit checks — truyền workspaceId để check đúng Personal vs Org plan
+            int? wsId = workspaceId > 0 ? workspaceId : null;
+            var (fileSizeOk, fileSizeErr) = await _planLimit.CheckFileSizeAsync(userId, image.Length, wsId);
+            if (!fileSizeOk) return StatusCode(402, new { message = fileSizeErr });
+
+            var (ocrOk, ocrErr) = await _planLimit.CheckOcrQuotaAsync(userId, wsId);
+            if (!ocrOk) return StatusCode(402, new { message = ocrErr });
+
             OcrProcessingResultDto result = await _ocrProcessingService.UploadImageOnlyAsync(image, userId, workspaceId, projectId);
 
             return Ok(result);

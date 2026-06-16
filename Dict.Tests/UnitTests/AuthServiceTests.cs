@@ -57,7 +57,7 @@ namespace Dict.Tests.Services
 
             _mockConfig.Setup(c => c["FrontendUrl"]).Returns("http://localhost:3000");
 
-            // 5. KHỞI TẠO SERVICE
+            // 5. KHỞI TẠO SERVICE — thêm null cho db (unit tests không cần real DB)
             _sut = new AuthService(
                 _mockUserManager.Object,
                 _mockSignInManager.Object,
@@ -66,7 +66,8 @@ namespace Dict.Tests.Services
                 _mockEmailService.Object,
                 _mockConfig.Object,
                 _mockLogger.Object,
-                _memoryCache
+                _memoryCache,
+                null! // db - not needed for unit tests that don't create workspaces
             );
         }
 

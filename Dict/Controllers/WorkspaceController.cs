@@ -1,4 +1,4 @@
-﻿using Dict.DTO;
+using Dict.DTO;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
@@ -26,6 +26,9 @@ namespace Dict.Controllers
             return userId;
         }
 
+        /// <summary>Platform ADMIN có thể bypass workspace role check</summary>
+        private bool IsPlatformAdmin() => User.IsInRole("ADMIN");
+
         // ── Workspace ─────────────────────────────────────────────
 
         /// <summary>GET /api/workspaces — Lấy danh sách workspace của tôi</summary>
@@ -45,7 +48,7 @@ namespace Dict.Controllers
                 var result = await _service.GetByIdAsync(id, GetUserId());
                 return Ok(result);
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -53,8 +56,13 @@ namespace Dict.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateWorkspaceDto dto)
         {
-            var result = await _service.CreateAsync(GetUserId(), dto);
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            try
+            {
+                var result = await _service.CreateAsync(GetUserId(), dto, isPlatformAdmin: IsPlatformAdmin());
+                return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
+            catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
         /// <summary>PUT /api/workspaces/{id}</summary>
@@ -66,7 +74,7 @@ namespace Dict.Controllers
                 var result = await _service.UpdateAsync(id, GetUserId(), dto);
                 return Ok(result);
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -79,7 +87,7 @@ namespace Dict.Controllers
                 await _service.DeleteAsync(id, GetUserId());
                 return NoContent();
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -94,7 +102,7 @@ namespace Dict.Controllers
                 var result = await _service.GetMembersAsync(id, GetUserId());
                 return Ok(result);
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
         }
 
         /// <summary>POST /api/workspaces/{id}/members — Mời thành viên</summary>
@@ -106,7 +114,7 @@ namespace Dict.Controllers
                 await _service.InviteMemberAsync(id, GetUserId(), dto);
                 return Ok(new { message = "Đã mời thành viên thành công." });
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
         }
@@ -117,10 +125,12 @@ namespace Dict.Controllers
         {
             try
             {
-                await _service.UpdateMemberRoleAsync(id, GetUserId(), userId, dto);
+                // Platform admin bypass: dùng requesterId = 0 làm signal
+                var requesterId = IsPlatformAdmin() ? 0 : GetUserId();
+                await _service.UpdateMemberRoleAsync(id, requesterId, userId, dto, isPlatformAdmin: IsPlatformAdmin());
                 return Ok(new { message = "Đã cập nhật role." });
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
         }
@@ -131,10 +141,11 @@ namespace Dict.Controllers
         {
             try
             {
-                await _service.RemoveMemberAsync(id, GetUserId(), userId);
+                var requesterId = IsPlatformAdmin() ? 0 : GetUserId();
+                await _service.RemoveMemberAsync(id, requesterId, userId, isPlatformAdmin: IsPlatformAdmin());
                 return NoContent();
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
         }
@@ -148,7 +159,7 @@ namespace Dict.Controllers
                 await _service.LeaveWorkspaceAsync(id, GetUserId());
                 return Ok(new { message = "Đã rời workspace." });
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
         }
     }

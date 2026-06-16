@@ -17,12 +17,14 @@ namespace Dict.Controllers
         private readonly IAuthService _authService;
         private readonly ResponseDTO _response;
         private readonly ILogger<AuthController> _logger;
+        private readonly Dict.Service.PlanLimitService _planLimit;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, Dict.Service.PlanLimitService planLimit)
         {
             _authService = authService;
             _response = new ResponseDTO();
             _logger = logger;
+            _planLimit = planLimit;
         }
 
         private int GetUserId()
@@ -225,6 +227,56 @@ namespace Dict.Controllers
                 _logger.LogError(ex, "Lỗi khi reset mật khẩu cho email {Email}", dto.Email);
                 _response.IsSuccess = false;
                 _response.Message = "Đã xảy ra lỗi hệ thống.";
+                return StatusCode(500, _response);
+            }
+        }
+
+        /// <summary>Trả về thông tin subscription hiện tại của user đang đăng nhập</summary>
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetMe()
+        {
+            try
+            {
+                var userId = GetUserId();
+                var user = await _authService.GetUserByIdAsync(userId);
+                if (user == null) return NotFound();
+
+                _response.Result = new
+                {
+                    userId = user.Id,
+                    userName = user.UserName,
+                    email = user.Email,
+                    avatarUrl = user.AvatarUrl,
+                    personalTier = user.PersonalTier,
+                    premiumExpiresAt = user.PremiumExpiresAt,
+                    isPremiumActive = user.IsPremiumActive(),
+                };
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
+                return StatusCode(500, _response);
+            }
+        }
+
+        /// <summary>Trả về thông tin quota usage hiện tại (OCR, file size...)</summary>
+        [HttpGet("usage")]
+        [Authorize]
+        public async Task<IActionResult> GetUsage()
+        {
+            try
+            {
+                var userId = GetUserId();
+                _response.Result = await _planLimit.GetUsageInfoAsync(userId);
+                return Ok(_response);
+            }
+            catch (Exception ex)
+            {
+                _response.IsSuccess = false;
+                _response.Message = ex.Message;
                 return StatusCode(500, _response);
             }
         }

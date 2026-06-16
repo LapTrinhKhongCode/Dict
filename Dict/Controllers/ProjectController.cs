@@ -1,4 +1,4 @@
-﻿using Dict.DTO;
+using Dict.DTO;
 using Dict.Service.IService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -30,14 +30,14 @@ namespace Dict.Controllers
         public async Task<IActionResult> GetByWorkspace(int workspaceId)
         {
             try { return Ok(await _service.GetByWorkspaceAsync(workspaceId, GetUserId())); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
         }
 
         [HttpGet("api/projects/{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             try { return Ok(await _service.GetByIdAsync(id, GetUserId())); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -49,14 +49,14 @@ namespace Dict.Controllers
                 var result = await _service.CreateAsync(workspaceId, GetUserId(), dto);
                 return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
             }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
         }
 
         [HttpPut("api/projects/{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateProjectDto dto)
         {
             try { return Ok(await _service.UpdateAsync(id, GetUserId(), dto)); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -64,7 +64,7 @@ namespace Dict.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             try { await _service.DeleteAsync(id, GetUserId()); return NoContent(); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -74,7 +74,7 @@ namespace Dict.Controllers
         public async Task<IActionResult> GetMedia(int projectId)
         {
             try { return Ok(await _service.GetMediaAsync(projectId, GetUserId())); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -88,7 +88,7 @@ namespace Dict.Controllers
             if (file.ContentType != "application/pdf")
                 return BadRequest("Chỉ hỗ trợ file PDF.");
             try { return Ok(await _service.UploadMediaAsync(projectId, GetUserId(), file)); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
@@ -96,7 +96,7 @@ namespace Dict.Controllers
         public async Task<IActionResult> DeleteMedia(int mediaId)
         {
             try { await _service.DeleteMediaAsync(mediaId, GetUserId()); return NoContent(); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
     }

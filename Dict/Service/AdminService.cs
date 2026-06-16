@@ -1,4 +1,4 @@
-﻿using Dict.Data;
+using Dict.Data;
 using Dict.DTO;
 using Dict.DTO.Admin;
 using Dict.DTO.Deck;
@@ -190,7 +190,7 @@ namespace Dict.Service
             }
 
             // Dùng IsInRoleAsync
-            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
+            if (await _userManager.IsInRoleAsync(user, WorkspaceRole.ADMIN))
             {
                 _logger.LogWarning("ADMINResetUserPasswordAsync: ADMIN {ADMINId} attempted to reset password of ADMIN account {TargetUserId}", GetAdminId(), userId);
                 return false;
@@ -261,7 +261,7 @@ namespace Dict.Service
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
-            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
+            if (await _userManager.IsInRoleAsync(user, WorkspaceRole.ADMIN))
             {
                 _logger.LogWarning("Admin {AdminId} attempted to lock ADMIN {TargetUserId}", GetAdminId(), userId);
                 return false;
@@ -292,7 +292,7 @@ namespace Dict.Service
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
-            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
+            if (await _userManager.IsInRoleAsync(user, WorkspaceRole.ADMIN))
             {
                 _logger.LogWarning("Admin {AdminId} attempted to change role of ADMIN {TargetUserId}", GetAdminId(), userId);
                 return false;
@@ -383,7 +383,7 @@ namespace Dict.Service
             var user = await _userManager.FindByIdAsync(userId.ToString());
             if (user == null) return false;
 
-            if (await _userManager.IsInRoleAsync(user, "ADMIN"))
+            if (await _userManager.IsInRoleAsync(user, WorkspaceRole.ADMIN))
             {
                 _logger.LogError("CRITICAL: Admin {AdminId} attempted to DELETE ADMIN {TargetUserId}", GetAdminId(), userId);
                 return false;
@@ -400,14 +400,14 @@ namespace Dict.Service
                 var workspacesToDeleteIds = new List<int>();
 
                 var adminWorkspaceIds = await _context.WorkspaceMembers
-                    .Where(wm => wm.UserId == userId && wm.Role == "ADMIN")
+                    .Where(wm => wm.UserId == userId && wm.Role == WorkspaceRole.ADMIN)
                     .Select(wm => wm.WorkspaceId)
                     .ToListAsync();
 
                 if (adminWorkspaceIds.Any())
                 {
                     var adminCounts = await _context.WorkspaceMembers
-                        .Where(wm => adminWorkspaceIds.Contains(wm.WorkspaceId) && wm.Role == "ADMIN")
+                        .Where(wm => adminWorkspaceIds.Contains(wm.WorkspaceId) && wm.Role == WorkspaceRole.ADMIN)
                         .GroupBy(wm => wm.WorkspaceId)
                         .Select(g => new { WorkspaceId = g.Key, AdminCount = g.Count() })
                         .ToListAsync();
@@ -676,8 +676,8 @@ namespace Dict.Service
                 {
                     Id = w.Id,
                     Name = w.Name,
-                    // Tìm Member có Role "Admin", lấy tên. Nếu không có thì lấy đại người đầu tiên, không có nữa thì ghi "Không rõ"
-                    OwnerName = w.Members.Where(m => m.Role == "Admin").Select(m => m.User.UserName).FirstOrDefault()
+                    // Tìm Member có Role WorkspaceRole.ADMIN, lấy tên. Nếu không có thì lấy đại người đầu tiên, không có nữa thì ghi "Không rõ"
+                    OwnerName = w.Members.Where(m => m.Role == WorkspaceRole.ADMIN).Select(m => m.User.UserName).FirstOrDefault()
                                 ?? w.Members.Select(m => m.User.UserName).FirstOrDefault()
                                 ?? "Không rõ",
                     MemberCount = w.Members.Count(),

@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/* Prevent double scrollbar — layout uses overflow-y-auto on main already */
+html, body {
+  overflow: hidden;
+  height: 100%;
+}
+
 .sidebar-link-style {
   @apply flex items-center space-x-2 px-3 py-2 rounded-lg
            hover:bg-neutral-700 hover:text-white

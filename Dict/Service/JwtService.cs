@@ -27,50 +27,24 @@ namespace Dict.Service
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            // ✅ TÌM WORKSPACE MẶC ĐỊNH CỦA USER NÀY
-            // Lấy ID công ty đầu tiên mà user này đang tham gia. Nếu không có trả về 0.
+            // Lấy workspace đầu tiên của user — workspace cá nhân đã được tạo lúc confirm email
             int defaultWorkspaceId = _db.WorkspaceMembers
                                         .Where(wm => wm.UserId == user.Id)
                                         .Select(wm => wm.WorkspaceId)
                                         .FirstOrDefault();
 
-            // 🌟 2. HYBRID B2B + B2C: NẾU CHƯA CÓ, TỰ ĐỘNG TẠO WORKSPACE CÁ NHÂN
+            // Fallback: nếu vì lý do nào đó chưa có workspace, tạo tại chỗ (backward compat)
             if (defaultWorkspaceId == 0)
             {
-                // Tạo một Workspace riêng cho khách hàng cá nhân này
-                var personalWorkspace = new Workspace
-                {
-                    Name = $"Personal - {user.UserName}",
-                    Description = "Không gian làm việc cá nhân",
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                _db.Workspaces.Add(personalWorkspace);
-                _db.SaveChanges(); // Lưu để lấy ID mới
-
-                // Cho user này làm Admin của chính cái Workspace cá nhân đó
-                var member = new WorkspaceMember
-                {
-                    WorkspaceId = personalWorkspace.Id,
-                    UserId = user.Id,
-                    Role = WorkspaceRole.ADMIN
-                };
-
-                _db.WorkspaceMembers.Add(member);
-                _db.SaveChanges();
-
-                // Gán lại ID vừa tạo để nhét vào Token
-                defaultWorkspaceId = personalWorkspace.Id;
+                defaultWorkspaceId = CreatePersonalWorkspace(user);
             }
 
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserName ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-                new Claim("userId", user.Id.ToString()), // Đã chốt dùng chuẩn này
+                new Claim("userId", user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                
-                // Bây giờ Token luôn luôn có WorkspaceId (Dù là B2B hay B2C)
                 new Claim("WorkspaceId", defaultWorkspaceId.ToString())
             };
 
@@ -87,6 +61,27 @@ namespace Dict.Service
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private int CreatePersonalWorkspace(ApplicationUser user)
+        {
+            var personalWorkspace = new Workspace
+            {
+                Name = $"Personal - {user.UserName}",
+                Description = "Không gian làm việc cá nhân",
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.Workspaces.Add(personalWorkspace);
+            _db.SaveChanges();
+
+            _db.WorkspaceMembers.Add(new WorkspaceMember
+            {
+                WorkspaceId = personalWorkspace.Id,
+                UserId = user.Id,
+                Role = WorkspaceRole.OWNER  // OWNER của personal workspace
+            });
+            _db.SaveChanges();
+            return personalWorkspace.Id;
         }
     }
 }

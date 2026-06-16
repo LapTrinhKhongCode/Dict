@@ -191,6 +191,8 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<IBlobService, BlobService>();
 builder.Services.AddScoped<IOcrProcessingService, OcrProcessingService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
+builder.Services.AddScoped<IStripeService, StripeService>();
+builder.Services.AddScoped<PlanLimitService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWorkspaceInvitationService, WorkspaceInvitationService>();
 builder.Services.AddScoped<IFileCommentService, FileCommentService>();

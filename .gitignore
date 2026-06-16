@@ -2,6 +2,8 @@
 obj/
 .vs/
 /Dict/appsettings.json
+/Dict/appsettings.Production.json
+/Dict/appsettings.Development.json
 .git
 Dict/venv
 Dict/TempOcr
@@ -14,3 +16,4 @@ Dict/requirements.txt
 /Dict/multilingual-e5-small.onnx
 /Dict/tokenizer.json
 /Dict/appsettings.json
+/Dict/appsettings.Production.json
