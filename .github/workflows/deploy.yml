@@ -17,6 +17,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: 📦 Restore NuGet packages
+        run: dotnet restore Dict.Tests/Dict.Tests.csproj
+
       - name: 🧪 Run Unit Tests
         run: dotnet test Dict.Tests/Dict.Tests.csproj --configuration Release --logger "trx;LogFileName=test-results.trx" --no-restore --filter "FullyQualifiedName!~IntegrationTests"
 
