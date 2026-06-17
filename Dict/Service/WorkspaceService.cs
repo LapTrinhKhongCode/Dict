@@ -1,4 +1,4 @@
-﻿using Dict.Data;
+using Dict.Data;
 using Dict.DTO;
 using Dict.Models;
 using Dict.Models.Enum;
@@ -293,15 +293,15 @@ namespace Dict.Service
         {
             var member = await GetMemberOrThrowAsync(workspaceId, userId);
 
-            // Nếu là Admin duy nhất thì không được rời
-            if (member.Role == "ADMIN")
+            // OWNER hoặc Admin duy nhất không được rời
+            if (member.Role == WorkspaceRole.OWNER || member.Role == WorkspaceRole.ADMIN)
             {
-                var adminCount = await _db.WorkspaceMembers
-                    .CountAsync(m => m.WorkspaceId == workspaceId && m.Role == "ADMIN");
-                if (adminCount <= 1)
-                    throw new InvalidOperationException("Cần có ít nhất 1 Admin. Hãy chỉ định Admin khác trước khi rời.");
+                var privilegedCount = await _db.WorkspaceMembers
+                    .CountAsync(m => m.WorkspaceId == workspaceId &&
+                                    (m.Role == WorkspaceRole.OWNER || m.Role == WorkspaceRole.ADMIN));
+                if (privilegedCount <= 1)
+                    throw new InvalidOperationException("Cần có ít nhất 1 Owner/Admin. Hãy chỉ định người khác trước khi rời.");
             }
-
             _db.WorkspaceMembers.Remove(member);
             await _db.SaveChangesAsync();
         }

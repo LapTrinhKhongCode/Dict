@@ -24,7 +24,9 @@ namespace Dict.Services
         // ── Helpers ──────────────────────────────────────────────
         private async Task<WorkspaceMember> RequireMemberAsync(int projectId, int userId)
         {
-            var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId)
+            var project = await _db.Projects
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == projectId)
                 ?? throw new KeyNotFoundException("Project không tồn tại.");
 
             return await _db.WorkspaceMembers
@@ -180,11 +182,6 @@ namespace Dict.Services
             RequireNotViewer(member);
 
             var project = await _db.Projects
-                .Select(p => new Project
-                {
-                    Id = p.Id, Name = p.Name, Description = p.Description,
-                    WorkspaceId = p.WorkspaceId, CreatedByUserId = p.CreatedByUserId, CreatedAt = p.CreatedAt
-                })
                 .FirstOrDefaultAsync(p => p.Id == projectId)
                 ?? throw new KeyNotFoundException("Project không tồn tại.");
 
@@ -194,9 +191,6 @@ namespace Dict.Services
 
             project.Name = dto.Name ?? project.Name;
             project.Description = dto.Description ?? project.Description;
-            _db.Projects.Attach(project);
-            _db.Entry(project).Property(p => p.Name).IsModified = true;
-            _db.Entry(project).Property(p => p.Description).IsModified = true;
             await _db.SaveChangesAsync();
 
             return new ProjectDto

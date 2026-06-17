@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -35,7 +35,7 @@ namespace Dict.Tests.Services
         }
 
         [Fact]
-        public async Task CreateAsync_ShouldCreateWorkspace_AndAssignCreatorAsAdmin()
+        public async Task CreateAsync_ShouldCreateWorkspace_AndAssignCreatorAsOwner()
         {
             // Arrange
             int userId = 100;
@@ -47,13 +47,13 @@ namespace Dict.Tests.Services
             // Assert
             result.Should().NotBeNull();
             result.Name.Should().Be("Dự án A");
-            result.MyRole.Should().Be(Role.ADMIN);
+            result.MyRole.Should().Be(WorkspaceRole.OWNER);
 
             var savedWorkspace = await _db.Workspaces.Include(w => w.Members).FirstOrDefaultAsync();
             savedWorkspace.Should().NotBeNull();
             savedWorkspace!.Members.Should().HaveCount(1);
             savedWorkspace.Members.First().UserId.Should().Be(userId);
-            savedWorkspace.Members.First().Role.Should().Be(Role.ADMIN);
+            savedWorkspace.Members.First().Role.Should().Be(WorkspaceRole.OWNER);
         }
 
         [Fact]
@@ -79,7 +79,7 @@ namespace Dict.Tests.Services
             Func<Task> act = async () => await _sut.UpdateAsync(workspaceId, nonAdminUserId, updateDto);
 
             await act.Should().ThrowAsync<UnauthorizedAccessException>()
-                .WithMessage("Chỉ Admin mới có quyền thực hiện thao tác này.");
+                .WithMessage("Chỉ Owner/Admin mới có quyền thực hiện thao tác này.");
         }
 
         [Fact]
@@ -109,7 +109,7 @@ namespace Dict.Tests.Services
             Func<Task> act = async () => await _sut.LeaveWorkspaceAsync(workspaceId, onlyAdminId);
 
             await act.Should().ThrowAsync<InvalidOperationException>()
-                .WithMessage("Cần có ít nhất 1 Admin. Hãy chỉ định Admin khác trước khi rời.");
+                .WithMessage("Cần có ít nhất 1 Owner/Admin. Hãy chỉ định người khác trước khi rời.");
         }
     }
 }
