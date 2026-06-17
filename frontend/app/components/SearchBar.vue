@@ -339,6 +339,7 @@ function toggleSearchMode() {
 const showSuggestions = ref(false);
 const searchContainer = ref<HTMLDivElement | null>(null);
 let debounceTimer: any = null;
+const adaptiveDebounceMs = ref(50); // tăng dần theo server load
 const selectedIndex = ref(-1);
 const suggestionsListEl = ref<HTMLUListElement | null>(null);
 const isProgrammaticUpdate = ref(false);
@@ -434,6 +435,10 @@ watch(internalSearchWord, (newValue) => {
       );
       if (!res.ok) throw new Error("Autocomplete fetch failed");
 
+      // Adaptive debounce: đọc tín hiệu tải từ server, điều chỉnh cho lần sau
+      const loadLevel = res.headers.get("X-Server-Load") ?? "normal";
+      adaptiveDebounceMs.value = loadLevel === "high" ? 400 : loadLevel === "medium" ? 200 : 50;
+
       const data = await res.json();
 
       // --- BƯỚC 3: LƯU KẾT QUẢ VÀO CACHE CHO LẦN SAU ---
@@ -452,7 +457,7 @@ watch(internalSearchWord, (newValue) => {
       suggestions.value = [];
       showSuggestions.value = false;
     }
-  }, 200);
+  }, adaptiveDebounceMs.value);
 });
 
 // --- Watcher to manage canvas listeners ---
