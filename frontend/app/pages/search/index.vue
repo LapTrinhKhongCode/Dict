@@ -43,7 +43,7 @@
       <!-- Show recent searches when no search has been performed -->
       <RecentSearches v-if="!hasSearched" />
 
-      <!-- Show search results after a search is made -->
+      <!-- Search results (dùng chung cho cả JP→VN và VN→JP) -->
       <SearchResult
         v-else
         :loading="loading"
@@ -77,7 +77,7 @@ const searchWord = ref((route.query.q as string) || "");
 const wordResult = ref<any | null>(null);
 const kanjiResult = ref<any | null>(null);
 const conjugationResult = ref<any | null>(null);
-const selectedWordItem = ref<any | null>(null); // State để nhận từ được chọn từ SearchResult
+const selectedWordItem = ref<any | null>(null);
 const searchResultRef = ref(null);
 // ---
 
@@ -87,6 +87,9 @@ const searchedTerm = ref(searchWord.value);
 const hasSearched = ref(false);
 const config = useRuntimeConfig();
 const { addRecentSearch } = useRecentSearches();
+
+// --- Search mode from URL ---
+const searchMode = computed(() => (route.query.mode as string) === 'vi-ja' ? 'vi-ja' : 'ja-vi');
 
 // --- Computed properties to drive the UI ---
 const viewMode = computed(() => {
@@ -251,7 +254,7 @@ const handleSelectionChange = async (item: any) => {
   }
 };
 
-// --- Main API Fetch Logic (ĐÃ SỬA ÁP DỤNG LAZY LOAD) ---
+// --- Main API Fetch Logic ---
 const fetchAll = async (word: string) => {
   if (!word) return;
 
@@ -261,34 +264,32 @@ const fetchAll = async (word: string) => {
   wordResult.value = null;
   kanjiResult.value = null;
   conjugationResult.value = null;
-  selectedWordItem.value = null; // Reset selection on new search
+  selectedWordItem.value = null;
 
-  // 1. Chạy Word Fetch (Word Fetch phải chạy trước)
   const fetchWordData = async () => {
     try {
-      const conjugation = checkConjugation(word);
-      conjugationResult.value = conjugation;
+      let apiUrl: string;
 
-      const dictionaryForm = getDictionaryForm(word);
-      const apiUrl = `${
-        config.public.apiBaseUrl
-      }/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
+      if (searchMode.value === 'vi-ja') {
+        // VN→JP: gọi endpoint mới, trả về cùng format (suggestWords)
+        apiUrl = `${config.public.apiBaseUrl}/api/Word/SearchByViMeaning/${encodeURIComponent(word.trim())}`;
+      } else {
+        // JP→VN: flow cũ
+        const conjugation = checkConjugation(word);
+        conjugationResult.value = conjugation;
+        const dictionaryForm = getDictionaryForm(word);
+        apiUrl = `${config.public.apiBaseUrl}/api/Word/GetWordJson/${encodeURIComponent(dictionaryForm)}`;
+      }
+
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error("Word data not found");
       const response = await res.json();
 
-      const hasWordData =
-        response.data && response.data.words && response.data.words.length > 0;
-      const hasSuggestData =
-        response.data &&
-        response.data.suggestWords &&
-        response.data.suggestWords.length > 0;
+      const hasWordData = response.data?.words?.length > 0;
+      const hasSuggestData = response.data?.suggestWords?.length > 0;
 
       if (response.status === 200 && (hasWordData || hasSuggestData)) {
-        wordResult.value = {
-          type: "word",
-          ...response.data,
-        };
+        wordResult.value = { type: "word", ...response.data };
       }
     } catch (e: any) {
       console.error("Word fetch failed:", e.message);
@@ -297,15 +298,14 @@ const fetchAll = async (word: string) => {
 
   await fetchWordData();
 
-  // 2. GỌI KANJI THEO KIỂU LAZY LOAD (Chỉ gọi nếu đang ở sẵn Tab Kanji)
-  if (viewMode.value === "kanji") {
+  // Kanji lazy load chỉ cho JP→VN
+  if (searchMode.value === 'ja-vi' && viewMode.value === "kanji") {
     await loadKanjiIfNeeded();
   }
 
   loading.value = false;
 
-  // Save to recent searches if word result found
-  if (wordResult.value?.words?.[0]) {
+  if (searchMode.value === 'ja-vi' && wordResult.value?.words?.[0]) {
     const firstWord = wordResult.value.words[0];
     addRecentSearch({
       word: firstWord.word,
@@ -314,22 +314,23 @@ const fetchAll = async (word: string) => {
     });
   }
 
-  // Báo lỗi nếu tab Word không có dữ liệu (và không phải đang xem tab Kanji)
   if (!wordResult.value && viewMode.value !== "kanji") {
-    error.value = "Không tìm thấy dữ liệu từ vựng.";
+    error.value = searchMode.value === 'vi-ja'
+      ? "Không tìm thấy từ tiếng Nhật nào."
+      : "Không tìm thấy dữ liệu từ vựng.";
   }
 };
 
-// --- MODIFIED: onSearch và Watcher (Giữ nguyên) ---
-const onSearch = (term: string) => {
+// --- onSearch: lưu mode vào URL ---
+const onSearch = (term: string, mode: 'ja-vi' | 'vi-ja' = 'ja-vi') => {
   const trimmedWord = term.trim();
   if (!trimmedWord) return;
 
-  const convertedWord = toKana(trimmedWord);
+  const convertedWord = mode === 'ja-vi' ? toKana(trimmedWord) : trimmedWord;
 
   router.push({
     path: "/search",
-    query: { q: convertedWord, view: viewMode.value },
+    query: { q: convertedWord, view: viewMode.value, mode },
   });
 };
 

@@ -8,9 +8,9 @@
             <div
               :class="[
                 'w-32 h-32 rounded-full mb-4',
-                role === 'Admin'
+                role === 'ADMIN'
                   ? 'p-1 admin-avatar-border'
-                  : role === 'Premium'
+                  : (role === 'PREMIUM_USER' || me?.isPremiumActive)
                   ? 'p-1 premium-avatar-border'
                   : 'border-4 border-sky-500',
               ]"
@@ -26,9 +26,9 @@
             </h2>
             <p class="text-sm text-gray-600 dark:text-gray-300">
               {{
-                role === "Admin"
+                role === "ADMIN"
                   ? "Admin Member"
-                  : role === "Premium"
+                  : (role === "PREMIUM_USER" || me?.isPremiumActive)
                   ? "Premium Member"
                   : "Thành viên"
               }}

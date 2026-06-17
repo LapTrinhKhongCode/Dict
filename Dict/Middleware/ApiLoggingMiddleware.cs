@@ -1,4 +1,4 @@
-﻿using Dict.Models;
+using Dict.Models;
 using Dict.Service;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -56,6 +56,12 @@ namespace Dict.Middleware
             stopwatch.Stop();
             // ----------------------------
 
+
+            // Adaptive load signal: FE dùng để điều chỉnh debounce tự động
+            var loadLevel = stopwatch.ElapsedMilliseconds > 800 ? "high"
+                          : stopwatch.ElapsedMilliseconds > 300 ? "medium" : "normal";
+            if (!context.Response.HasStarted)
+                context.Response.Headers.Append("X-Server-Load", loadLevel);
             var endpoint = context.Request.Path.ToString();
             var apiCall = new ApiCall
             {

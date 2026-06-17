@@ -849,7 +849,7 @@ const visibleSuggestions = computed(() => {
 const { isAuthenticated, jwt, role } = useJwt();
 const isAdmin = computed(() => {
   const r = role.value ?? (process.client ? localStorage.getItem('user_role') : null)
-  return r?.toLowerCase() === 'admin'
+  return ['ADMIN', 'OWNER'].includes(r?.toUpperCase())
 })
 const decks = ref<any[]>([]);
 const decksLoading = ref(false);

@@ -185,13 +185,14 @@ namespace Dict.Service
             var ranked = await _db.Glosses
                 .AsNoTracking()
                 .Where(g => g.Language!.Code == "vi" &&
-                            g.Sense!.Entry!.Type == "word" &&
+                            g.Sense != null && g.Sense.EntryId != null && g.Sense.Entry != null &&
+                            g.Sense.Entry.Type == "word" &&
                             EF.Functions.Like(
                                 EF.Functions.Collate(g.Text, VI_COLLATION),
                                 $"%{clean}%"))
                 .Select(g => new
                 {
-                    EntryId   = (int)g.Sense!.EntryId!,
+                    EntryId   = g.Sense!.EntryId ?? 0,
                     Label     = g.Sense.Entry!.Label,
                     Phonetic  = g.Sense.Entry.Phonetic ?? "",
                     ShortMean = g.Sense.Entry.ShortMean ?? "",
@@ -203,6 +204,7 @@ namespace Dict.Service
                         20  // base contains
                 })
                 .GroupBy(x => x.EntryId)
+                .Where(grp => grp.Key != 0)
                 .Select(grp => new
                 {
                     MaxScore  = grp.Max(x => x.Score),
