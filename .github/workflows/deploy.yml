@@ -6,7 +6,29 @@ on:
       - main
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 🧪 Run Unit Tests
+        run: dotnet test Dict.Tests/Dict.Tests.csproj --configuration Release --logger "trx;LogFileName=test-results.trx" --no-restore --filter "FullyQualifiedName!~IntegrationTests"
+
+      - name: 📊 Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: Dict.Tests/TestResults/*.trx
+
   deploy:
+    needs: test
     runs-on: self-hosted
     
     steps:
