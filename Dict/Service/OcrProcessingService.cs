@@ -5,6 +5,7 @@ using Dict.Service.IService;
 using ImageMagick;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Memory;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Text;
@@ -35,6 +36,7 @@ namespace Dict.Service
         private static readonly TimeSpan VisionTimeout = TimeSpan.FromSeconds(60);
         private const string OcrCachePrefix = "ocr_job_";
         private static readonly TimeSpan OcrCacheTtl = TimeSpan.FromMinutes(10);
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> _pageOcrLocks = new();
 
         // Max width ảnh gửi lên Vision — đủ để nhận diện tốt, giảm bandwidth
         private const int MaxImageWidth = 1500;
@@ -88,7 +90,108 @@ namespace Dict.Service
 
             return jobs;
         }
-        // --- HÀM 1: UPLOAD + GỌI VISION SONG SONG — trả kết quả ngay trong 1 request ---
+        // --- HÀM 0: UPLOAD tài liệu native (PDF có text layer / DOCX) — không cần Vision ---
+        public async Task<OcrProcessingResultDto> UploadNativeDocAsync(IFormFile file, int userId, int workspaceId, int? projectId)
+        {
+            byte[] fileBytes;
+            await using (var ms = new MemoryStream())
+            {
+                await file.CopyToAsync(ms);
+                fileBytes = ms.ToArray();
+            }
+
+            string sha256 = ComputeSha256(fileBytes);
+            bool isDocx = file.FileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase)
+                       || file.ContentType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+            // Extract text pages
+            List<(int Page, string Text)> textPages;
+            if (isDocx)
+                textPages = ExtractTextFromDocx(fileBytes);
+            else
+                textPages = ExtractTextFromNativePdf(fileBytes);
+
+            if (textPages.Count == 0 || !IsNativePdf(textPages))
+                throw new InvalidOperationException("File không chứa text layer. Hãy dùng luồng OCR thông thường.");
+
+            // Upload to blob
+            string uploadedUrl;
+            int mediaId;
+            try
+            {
+                var existing = await _db.MediaStore.AsNoTracking()
+                    .FirstOrDefaultAsync(m => m.Sha256 == sha256 && m.OwnerId == userId);
+                if (existing != null)
+                {
+                    mediaId = existing.Id; uploadedUrl = existing.StorageUrl;
+                }
+                else
+                {
+                    var uniqueName = $"{Guid.NewGuid()}_{file.FileName}";
+                    await using var stream = new MemoryStream(fileBytes);
+                    uploadedUrl = await _blobService.UploadFileBlobAsync("ocr-images", stream, file.ContentType, uniqueName);
+                    var media = new MediaStore
+                    {
+                        OwnerId = userId, WorkspaceId = workspaceId, FileName = file.FileName,
+                        MimeType = file.ContentType, ProjectId = projectId,
+                        SizeBytes = file.Length, StorageUrl = uploadedUrl, Sha256 = sha256, CreatedAt = DateTime.UtcNow
+                    };
+                    _db.MediaStore.Add(media);
+                    await _db.SaveChangesAsync();
+                    mediaId = media.Id;
+                }
+            }
+            catch (Exception ex) { throw new Exception("Lỗi upload file.", ex); }
+
+            // Create job as Completed immediately
+            var jobDto = await _ocrJobService.CreateAsync(new OcrJobCreateDto
+            {
+                UserId = userId, MediaId = mediaId, ProjectId = projectId,
+                Status = OcrStatus.Processing, DetectedText = string.Empty
+            });
+
+            // Store each page as OcrResult rows (same format as Vision output)
+            var fullTextSb = new StringBuilder();
+            var results = new List<CreateOcrResultDto>();
+            foreach (var (page, text) in textPages)
+            {
+                if (string.IsNullOrWhiteSpace(text)) continue;
+                // Split into word-level tokens for compatibility with existing RAG indexer
+                var words = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var word in words)
+                {
+                    string trimmed = word.Trim();
+                    if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                    results.Add(new CreateOcrResultDto
+                    {
+                        PageNumber = page,
+                        WordText = trimmed,
+                        BoundingBox = "[]"
+                    });
+                }
+                fullTextSb.AppendLine(text);
+            }
+
+            if (results.Any())
+                await _ocrJobService.AppendResultsAsync(jobDto.Id, results);
+
+            await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto
+            {
+                Status = OcrStatus.Completed,
+                DetectedText = fullTextSb.ToString()
+            });
+
+            _logger.LogInformation("✅ UploadNativeDocAsync: Job {JobId} — {Pages} trang, {Words} dòng (no Vision)",
+                jobDto.Id, textPages.Count, results.Count);
+
+            return new OcrProcessingResultDto
+            {
+                JobId = jobDto.Id, Status = OcrStatus.Completed,
+                MediaId = mediaId, ImageUrl = uploadedUrl, Results = results
+            };
+        }
+
+        // --- HÀM 1: UPLOAD + tạo job pending — Vision do FE trigger khi render trang ---
         public async Task<OcrProcessingResultDto> UploadImageOnlyAsync(IFormFile image, int userId, int workspaceId, int? projectId)
         {
             byte[] originalImageBytes;
@@ -100,10 +203,7 @@ namespace Dict.Service
 
             string sha256 = ComputeSha256(originalImageBytes);
 
-            // ── Chạy Azure upload và Google Vision song song ──────────────────────
-            // Vision dùng bytes trong RAM — không cần download lại từ Azure
-            var visionTask = CallVisionAsync(originalImageBytes);
-
+            // ── Upload Azure (không chạy Vision nữa) ────────────────────────────
             int originalMediaId;
             string uploadedUrl;
             try
@@ -121,7 +221,6 @@ namespace Dict.Service
                 else
                 {
                     var uniqueFileName = $"{Guid.NewGuid()}_{image.FileName}";
-                    // Compress trước khi upload Azure (không ảnh hưởng Vision vì Vision dùng originalBytes)
                     var compressedBytes = CompressImage(originalImageBytes);
                     await using (var stream = new MemoryStream(compressedBytes))
                     {
@@ -156,62 +255,26 @@ namespace Dict.Service
                 throw new Exception("Lỗi lưu ảnh lên Cloud.", ex);
             }
 
-            // ── Tạo job và chờ Vision hoàn thành ─────────────────────────────────
+            // ── Tạo job với status Pending — FE sẽ trigger OCR khi render trang ─
             var jobDto = await _ocrJobService.CreateAsync(new OcrJobCreateDto
             {
                 UserId = userId,
                 MediaId = originalMediaId,
                 ProjectId = projectId,
-                Status = OcrStatus.Processing,
+                Status = OcrStatus.Pending,
                 DetectedText = string.Empty
             });
 
-            try
+            _logger.LogInformation("✅ UploadImageOnlyAsync: Tạo Job {JobId} (Pending) — chờ FE trigger OCR", jobDto.Id);
+
+            return new OcrProcessingResultDto
             {
-                var (createResults, fullText) = await visionTask;
-
-                if (createResults.Any())
-                    await _ocrJobService.AppendResultsAsync(jobDto.Id, createResults);
-
-                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto
-                {
-                    Status = OcrStatus.Completed,
-                    DetectedText = fullText
-                });
-
-                _logger.LogInformation("✅ UploadImageOnlyAsync: Vision xong Job {JobId} — {Count} từ", jobDto.Id, createResults.Count);
-
-                var completedDto = new OcrProcessingResultDto
-                {
-                    JobId = jobDto.Id,
-                    Status = OcrStatus.Completed,
-                    DetectedText = fullText,
-                    MediaId = originalMediaId,
-                    ImageUrl = uploadedUrl,
-                    Results = createResults
-                };
-
-                _cache.Set($"{OcrCachePrefix}{jobDto.Id}", completedDto, OcrCacheTtl);
-                return completedDto;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Vision thất bại cho Job {JobId}", jobDto.Id);
-                await _ocrJobService.UpdateStatusAsync(jobDto.Id, new OcrJobUpdateStatusDto
-                {
-                    Status = OcrStatus.Failed,
-                    DetectedText = string.Empty
-                });
-
-                return new OcrProcessingResultDto
-                {
-                    JobId = jobDto.Id,
-                    Status = OcrStatus.Failed,
-                    MediaId = originalMediaId,
-                    ImageUrl = uploadedUrl,
-                    Results = new List<CreateOcrResultDto>()
-                };
-            }
+                JobId = jobDto.Id,
+                Status = OcrStatus.Pending,
+                MediaId = originalMediaId,
+                ImageUrl = uploadedUrl,
+                Results = new List<CreateOcrResultDto>()
+            };
         }
 
         // Helper: gọi Google Vision với bytes trong RAM
@@ -451,88 +514,109 @@ namespace Dict.Service
         /// </summary>
         public async Task<object> UploadAndOcrPageAsync(int jobId, int pageNumber, IFormFile image)
         {
-            // ── 1. Check xem trang này đã OCR chưa (idempotent) ──────────────────
-            bool alreadyDone = await _db.OcrResults
-                .AnyAsync(r => r.OcrJobId == jobId && r.PageNumber == pageNumber);
-
-            if (alreadyDone)
+            string lockKey = $"{jobId}:{pageNumber}";
+            var pageLock = _pageOcrLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
+            await pageLock.WaitAsync();
+            try
             {
-                _logger.LogInformation("✅ Cache HIT trang {Page} Job {JobId} — bỏ qua", pageNumber, jobId);
-                var cachedResults = await _db.OcrResults
-                    .Where(r => r.OcrJobId == jobId && r.PageNumber == pageNumber)
-                    .ToListAsync();
-                return new { jobId, pageNumber, status = "cached", results = cachedResults };
-            }
+                // ── 1. Check xem trang này đã OCR chưa (idempotent) ──────────────────
+                bool alreadyDone = await _db.OcrResults
+                    .AnyAsync(r => r.OcrJobId == jobId && r.PageNumber == pageNumber);
 
-            // ── 2. Đọc bytes ảnh ─────────────────────────────────────────────────
-            byte[] imageBytes;
-            await using (var ms = new MemoryStream())
-            {
-                await image.CopyToAsync(ms);
-                imageBytes = ms.ToArray();
-            }
+                if (alreadyDone)
+                {
+                    _logger.LogInformation("✅ Cache HIT trang {Page} Job {JobId} — bỏ qua", pageNumber, jobId);
+                    var cachedResults = await _db.OcrResults
+                        .Where(r => r.OcrJobId == jobId && r.PageNumber == pageNumber)
+                        .ToListAsync();
+                    return new { jobId, pageNumber, status = "cached", results = cachedResults };
+                }
 
-            // ── 3. Compress ảnh trước khi upload (giảm bandwidth ~60-70%) ────────
-            byte[] compressedBytes = CompressImage(imageBytes);
-            _logger.LogInformation("🗜️ Compress trang {Page}: {Before}KB → {After}KB",
-                pageNumber, imageBytes.Length / 1024, compressedBytes.Length / 1024);
+                // ── 2. Đọc bytes ảnh ─────────────────────────────────────────────────
+                byte[] imageBytes;
+                await using (var ms = new MemoryStream())
+                {
+                    await image.CopyToAsync(ms);
+                    imageBytes = ms.ToArray();
+                }
 
-            // ── 4. Upload lên Azure ───────────────────────────────────────────────
-            var fileName = $"job{jobId}_page{pageNumber}_{Guid.NewGuid()}.jpg";
-            string blobUrl;
-            await using (var stream = new MemoryStream(compressedBytes))
-            {
-                blobUrl = await _blobService.UploadFileBlobAsync(
-                    containerName: "ocr-images",
-                    content: stream,
-                    contentType: "image/jpeg",
-                    fileName: fileName
-                );
-            }
+                // ── 3. Compress ảnh trước khi upload (giảm bandwidth ~60-70%) ────────
+                byte[] compressedBytes = CompressImage(imageBytes);
+                _logger.LogInformation("🗜️ Compress trang {Page}: {Before}KB → {After}KB",
+                    pageNumber, imageBytes.Length / 1024, compressedBytes.Length / 1024);
 
-            // ── 5. Gọi Google Cloud Vision (dùng ảnh gốc để đảm bảo chất lượng OCR) ──
-            using var visionCts = new CancellationTokenSource(VisionTimeout);
-            var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(imageBytes);
-            var response = await _visionClient.DetectDocumentTextAsync(googleImage);
+                // ── 4. Upload lên Azure ───────────────────────────────────────────────
+                var fileName = $"job{jobId}_page{pageNumber}_{Guid.NewGuid()}.jpg";
+                string blobUrl;
+                await using (var stream = new MemoryStream(compressedBytes))
+                {
+                    blobUrl = await _blobService.UploadFileBlobAsync(
+                        containerName: "ocr-images",
+                        content: stream,
+                        contentType: "image/jpeg",
+                        fileName: fileName
+                    );
+                }
 
-            var createResults = new List<CreateOcrResultDto>();
-            var fullTextBuilder = new StringBuilder();
+                // ── 5. Gọi Google Cloud Vision (dùng ảnh gốc để đảm bảo chất lượng OCR) ──
+                using var visionCts = new CancellationTokenSource(VisionTimeout);
+                var googleImage = Google.Cloud.Vision.V1.Image.FromBytes(imageBytes);
+                var response = await _visionClient.DetectDocumentTextAsync(googleImage);
 
-            if (response?.Text != null)
-            {
-                foreach (var page in response.Pages)
-                    foreach (var block in page.Blocks)
-                        foreach (var paragraph in block.Paragraphs)
-                            foreach (var word in paragraph.Words)
-                            {
-                                string wordText = string.Join("", word.Symbols.Select(s => s.Text));
-                                fullTextBuilder.Append(wordText).Append(" ");
-                                var bboxList = word.BoundingBox.Vertices
-                                    .Select(v => new[] { v.X, v.Y }).ToList();
-                                createResults.Add(new CreateOcrResultDto
+                var createResults = new List<CreateOcrResultDto>();
+                var fullTextBuilder = new StringBuilder();
+
+                if (response?.Text != null)
+                {
+                    foreach (var page in response.Pages)
+                        foreach (var block in page.Blocks)
+                            foreach (var paragraph in block.Paragraphs)
+                                foreach (var word in paragraph.Words)
                                 {
-                                    PageNumber = pageNumber,
-                                    WordText = wordText,
-                                    BoundingBox = JsonSerializer.Serialize(bboxList)
-                                });
-                            }
+                                    string wordText = string.Join("", word.Symbols.Select(s => s.Text));
+                                    fullTextBuilder.Append(wordText).Append(" ");
+                                    var bboxList = word.BoundingBox.Vertices
+                                        .Select(v => new[] { v.X, v.Y }).ToList();
+                                    createResults.Add(new CreateOcrResultDto
+                                    {
+                                        PageNumber = pageNumber,
+                                        WordText = wordText,
+                                        BoundingBox = JsonSerializer.Serialize(bboxList)
+                                    });
+                                }
+                }
+
+                // Double-check trước khi ghi DB để tránh duplicate khi nhiều node xử lý đồng thời.
+                bool becameDone = await _db.OcrResults
+                    .AnyAsync(r => r.OcrJobId == jobId && r.PageNumber == pageNumber);
+                if (becameDone)
+                {
+                    var cachedResults = await _db.OcrResults
+                        .Where(r => r.OcrJobId == jobId && r.PageNumber == pageNumber)
+                        .ToListAsync();
+                    return new { jobId, pageNumber, status = "cached", results = cachedResults };
+                }
+
+                // ── 6. Lưu kết quả vào DB ─────────────────────────────────────────────
+                if (createResults.Any())
+                    await _ocrJobService.AppendResultsAsync(jobId, createResults);
+
+                await _ocrJobService.AppendDetectedTextAsync(jobId,
+                    $"[Trang {pageNumber}]\n{fullTextBuilder.ToString().Trim()}\n");
+
+                _logger.LogInformation("✅ OCR xong trang {Page} Job {JobId} — {Count} từ",
+                    pageNumber, jobId, createResults.Count);
+
+                // ── 7. SignalR: push progress về client ──────────────────────────────
+                await _hub.Clients.Group($"OcrJob_{jobId}")
+                    .SendAsync("OcrPageCompleted", new { jobId, pageNumber, wordCount = createResults.Count });
+
+                return new { jobId, pageNumber, status = OcrStatus.Completed, results = createResults };
             }
-
-            // ── 6. Lưu kết quả vào DB ─────────────────────────────────────────────
-            if (createResults.Any())
-                await _ocrJobService.AppendResultsAsync(jobId, createResults);
-
-            await _ocrJobService.AppendDetectedTextAsync(jobId,
-                $"[Trang {pageNumber}]\n{fullTextBuilder.ToString().Trim()}\n");
-
-            _logger.LogInformation("✅ OCR xong trang {Page} Job {JobId} — {Count} từ",
-                pageNumber, jobId, createResults.Count);
-
-            // ── 7. SignalR: push progress về client ──────────────────────────────
-            await _hub.Clients.Group($"OcrJob_{jobId}")
-                .SendAsync("OcrPageCompleted", new { jobId, pageNumber, wordCount = createResults.Count });
-
-            return new { jobId, pageNumber, status = OcrStatus.Completed, results = createResults };
+            finally
+            {
+                pageLock.Release();
+            }
         }
 
         /// <summary>Resize về max 1500px width và encode JPEG Q85 để giảm size upload.</summary>
@@ -764,6 +848,75 @@ namespace Dict.Service
                 }
                 return sb.ToString();
             }
+        }
+
+        // --- Native PDF text extraction (iText 9) ---
+        // Returns list of (pageNumber, pageText). Empty list if PDF is image-only.
+        public static List<(int Page, string Text)> ExtractTextFromNativePdf(byte[] pdfBytes)
+        {
+            var pages = new List<(int, string)>();
+            try
+            {
+                using var reader = new iText.Kernel.Pdf.PdfReader(new MemoryStream(pdfBytes));
+                using var doc = new iText.Kernel.Pdf.PdfDocument(reader);
+                for (int i = 1; i <= doc.GetNumberOfPages(); i++)
+                {
+                    var strategy = new iText.Kernel.Pdf.Canvas.Parser.Listener.SimpleTextExtractionStrategy();
+                    string text = iText.Kernel.Pdf.Canvas.Parser.PdfTextExtractor.GetTextFromPage(doc.GetPage(i), strategy);
+                    pages.Add((i, text?.Trim() ?? string.Empty));
+                }
+            }
+            catch { /* not a valid PDF or encrypted */ }
+            return pages;
+        }
+
+        public static bool IsNativePdf(IEnumerable<(int Page, string Text)> pages, int minCharsPerPage = 30)
+        {
+            // Consider native if at least half of pages have meaningful text
+            var list = pages.ToList();
+            if (list.Count == 0) return false;
+            int textualPages = list.Count(p => p.Text.Length >= minCharsPerPage);
+            return textualPages >= Math.Max(1, list.Count / 2);
+        }
+
+        // --- DOCX text extraction (OpenXml) ---
+        public static List<(int Page, string Text)> ExtractTextFromDocx(byte[] docxBytes)
+        {
+            var pages = new List<(int, string)>();
+            try
+            {
+                using var ms = new MemoryStream(docxBytes);
+                using var wordDoc = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(ms, false);
+                var body = wordDoc.MainDocumentPart?.Document?.Body;
+                if (body == null) return pages;
+
+                var sb = new StringBuilder();
+                int pageNum = 1;
+
+                foreach (var element in body.Elements())
+                {
+                    // Page break detection
+                    bool hasPageBreak = element.Descendants<DocumentFormat.OpenXml.Wordprocessing.Break>()
+                        .Any(b => b.Type?.Value == DocumentFormat.OpenXml.Wordprocessing.BreakValues.Page);
+
+                    string paraText = string.Concat(
+                        element.Descendants<DocumentFormat.OpenXml.Wordprocessing.Text>().Select(t => t.Text));
+
+                    if (!string.IsNullOrWhiteSpace(paraText))
+                        sb.AppendLine(paraText);
+
+                    if (hasPageBreak && sb.Length > 0)
+                    {
+                        pages.Add((pageNum++, sb.ToString().Trim()));
+                        sb.Clear();
+                    }
+                }
+
+                if (sb.Length > 0)
+                    pages.Add((pageNum, sb.ToString().Trim()));
+            }
+            catch { /* not a valid docx */ }
+            return pages;
         }
     }
 }

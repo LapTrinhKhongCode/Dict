@@ -151,6 +151,47 @@ public class InferController : ControllerBase
         public int TotalPages { get; set; }
     }
 
+    public class UploadNativeDocForm
+    {
+        [Microsoft.AspNetCore.Mvc.FromForm(Name = "file")]
+        public IFormFile File { get; set; }
+
+        [Microsoft.AspNetCore.Mvc.FromForm(Name = "projectId")]
+        public int? ProjectId { get; set; }
+    }
+
+    /// <summary>
+    /// Upload tài liệu native (PDF có text layer / DOCX) — không cần Vision OCR
+    /// </summary>
+    [HttpPost("upload-native-doc")]
+    [Authorize]
+    public async Task<IActionResult> UploadNativeDoc([FromForm] UploadNativeDocForm form)
+    {
+        if (form.File == null || form.File.Length == 0)
+            return BadRequest(new { message = "Không có file." });
+
+        var allowed = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+        if (!allowed.Contains(form.File.ContentType))
+            return BadRequest(new { message = "Chỉ hỗ trợ PDF và DOCX." });
+
+        try
+        {
+            int userId = _currentUserService.UserId;
+            int workspaceId = _currentUserService.WorkspaceId;
+            var result = await _ocrProcessingService.UploadNativeDocAsync(form.File, userId, workspaceId, form.ProjectId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi UploadNativeDoc");
+            return Problem(detail: ex.Message, statusCode: 500);
+        }
+    }
+
     /// <summary>
     /// Bước 1: FE gọi 1 lần khi mở PDF → tạo Job trống, nhận jobId
     /// </summary>

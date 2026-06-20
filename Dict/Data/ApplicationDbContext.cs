@@ -102,6 +102,8 @@ namespace Dict.Data
         public DbSet<OrganizationMember> OrganizationMembers { get; set; }
         public DbSet<FileComment> FileComments { get; set; }
         public DbSet<WordComment> WordComments { get; set; }
+        public DbSet<ChatSession> ChatSessions { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

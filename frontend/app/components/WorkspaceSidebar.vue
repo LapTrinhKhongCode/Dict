@@ -183,22 +183,14 @@
       >
         <div class="px-3 py-3 border-b border-gray-200 dark:border-neutral-700">
           <div class="flex items-center justify-between">
-            <div class="min-w-0">
-              <p class="font-semibold text-gray-900 dark:text-white text-sm truncate">{{ activeWs.name }}</p>
+            <button @click="goToWorkspace" class="min-w-0 text-left group/ws-title hover:opacity-80 transition-opacity">
+              <p class="font-semibold text-gray-900 dark:text-white text-sm truncate group-hover/ws-title:text-blue-600 dark:group-hover/ws-title:text-blue-400 transition-colors">{{ activeWs.name }}</p>
               <span :class="[
                 'text-xs px-1.5 py-0.5 rounded font-medium',
                 activeWs.myRole === 'ADMIN'
                   ? 'text-yellow-700 dark:text-yellow-400'
                   : 'text-blue-600 dark:text-blue-400'
               ]">{{ activeWs.myRole }}</span>
-            </div>
-            <button @click="goToWorkspace" title="Cài đặt workspace"
-              class="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-neutral-700 transition-colors flex-shrink-0"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
             </button>
           </div>
         </div>

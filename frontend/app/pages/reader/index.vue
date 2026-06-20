@@ -88,17 +88,44 @@
         </div>
 
         <div class="flex border-b border-[#30363d] bg-[#0d1117] shrink-0">
-          <div class="flex-1 p-3 text-sm font-semibold text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d] flex items-center justify-center gap-2">
+          <button
+            @click="rightTab = 'rag'"
+            :class="[
+              'flex-1 p-3 text-sm font-semibold flex items-center justify-center gap-2 transition',
+              rightTab === 'rag'
+                ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-[#161b22]'
+            ]"
+          >
+            🤖 AI RAG
+          </button>
+          <button
+            @click="rightTab = 'discussion'"
+            :class="[
+              'flex-1 p-3 text-sm font-semibold flex items-center justify-center gap-2 transition',
+              rightTab === 'discussion'
+                ? 'text-[#f0c040] border-b-2 border-[#f0c040] bg-[#21262d]'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-[#161b22]'
+            ]"
+          >
             📝 Thảo luận
-          </div>
+          </button>
         </div>
 
         <div class="flex-1 overflow-hidden">
           <FileCommentTab 
-            v-if="fileId"
+            v-if="rightTab === 'discussion' && fileId"
             :file-id="Number(fileId)" 
             :current-page="pdfCurrentPage"
             @jump-to-page="triggerPdfJump"
+          />
+          <RagChat
+            v-else-if="rightTab === 'rag'"
+            :job-id="jobId"
+            :project-id="projectId"
+            :on-scan-all-ocr="scanAllOcrForRag"
+            @jump-to-page="triggerPdfJump"
+            @highlight-source="({ pageNumber, text }) => highlightRagSource(pageNumber, text)"
           />
         </div>
       </section>
@@ -117,6 +144,7 @@ import { useJwt } from '~/composables/useJwt'
 import PdfViewer from '~/components/PdfViewer.vue'
 import FileCommentTab from '~/components/FileCommentTab.vue'
 import CollabCursorOverlay from '~/components/CollabCursorOverlay.vue'
+import RagChat from '~/components/RagChat.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -180,6 +208,7 @@ const isAccessDenied = ref(false)
 const pdfViewerRef = ref(null)
 const pdfCurrentPage = ref(1)
 const viewers = ref([])
+const rightTab = ref('rag')
 
 watch(() => route.query.id, (newId) => {
   if (newId && !fileId.value) {
@@ -201,6 +230,28 @@ function triggerPdfJump(pageNum) {
   if (pdfViewerRef.value) {
     pdfViewerRef.value.gotoPage = pageNum
     pdfViewerRef.value.jumpToPage()
+  }
+}
+
+// Auto-jump to page from query param (e.g. opened from workspace RAG sidebar)
+const initialPage = computed(() => route.query.page ? Number(route.query.page) : null)
+watch(initialPage, (page) => {
+  if (page && page > 1) {
+    setTimeout(() => triggerPdfJump(page), 1500) // wait for PDF to load
+  }
+}, { immediate: true })
+
+async function scanAllOcrForRag() {
+  if (!pdfViewerRef.value?.scanAllPagesForRag) {
+    throw new Error('PDF chưa sẵn sàng để quét OCR toàn bộ.')
+  }
+
+  return await pdfViewerRef.value.scanAllPagesForRag()
+}
+
+function highlightRagSource(pageNum, text) {
+  if (pdfViewerRef.value?.highlightSourceText) {
+    pdfViewerRef.value.highlightSourceText(pageNum, text)
   }
 }
 
