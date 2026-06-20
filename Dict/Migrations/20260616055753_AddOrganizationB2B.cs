@@ -11,30 +11,16 @@ namespace Dict.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "PersonalTier",
-                table: "AspNetUsers",
-                type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "");
-
-            migrationBuilder.AddColumn<DateTime>(
-                name: "PremiumExpiresAt",
-                table: "AspNetUsers",
-                type: "datetime2",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "StripeCustomerId",
-                table: "AspNetUsers",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "StripeSubscriptionId",
-                table: "AspNetUsers",
-                type: "nvarchar(max)",
-                nullable: true);
+            migrationBuilder.Sql("""
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('AspNetUsers') AND name = 'PersonalTier')
+                    ALTER TABLE [AspNetUsers] ADD [PersonalTier] nvarchar(max) NOT NULL DEFAULT N'';
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('AspNetUsers') AND name = 'PremiumExpiresAt')
+                    ALTER TABLE [AspNetUsers] ADD [PremiumExpiresAt] datetime2 NULL;
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('AspNetUsers') AND name = 'StripeCustomerId')
+                    ALTER TABLE [AspNetUsers] ADD [StripeCustomerId] nvarchar(max) NULL;
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('AspNetUsers') AND name = 'StripeSubscriptionId')
+                    ALTER TABLE [AspNetUsers] ADD [StripeSubscriptionId] nvarchar(max) NULL;
+                """);
         }
 
         /// <inheritdoc />

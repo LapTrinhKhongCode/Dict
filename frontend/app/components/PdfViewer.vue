@@ -214,7 +214,20 @@
     >
       <div class="min-w-full block pb-12">
         <div
-          v-if="!pdfDoc && !ocrMode"
+          v-if="pdfLoadError && !ocrMode"
+          class="flex flex-col items-center justify-center text-red-300 mt-20 gap-3"
+        >
+          <p class="text-sm">{{ pdfLoadError }}</p>
+          <button
+            @click="retryLoadPdf"
+            class="px-3 py-1.5 rounded bg-[#1f6feb] hover:bg-[#388bfd] text-white text-sm font-semibold"
+          >
+            Thử lại
+          </button>
+        </div>
+
+        <div
+          v-else-if="!pdfDoc && !ocrMode"
           class="flex flex-col items-center justify-center text-gray-400 mt-20"
         >
           <div
@@ -403,6 +416,9 @@ const getToken = () => localStorage.getItem("jwt_token") || "";
 const { connect: hubConnect, broadcastStroke, broadcastErase, onStroke, offStroke, onErase, offErase } = useDocumentHub();
 
 const accessDenied = ref(false);
+const pdfLoadError = ref("");
+const viewerLoadSession = ref(0);
+const viewerSourceKey = ref("");
 
 const pdfDoc = shallowRef(null);
 const totalPages = ref(0);
@@ -464,6 +480,7 @@ const pdfJobId = ref(null);
 const hubMediaId = ref(null); // canonical ID dùng cho SignalR room (mediaId từ API)
 let isUploadRunning = false;
 const pageDimensions = ref({});
+let activePdfLoadingTask = null;
 
 // SignalR connection cho OCR progress
 let signalrConnection = null;
@@ -486,7 +503,7 @@ async function setupSignalR(jobId) {
       if (payload.jobId !== jobId) return;
       if (payload.status === "completed") {
         ocrLoading.value = false;
-        startLoadJob(jobId); // fetch 1 lần để lấy results
+        startLoadJob(jobId, viewerLoadSession.value); // fetch 1 lần để lấy results
       } else if (payload.status === "failed") {
         ocrLoading.value = false;
         console.error("OCR thất bại, thử lại bằng cách bấm lại.");
@@ -531,7 +548,7 @@ async function trySetupSignalRForImage(jobId) {
       if (id !== Number(jobId)) return;
       ocrLoading.value = false;
       if (payload.status === "completed" || payload.Status === "completed") {
-        startLoadJob(jobId);
+        startLoadJob(jobId, viewerLoadSession.value);
       }
     });
 
@@ -544,23 +561,87 @@ async function trySetupSignalRForImage(jobId) {
   }
 }
 
+function getViewerSourceKey() {
+  return `${props.jobId ?? ""}|${props.fileUrl ?? ""}|${props.fileData ? "data" : ""}`;
+}
+
+function resetViewerState() {
+  pdfDoc.value = null;
+  ocrMode.value = false;
+  ocrLoading.value = false;
+  ocrImageUrl.value = "";
+  ocrResults.value = null;
+  totalPages.value = 0;
+  currentPage.value = 1;
+  gotoPage.value = 1;
+  pageRendered.value = {};
+  renderQueue.length = 0;
+  visiblePagesSet.clear();
+  pageUploadStatus.value = {};
+  uploadQueue.value = [];
+  pageOcrResults.value = {};
+  pdfLoadError.value = "";
+}
+
+function appendCacheBust(url) {
+  if (!url) return url;
+  const marker = `_ts=${Date.now()}`;
+  return url.includes("?") ? `${url}&${marker}` : `${url}?${marker}`;
+}
+
+function createPdfLoadingTask(source, forceFreshUrl = false) {
+  if (typeof source === "string") {
+    return pdfjsLib.getDocument({
+      url: forceFreshUrl ? appendCacheBust(source) : source,
+      disableRange: true,
+      disableStream: true,
+      disableAutoFetch: true,
+      withCredentials: false,
+    });
+  }
+
+  if (source?.url) {
+    return pdfjsLib.getDocument({
+      ...source,
+      url: forceFreshUrl ? appendCacheBust(source.url) : source.url,
+      disableRange: true,
+      disableStream: true,
+      disableAutoFetch: true,
+      withCredentials: false,
+    });
+  }
+
+  return pdfjsLib.getDocument(source);
+}
+
+async function initViewerFromProps(force = false) {
+  const sourceKey = getViewerSourceKey();
+  const sourceChanged = sourceKey !== viewerSourceKey.value;
+  if (sourceChanged) {
+    viewerSourceKey.value = sourceKey;
+  }
+
+  if (sourceChanged || force) {
+    resetViewerState();
+  }
+
+  const sessionId = ++viewerLoadSession.value;
+  if (props.jobId) {
+    await startLoadJob(props.jobId, sessionId);
+    return;
+  }
+
+  if (props.fileUrl || props.fileData) {
+    await loadPdf(sessionId);
+  }
+}
+
 watch(
-  () => props.jobId,
-  (v) => {
-    if (v) startLoadJob(v);
+  () => [props.jobId, props.fileUrl, props.fileData],
+  () => {
+    initViewerFromProps();
   },
-);
-watch(
-  () => props.fileUrl,
-  (v) => {
-    if (v) loadPdf();
-  },
-);
-watch(
-  () => props.fileData,
-  (v) => {
-    if (v) loadPdf();
-  },
+  { immediate: true },
 );
 
 // FIX 4: Theo dõi ảnh cẩn thận để tránh lỗi cache trình duyệt làm ocrDisplayW bị kẹt số 0
@@ -721,7 +802,10 @@ async function checkAccessByProjectId(token, projectId) {
   }
 }
 
-async function startLoadJob(jobId) {
+async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
+  if (sessionId !== viewerLoadSession.value) return;
+
+  pdfLoadError.value = "";
   const token = getToken();
   if (!token || !isAuthenticated.value) {
     accessDenied.value = true;
@@ -736,8 +820,10 @@ async function startLoadJob(jobId) {
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!res.ok) throw new Error("Load Job thất bại.");
+    if (sessionId !== viewerLoadSession.value) return;
 
     const data = await res.json();
+    if (sessionId !== viewerLoadSession.value) return;
     if (data.mediaId) {
       emit("media-id-loaded", data.mediaId);
       hubMediaId.value = Number(data.mediaId); // lưu lại để dùng cho SignalR
@@ -773,22 +859,40 @@ async function startLoadJob(jobId) {
           });
         }
 
-        // 2. Tải cái vỏ PDF và kích hoạt logic Lazy Load (cuộn + 3 trang)
-        pdfjsLib
-          .getDocument(data.imageUrl)
-          .promise.then((doc) => {
-            pdfDoc.value = doc;
-            totalPages.value = doc.numPages;
-            nextTick(() =>
-              viewMode.value === "scroll"
-                ? setupScrollObserver()
-                : renderPage(1),
-            );
+        try {
+          activePdfLoadingTask?.destroy?.();
+        } catch {}
 
-            // Logic 3 trang của bạn được gọi tại đây (chỉ chạy 1 lần lúc khởi tạo)
-            enqueuePagesAhead(1);
-          })
-          .catch((err) => console.error("Lỗi vẽ PDF ban đầu:", err));
+        try {
+          activePdfLoadingTask = createPdfLoadingTask(data.imageUrl);
+          let doc;
+          try {
+            doc = await activePdfLoadingTask.promise;
+          } catch (firstError) {
+            if (firstError?.name !== "InvalidPDFException") throw firstError;
+            activePdfLoadingTask = createPdfLoadingTask(data.imageUrl, true);
+            doc = await activePdfLoadingTask.promise;
+          }
+          if (sessionId !== viewerLoadSession.value) return;
+
+          pdfDoc.value = doc;
+          totalPages.value = doc.numPages;
+          pdfLoadError.value = "";
+          await nextTick();
+          viewMode.value === "scroll" ? setupScrollObserver() : renderPage(1);
+
+          // Logic 3 trang của bạn được gọi tại đây (chỉ chạy 1 lần lúc khởi tạo)
+          enqueuePagesAhead(1);
+        } catch (err) {
+          if (sessionId !== viewerLoadSession.value) return;
+          console.error("Lỗi vẽ PDF ban đầu:", err);
+          pdfLoadError.value = "Không thể tải PDF. Vui lòng thử lại.";
+          pdfDoc.value = null;
+        } finally {
+          if (activePdfLoadingTask) {
+            activePdfLoadingTask = null;
+          }
+        }
       }
 
       // LƯU Ý: Tuyệt đối không có đoạn setTimeout gọi lại hàm ở đây!
@@ -809,7 +913,10 @@ async function startLoadJob(jobId) {
         const signalrOk = await trySetupSignalRForImage(jobId);
         if (!signalrOk) {
           // Fallback: polling 2s nếu SignalR không hoạt động
-          setTimeout(() => startLoadJob(jobId), 2000);
+          setTimeout(() => {
+            if (sessionId !== viewerLoadSession.value) return;
+            startLoadJob(jobId, sessionId);
+          }, 2000);
         }
         return;
       }
@@ -823,19 +930,42 @@ async function startLoadJob(jobId) {
   } catch (err) {
     console.error("Lỗi nạp dữ liệu OCR:", err);
     ocrLoading.value = false;
+    if (!ocrMode.value) {
+      pdfLoadError.value = "Không thể tải PDF. Vui lòng thử lại.";
+      pdfDoc.value = null;
+    }
   }
 }
 
-async function loadPdf() {
+async function loadPdf(sessionId = viewerLoadSession.value) {
+  if (sessionId !== viewerLoadSession.value) return;
+
+  pdfLoadError.value = "";
   if (!props.fileUrl && !props.fileData) return;
   try {
     const source = props.fileData
       ? { data: props.fileData }
       : { url: props.fileUrl };
-    pdfDoc.value = await pdfjsLib.getDocument(source).promise;
+    try {
+      activePdfLoadingTask?.destroy?.();
+    } catch {}
+
+    activePdfLoadingTask = createPdfLoadingTask(source);
+    let loadedDoc;
+    try {
+      loadedDoc = await activePdfLoadingTask.promise;
+    } catch (firstError) {
+      if (firstError?.name !== "InvalidPDFException" || !source?.url) throw firstError;
+      activePdfLoadingTask = createPdfLoadingTask(source, true);
+      loadedDoc = await activePdfLoadingTask.promise;
+    }
+    if (sessionId !== viewerLoadSession.value) return;
+    pdfDoc.value = loadedDoc;
     totalPages.value = pdfDoc.value.numPages;
+    pdfLoadError.value = "";
 
     const p1 = await pdfDoc.value.getPage(1);
+    if (sessionId !== viewerLoadSession.value) return;
     defaultPageHeight.value = p1.getViewport({ scale: scale.value }).height;
 
     await nextTick();
@@ -849,7 +979,18 @@ async function loadPdf() {
     }
   } catch (err) {
     console.error("Lỗi nạp PDF:", err);
+    if (sessionId !== viewerLoadSession.value) return;
+    pdfLoadError.value = "Không thể tải PDF. Vui lòng thử lại.";
+    pdfDoc.value = null;
+  } finally {
+    if (activePdfLoadingTask) {
+      activePdfLoadingTask = null;
+    }
   }
+}
+
+function retryLoadPdf() {
+  initViewerFromProps(true);
 }
 
 async function renderPage(pageNum) {
@@ -1210,6 +1351,45 @@ function getOcrTextStyleForPdf(r, pageNum) {
     userSelect: "text",
   };
 }
+
+async function ensureAllPdfPagesOcrUploaded() {
+  if (ocrMode.value || !pdfDoc.value) {
+    return { scannedPages: 0, skipped: true };
+  }
+
+  const missingPages = [];
+  for (let i = 1; i <= totalPages.value; i++) {
+    const status = pageUploadStatus.value[i];
+    if (status !== "done" && status !== "cached") {
+      missingPages.push(i);
+    }
+  }
+
+  if (missingPages.length === 0) {
+    return { scannedPages: 0, skipped: false };
+  }
+
+  for (const p of missingPages) {
+    await uploadOnePage(p);
+  }
+
+  return { scannedPages: missingPages.length, skipped: false };
+}
+
+async function scanAllPagesForRag() {
+  if (isExporting.value || ocrLoading.value) {
+    return { scannedPages: 0, busy: true };
+  }
+
+  isExporting.value = true;
+  try {
+    const result = await ensureAllPdfPagesOcrUploaded();
+    return { ...result, busy: false };
+  } finally {
+    isExporting.value = false;
+  }
+}
+
 // Hàm xuất Searchable PDF có ép chạy OCR toàn bộ
 async function exportToSearchablePdf() {
   if (isExporting.value || ocrLoading.value) return;
@@ -1217,26 +1397,7 @@ async function exportToSearchablePdf() {
 
   try {
     // 1. KIỂM TRA & ÉP CHẠY QUÉT OCR CHO CÁC TRANG LAZY LOAD (Chỉ áp dụng với PDF)
-    if (!ocrMode.value && pdfDoc.value) {
-      const missingPages = [];
-      for (let i = 1; i <= totalPages.value; i++) {
-        const status = pageUploadStatus.value[i];
-        // Nếu trang chưa hoàn thành hoặc chưa được cache từ trước -> Đưa vào danh sách cần quét
-        if (status !== "done" && status !== "cached") {
-          missingPages.push(i);
-        }
-      }
-
-      if (missingPages.length > 0) {
-        console.log(
-          `Đang ép nhận diện ${missingPages.length} trang còn thiếu để xuất PDF...`,
-        );
-        // Chạy tuần tự (hạn chế chạy song song quá nhiều để tránh spam server AI)
-        for (const p of missingPages) {
-          await uploadOnePage(p);
-        }
-      }
-    }
+    await ensureAllPdfPagesOcrUploaded();
 
     // 2. LẤY PROJECT ID VÀ GỌI API CỦA BACKEND
     // Lấy projectId từ url (VD: /workspaces/project/1) hoặc thông qua prop
@@ -1518,9 +1679,6 @@ async function saveAllDirtyPages() {
 // ---- END ANNOTATION ----
 
 onMounted(() => {
-  if (props.jobId) startLoadJob(props.jobId);
-  else if (props.fileUrl || props.fileData) loadPdf();
-
   // Receive strokes drawn by other collaborators
   const handleRemoteStroke = ({ pageNumber, strokeJson }) => {
     try {
@@ -1588,6 +1746,10 @@ onBeforeUnmount(() => {
     signalrConnection.stop().catch(() => {});
     signalrConnection = null;
   }
+  if (activePdfLoadingTask) {
+    try { activePdfLoadingTask.destroy?.(); } catch {}
+    activePdfLoadingTask = null;
+  }
   // Save any remaining dirty pages before unmounting
   saveAllDirtyPages();
 });
@@ -1604,7 +1766,61 @@ watch(scale, () => {
   }
 });
 
-defineExpose({ gotoPage, jumpToPage });
+let _highlightClearTimer = null
+
+function extractHighlightTerms(text) {
+  if (!text) return []
+  const terms = new Set()
+  // CJK words (2+ chars)
+  for (const m of text.matchAll(/[\u3000-\u9FFF\uF900-\uFAFF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AFぁ-んァ-ンー々]{2,}/g)) {
+    terms.add(m[0])
+  }
+  // Latin/ASCII keywords (2+ chars, keep original case)
+  for (const m of text.matchAll(/[A-Za-z0-9_\-]{2,}/g)) {
+    terms.add(m[0])
+  }
+  return [...terms]
+}
+
+function highlightSourceText(pageNum, keywords) {
+  gotoPage.value = pageNum
+  jumpToPage()
+
+  if (_highlightClearTimer) {
+    clearTimeout(_highlightClearTimer)
+    _highlightClearTimer = null
+  }
+
+  document.querySelectorAll('.rag-source-highlight').forEach(el => {
+    el.classList.remove('rag-source-highlight')
+  })
+
+  const terms = extractHighlightTerms(keywords)
+  if (!terms.length) return
+
+  setTimeout(() => {
+    const ocrSpans = document.querySelectorAll('.ocr-word')
+    const textSpans = ocrSpans.length > 0
+      ? ocrSpans
+      : document.querySelectorAll('.textLayer span')
+
+    textSpans.forEach(span => {
+      const t = span.textContent?.trim() || ''
+      if (!t) return
+      if (terms.some(kw => t.toLowerCase().includes(kw.toLowerCase()) || kw.toLowerCase().includes(t.toLowerCase()))) {
+        span.classList.add('rag-source-highlight')
+      }
+    })
+
+    _highlightClearTimer = setTimeout(() => {
+      document.querySelectorAll('.rag-source-highlight').forEach(el => {
+        el.classList.remove('rag-source-highlight')
+      })
+    }, 5000)
+  }, 400)
+}
+
+defineExpose({ gotoPage, jumpToPage, scanAllPagesForRag, highlightSourceText });
 </script>
 
 <style scoped>
@@ -1644,10 +1860,24 @@ defineExpose({ gotoPage, jumpToPage });
   position: absolute;
   transform-origin: 0 0;
   white-space: pre;
-  color: transparent; /* Giữ trong suốt để bôi đen, nhưng có thể xóa để test nếu muốn */
+  color: transparent;
   background: transparent;
   user-select: text;
-  pointer-events: auto !important; /* Đảm bảo con trỏ chuột bôi đen được */
+  pointer-events: auto !important;
   cursor: text;
+  transition: background 0.2s ease;
+}
+
+:deep(.rag-source-highlight) {
+  background: rgba(240, 192, 64, 0.38) !important;
+  color: transparent !important;
+  outline: 1px solid rgba(240, 192, 64, 0.6);
+  border-radius: 2px;
+  animation: rag-highlight-pulse 0.5s ease;
+}
+
+@keyframes rag-highlight-pulse {
+  0% { background: rgba(240, 192, 64, 0.7) !important; }
+  100% { background: rgba(240, 192, 64, 0.38) !important; }
 }
 </style>

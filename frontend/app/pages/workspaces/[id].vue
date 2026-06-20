@@ -189,8 +189,16 @@
             </button>
           </div>
         </div>
+
+        <!-- AI RAG tab -->
+        <div v-if="tab === 'ai'" class="h-[600px] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+          <WorkspaceRagChat :workspace-id="id" />
+        </div>
       </template>
     </div>
+
+    <!-- AI RAG Sidebar (fixed right, collapsible) -->
+    <RagSidebar :workspace-id="id" />
 
     <Transition name="modal">
       <div v-if="showEdit"

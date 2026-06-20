@@ -24,5 +24,8 @@ namespace Dict.Models
         public int? ProjectId { get; set; }
         public virtual Project Project { get; set; }
         public virtual ICollection<OcrResult> Results { get; set; }
+
+        /// <summary>Generated once during indexing, cached permanently.</summary>
+        public string? DocumentOverview { get; set; }
     }
 }

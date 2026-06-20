@@ -8,12 +8,13 @@ import { useWorkspace } from "@/composables/useWorkspace";
 import * as signalR from "@microsoft/signalr";
 
 const config = useRuntimeConfig();
-const { $bus } = useNuxtApp(); // Lấy Event Bus để bắn tín hiệu cho Sidebar
+const { $bus } = useNuxtApp();
 const { jwt, isAuthenticated, logout, avatarUrl, username } = useJwt();
 const { showToast } = useToast();
 const { getMyPendingInvitations, respondToInvitation } = useWorkspace();
 const router = useRouter();
 const route = useRoute();
+const showUserMenu = ref(false);
 
 // ==========================================
 // 1. LOGIC THÔNG BÁO MẸO HỌC TẬP (TOOLTIPS)
@@ -370,28 +371,28 @@ function toggleTheme() {
       </div>
 
       <div class="relative group">
-        <div>
+        <div class="cursor-pointer">
           <img
             v-if="isAuthenticated && avatarUrl"
             :src="avatarUrl"
-            class="rounded-full w-10 h-10 object-cover cursor-pointer border-2 border-primary-400"
+            class="rounded-full w-10 h-10 object-cover border-2 border-primary-400"
           />
           <UButton v-else icon="i-lucide-user" size="xl" variant="ghost" />
         </div>
         <div
-          class="absolute right-0 top-full w-32 bg-white dark:bg-neutral-800 border border-gray-200 rounded shadow-lg z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+          class="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg z-50 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150"
         >
           <button
             v-if="!isAuthenticated"
             @click="handleLogin"
-            class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-neutral-700"
+            class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
           >
             Đăng nhập
           </button>
           <button
             v-else
             @click="handleLogout"
-            class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-neutral-700"
+            class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg"
           >
             Đăng xuất
           </button>

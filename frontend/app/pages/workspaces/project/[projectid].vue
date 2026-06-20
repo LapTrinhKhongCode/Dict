@@ -136,14 +136,12 @@
       v-for="file in files"
       :key="file.id"
       @click="openFile(file)"
-      class="group relative cursor-pointer flex flex-col
-      
-             bg-white dark:bg-[#161b22]
-            overflow-hidden
-             border border-gray-300 dark:border-[#30363d]
-             hover:border-blue-500
-             transition-all duration-200
-             hover:shadow-xl"
+      :class="[
+        'group relative cursor-pointer flex flex-col bg-white dark:bg-[#161b22] overflow-hidden border transition-all duration-300 hover:shadow-xl',
+        highlightedJobId === file.id
+          ? 'border-yellow-400 shadow-lg shadow-yellow-400/30 scale-[1.03] ring-2 ring-yellow-400/60'
+          : 'border-gray-300 dark:border-[#30363d] hover:border-blue-500'
+      ]"
     >
 
       <!-- THUMB -->
@@ -350,6 +348,9 @@
         </div>
       </div>
     </Transition>
+
+    <!-- AI RAG Sidebar (fixed right, collapsible) -->
+    <RagSidebar :workspace-id="workspaceId" :project-id="Number(projectId)" @highlight-doc="highlightedJobId = $event" />
   </div>
 </template>
 
@@ -373,6 +374,8 @@ const { userId: currentUserId, isAuthenticated } = useJwt()
 // --- STATES ---
 const projectId = route.params.projectid
 const projectName = ref('')
+const workspaceId = ref(null)
+const highlightedJobId = ref(null)
 const files = ref([])
 const isLoading = ref(true)
 const uploading = ref(false)
@@ -508,6 +511,7 @@ async function checkAccessAndLoad() {
 
     projectName.value = project.name
     const wsId = project.workspaceId
+    workspaceId.value = wsId
 
     const membersRes = await fetch(`${config.public.apiBaseUrl}/api/workspaces/${wsId}/members`, {
       headers: { Authorization: `Bearer ${token}` }

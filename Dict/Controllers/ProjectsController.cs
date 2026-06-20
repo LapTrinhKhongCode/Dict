@@ -128,12 +128,15 @@ public class ProjectsController : ControllerBase
         var isAdmin = await _context.WorkspaceMembers
             .AnyAsync(wm => wm.WorkspaceId == job.Project.WorkspaceId
                          && wm.UserId == userId
-                         && wm.Role == WorkspaceRole.ADMIN);
+                         && (wm.Role == WorkspaceRole.ADMIN || wm.Role == WorkspaceRole.OWNER));
 
-        if (!isAdmin)
+        // Also allow the file uploader to delete their own file
+        bool isFileOwner = job.UserId == userId;
+
+        if (!isAdmin && !isFileOwner)
         {
             return StatusCode(StatusCodes.Status403Forbidden,
-                new { message = "Chỉ Admin mới có quyền xóa file." });
+                new { message = "Chỉ Admin/Owner hoặc người tải lên mới có quyền xóa file." });
         }
 
         // 🔥 XÓA OCR RESULTS TRƯỚC
@@ -208,18 +211,33 @@ public class ProjectsController : ControllerBase
         bool isPdf = job.Media.FileName.ToLower().EndsWith(".pdf") || job.Media.StorageUrl.ToLower().EndsWith(".pdf");
         using var ms = new MemoryStream();
 
-        // 2. Nạp Font tiếng Nhật/Việt từ Windows
-        string fontPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "msgothic.ttc,0");
-        if (!System.IO.File.Exists(fontPath.Replace(",0", "")))
+        // 2. Nạp Font — thử Windows fonts trước, fallback sang iText built-in
+        PdfFont unicodeFont;
+        try
         {
-            fontPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "meiryo.ttc,0");
-        }
-        if (!System.IO.File.Exists(fontPath.Replace(",0", ""))) // Backup cuối cùng
-        {
-            fontPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "arial.ttf");
-        }
+            string[] candidateFonts = {
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "msgothic.ttc,0"),
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "meiryo.ttc,0"),
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "arial.ttf"),
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc,0",
+                "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+            };
 
-        PdfFont unicodeFont = PdfFontFactory.CreateFont(fontPath, PdfEncodings.IDENTITY_H);
+            string? resolvedFont = null;
+            foreach (var candidate in candidateFonts)
+            {
+                string path = candidate.Contains(",") ? candidate[..candidate.LastIndexOf(',')] : candidate;
+                if (System.IO.File.Exists(path)) { resolvedFont = candidate; break; }
+            }
+
+            unicodeFont = resolvedFont != null
+                ? PdfFontFactory.CreateFont(resolvedFont, PdfEncodings.IDENTITY_H)
+                : PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
+        }
+        catch
+        {
+            unicodeFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
+        }
 
         // 3. XỬ LÝ THEO LOẠI FILE
         if (isPdf)
