@@ -47,18 +47,6 @@ namespace Dict.DTO
         public string ContentType { get; set; } = "text";
         public double Score { get; set; }
         public string DocumentName { get; set; } = string.Empty;
-        public int OccurrenceCount { get; set; } = 1;
-        public string OccurrenceSummary { get; set; } = string.Empty;
-        public List<DocumentRagSourceOccurrenceDto> Occurrences { get; set; } = new();
-    }
-
-    public class DocumentRagSourceOccurrenceDto
-    {
-        public int JobId { get; set; }
-        public int ProjectId { get; set; }
-        public int PageNumber { get; set; }
-        public int ChunkIndex { get; set; }
-        public string DocumentName { get; set; } = string.Empty;
     }
 
     public class DocumentRagCitationDto

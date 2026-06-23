@@ -150,12 +150,7 @@
         <div class="assistant-bubble bg-[#161b22]/95 border border-[#30363d] rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
           <div class="flex items-center gap-2 text-[11px] text-gray-400">
             <span class="thinking-pulse"></span>
-            <span>{{ thinkingLabel }}</span>
-          </div>
-          <div class="mt-2 flex gap-1.5">
-            <span class="typing-dot" style="animation-delay: 0ms"></span>
-            <span class="typing-dot" style="animation-delay: 180ms"></span>
-            <span class="typing-dot" style="animation-delay: 360ms"></span>
+            <span class="thinking-label" :data-text="thinkingLabel">{{ thinkingLabel }}</span>
           </div>
         </div>
       </div>
@@ -701,13 +696,32 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
   animation: message-in 220ms ease-out;
 }
 
-.typing-dot {
-  width: 6px;
-  height: 6px;
-  background-color: #6b7280;
-  border-radius: 9999px;
+.thinking-label {
+  position: relative;
   display: inline-block;
-  animation: typing-bounce 1.05s ease-in-out infinite;
+  color: inherit;
+}
+
+.thinking-label::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 34%,
+    rgba(250, 204, 21, 0.98) 47%,
+    rgba(245, 158, 11, 0.95) 50%,
+    rgba(250, 204, 21, 0.98) 53%,
+    transparent 66%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: thinking-shimmer 2.15s linear infinite;
 }
 
 .thinking-pulse {
@@ -747,9 +761,9 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
   color: #ffffff;
 }
 
-@keyframes typing-bounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
-  40% { transform: translateY(-5px); opacity: 1; }
+@keyframes thinking-shimmer {
+  0% { background-position: 140% 0; }
+  100% { background-position: -40% 0; }
 }
 
 @keyframes message-in {

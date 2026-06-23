@@ -542,15 +542,33 @@ async function askWorkspace() {
   animation: message-in 220ms ease-out;
 }
 
-.typing-dot {
-  width: 6px;
-  height: 6px;
-  background-color: #9ca3af;
-  border-radius: 50%;
+.thinking-label {
+  position: relative;
   display: inline-block;
-  animation: typing-bounce 1.05s ease-in-out infinite !important;
+  color: inherit;
 }
-.dark .typing-dot { background-color: #6b7280; }
+
+.thinking-label::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 34%,
+    rgba(250, 204, 21, 0.98) 47%,
+    rgba(245, 158, 11, 0.95) 50%,
+    rgba(250, 204, 21, 0.98) 53%,
+    transparent 66%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: thinking-shimmer 2.15s linear infinite;
+}
 
 .thinking-pulse {
   width: 7px;
@@ -561,9 +579,9 @@ async function askWorkspace() {
   animation: thinking-pulse 1.8s ease-out infinite;
 }
 
-@keyframes typing-bounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
-  40% { transform: translateY(-6px); opacity: 1; }
+@keyframes thinking-shimmer {
+  0% { background-position: 140% 0; }
+  100% { background-position: -40% 0; }
 }
 
 @keyframes message-in {

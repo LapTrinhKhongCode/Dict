@@ -644,7 +644,7 @@ async function handleDeleteFile() {
   }
 }
 
-const NATIVE_DOC_EXTENSIONS = new Set(['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'csv', 'md'])
+const NATIVE_DOC_EXTENSIONS = new Set(['docx', 'pptx', 'xlsx', 'txt', 'csv', 'md'])
 const DOCUMENT_AI_EXTENSIONS = new Set(['pdf'])
 
 function isNativeDocFile(file) {
