@@ -477,6 +477,7 @@ const pageOcrResults = ref({});
 const pageUploadStatus = ref({});
 const uploadQueue = ref([]);
 const pdfJobId = ref(null);
+const allowPdfPageOcrUpload = ref(true);
 const hubMediaId = ref(null); // canonical ID dùng cho SignalR room (mediaId từ API)
 let isUploadRunning = false;
 const pageDimensions = ref({});
@@ -581,6 +582,7 @@ function resetViewerState() {
   uploadQueue.value = [];
   pageOcrResults.value = {};
   pdfLoadError.value = "";
+  allowPdfPageOcrUpload.value = true;
 }
 
 function appendCacheBust(url) {
@@ -676,6 +678,7 @@ async function initPdfJob(file) {
 }
 
 function enqueuePagesAhead(fromPage) {
+  if (!allowPdfPageOcrUpload.value) return;
   const AHEAD = 2;
   for (
     let p = fromPage;
@@ -775,6 +778,7 @@ async function uploadOnePage(pageNum, retryCount = 0) {
 }
 
 watch(currentPage, (newPage) => {
+  if (!allowPdfPageOcrUpload.value) return;
   enqueuePagesAhead(newPage);
 });
 
@@ -837,6 +841,8 @@ async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
     if (isPdf) {
       ocrMode.value = false;
       ocrLoading.value = false; // Tắt vòng quay loading
+      const hasExistingResults = Array.isArray(data.results) && data.results.length > 0;
+      allowPdfPageOcrUpload.value = !(data.status === "completed" && hasExistingResults);
 
       if (!pdfDoc.value) {
         ocrImageUrl.value = data.imageUrl; // Đánh dấu đã nạp URL
@@ -882,7 +888,9 @@ async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
           viewMode.value === "scroll" ? setupScrollObserver() : renderPage(1);
 
           // Logic 3 trang của bạn được gọi tại đây (chỉ chạy 1 lần lúc khởi tạo)
-          enqueuePagesAhead(1);
+          if (allowPdfPageOcrUpload.value) {
+            enqueuePagesAhead(1);
+          }
         } catch (err) {
           if (sessionId !== viewerLoadSession.value) return;
           console.error("Lỗi vẽ PDF ban đầu:", err);

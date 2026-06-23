@@ -78,7 +78,7 @@
       type="file"
       ref="fileInput"
       @change="handleFileChange"
-      accept="image/*,application/pdf"
+      accept="image/*,application/pdf,.docx,.pptx,.xlsx,.txt,.csv,.md"
       class="hidden"
     />
   </div>
@@ -644,6 +644,14 @@ async function handleDeleteFile() {
   }
 }
 
+const NATIVE_DOC_EXTENSIONS = new Set(['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'csv', 'md'])
+const DOCUMENT_AI_EXTENSIONS = new Set(['pdf'])
+
+function isNativeDocFile(file) {
+  const ext = file?.name?.split('.').pop()?.toLowerCase() || ''
+  return NATIVE_DOC_EXTENSIONS.has(ext)
+}
+
 async function handleFileUpload(pickedFile) {
   if (!pickedFile || uploading.value) return
   const token = getToken()
@@ -654,14 +662,37 @@ async function handleFileUpload(pickedFile) {
   pendingFile.value = { name: pickedFile.name, type: ext }
 
   const formData = new FormData()
-  formData.append('image', pickedFile)
-  formData.append('projectId', projectId)
+  const isPdfUpload = DOCUMENT_AI_EXTENSIONS.has(ext)
+  const useNativeDocFlow = isNativeDocFile(pickedFile)
+  if (useNativeDocFlow) {
+    formData.append('file', pickedFile)
+    formData.append('projectId', projectId)
+  } else {
+    formData.append('image', pickedFile)
+    formData.append('projectId', projectId)
+  }
 
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`, {
+    const endpoint = useNativeDocFlow
+      ? `${config.public.apiBaseUrl}/api/Infer/upload-native-doc`
+      : `${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`
+    const res = await fetch(endpoint, {
       method: 'POST', body: formData, headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw new Error(await res.text() || "Lỗi upload")
+    const uploadData = await res.json()
+    if (isPdfUpload && uploadData.needsAzureDocumentAi) {
+      const aiFormData = new FormData()
+      aiFormData.append('file', pickedFile)
+      aiFormData.append('projectId', projectId)
+      void fetch(`${config.public.apiBaseUrl}/api/Infer/upload-document-ai`, {
+        method: 'POST',
+        body: aiFormData,
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => {
+        console.warn('Document AI supplementary upload failed:', err)
+      })
+    }
     showToast("Tải lên thành công!")
     await fetchFiles(token)
   } catch (err) {

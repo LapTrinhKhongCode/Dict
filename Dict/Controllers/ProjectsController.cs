@@ -1,6 +1,7 @@
 using Dict.Data;
 using Dict.DTO;
 using Dict.Models;
+using Dict.Service.IService;
 using iText.IO.Font;
 using iText.IO.Font.Constants;
 using iText.IO.Image;
@@ -21,11 +22,16 @@ using System.Text.Json;
 public class ProjectsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly IDocumentRagService _documentRagService;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    public ProjectsController(ApplicationDbContext context, IHttpClientFactory httpClientFactory)
+    public ProjectsController(
+        ApplicationDbContext context,
+        IDocumentRagService documentRagService,
+        IHttpClientFactory httpClientFactory)
     {
         _context = context;
+        _documentRagService = documentRagService;
         _httpClientFactory = httpClientFactory;
     }
     private int GetUserId()
@@ -139,6 +145,10 @@ public class ProjectsController : ControllerBase
                 new { message = "Chỉ Admin/Owner hoặc người tải lên mới có quyền xóa file." });
         }
 
+        int? mediaId = job.MediaId;
+
+        await _documentRagService.DeleteJobArtifactsAsync(job.Id);
+
         // 🔥 XÓA OCR RESULTS TRƯỚC
         var results = await _context.OcrResults
             .Where(r => r.OcrJobId == job.Id)
@@ -149,20 +159,27 @@ public class ProjectsController : ControllerBase
             _context.OcrResults.RemoveRange(results);
         }
 
-        // 🔥 XÓA MEDIA
-        if (job.MediaId.HasValue)
+        // 🔥 XÓA JOB TRƯỚC để tránh FK từ ocr_jobs -> media_store
+        _context.OcrJobs.Remove(job);
+        await _context.SaveChangesAsync();
+
+        // 🔥 CHỈ XÓA MEDIA khi không còn job nào tham chiếu
+        if (mediaId.HasValue)
         {
-            var mediaRecord = await _context.MediaStore.FindAsync(job.MediaId.Value);
-            if (mediaRecord != null)
+            bool stillReferenced = await _context.OcrJobs
+                .AsNoTracking()
+                .AnyAsync(j => j.MediaId == mediaId.Value);
+
+            if (!stillReferenced)
             {
-                _context.MediaStore.Remove(mediaRecord);
+                var mediaRecord = await _context.MediaStore.FindAsync(mediaId.Value);
+                if (mediaRecord != null)
+                {
+                    _context.MediaStore.Remove(mediaRecord);
+                    await _context.SaveChangesAsync();
+                }
             }
         }
-
-        // 🔥 CUỐI CÙNG MỚI XÓA JOB
-        _context.OcrJobs.Remove(job);
-
-        await _context.SaveChangesAsync();
 
         return Ok(new { message = "Đã xóa file thành công!" });
     }

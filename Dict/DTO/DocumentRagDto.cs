@@ -15,6 +15,8 @@ namespace Dict.DTO
         public int TopK { get; set; } = 5;
         public List<DocumentRagTurnDto> ConversationHistory { get; set; } = new();
         public string SessionId { get; set; } = string.Empty;
+        /// <summary>"fast" | "balance" | "high" (default)</summary>
+        public string Mode { get; set; } = "high";
     }
 
     public class DocumentRagTurnDto
@@ -42,7 +44,20 @@ namespace Dict.DTO
         public int PageNumber { get; set; }
         public int ChunkIndex { get; set; }
         public string Text { get; set; } = string.Empty;
+        public string ContentType { get; set; } = "text";
         public double Score { get; set; }
+        public string DocumentName { get; set; } = string.Empty;
+        public int OccurrenceCount { get; set; } = 1;
+        public string OccurrenceSummary { get; set; } = string.Empty;
+        public List<DocumentRagSourceOccurrenceDto> Occurrences { get; set; } = new();
+    }
+
+    public class DocumentRagSourceOccurrenceDto
+    {
+        public int JobId { get; set; }
+        public int ProjectId { get; set; }
+        public int PageNumber { get; set; }
+        public int ChunkIndex { get; set; }
         public string DocumentName { get; set; } = string.Empty;
     }
 

@@ -263,7 +263,7 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">3. Tệp tài liệu</label>
                 <div class="relative">
-                  <input type="file" @change="onFileSelected" accept="image/*,application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  <input type="file" @change="onFileSelected" accept="image/*,application/pdf,.docx,.pptx,.xlsx,.txt,.csv,.md" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                   <div class="w-full border-2 border-dashed border-gray-300 dark:border-[#30363d] rounded-lg p-4 text-center hover:border-[#f0c040] transition-colors bg-gray-50 dark:bg-[#0d1117] flex flex-col items-center justify-center">
                     <p v-if="uploadForm.file" class="text-sm font-bold text-blue-600 dark:text-[#58a6ff] w-full truncate px-2">{{ uploadForm.file.name }}</p>
                     <div v-else class="text-sm text-gray-500 dark:text-[#8b949e]">
@@ -426,6 +426,8 @@ const uploadingFile = ref(false)
 const isFetchingUploadProjects = ref(false)
 const uploadProjects = ref([])
 const uploadForm = reactive({ workspaceId: '', projectId: '', file: null })
+const NATIVE_DOC_EXTENSIONS = new Set(['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'csv', 'md'])
+const DOCUMENT_AI_EXTENSIONS = new Set(['pdf'])
 
 function openUploadModal() {
   uploadForm.workspaceId = activeWsId.value || (workspaces.value.length > 0 ? workspaces.value[0].id : '')
@@ -458,17 +460,42 @@ async function handleConfirmUpload() {
   const token = getToken()
   uploadingFile.value = true
 
+  const pickedFile = uploadForm.file
+  const ext = pickedFile?.name?.split('.').pop()?.toLowerCase() || ''
+  const isPdfUpload = DOCUMENT_AI_EXTENSIONS.has(ext)
+  const useNativeDocFlow = NATIVE_DOC_EXTENSIONS.has(ext)
   const formData = new FormData()
-  formData.append('image', uploadForm.file)
-  formData.append('projectId', uploadForm.projectId.toString())
+  if (useNativeDocFlow) {
+    formData.append('file', pickedFile)
+    formData.append('projectId', uploadForm.projectId.toString())
+  } else {
+    formData.append('image', pickedFile)
+    formData.append('projectId', uploadForm.projectId.toString())
+  }
 
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`, {
+    const endpoint = useNativeDocFlow
+      ? `${config.public.apiBaseUrl}/api/Infer/upload-native-doc`
+      : `${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`
+    const res = await fetch(endpoint, {
       method: 'POST', body: formData, headers: { Authorization: `Bearer ${token}` }
     })
     
     if (!res.ok) throw new Error("Upload thất bại")
     const jobData = await res.json()
+
+    if (isPdfUpload && jobData.needsAzureDocumentAi) {
+      const aiFormData = new FormData()
+      aiFormData.append('file', pickedFile)
+      aiFormData.append('projectId', uploadForm.projectId.toString())
+      void fetch(`${config.public.apiBaseUrl}/api/Infer/upload-document-ai`, {
+        method: 'POST',
+        body: aiFormData,
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => {
+        console.warn('Document AI supplementary upload failed:', err)
+      })
+    }
     
     sessionStorage.setItem(`ocr_view_meta_${jobData.jobId}`, JSON.stringify({ jobId: jobData.jobId, imageUrl: jobData.imageUrl }))
     

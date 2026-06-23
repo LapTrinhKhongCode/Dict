@@ -88,6 +88,7 @@ namespace Dict.Data
         public DbSet<OcrJob> OcrJobs { get; set; }
         public DbSet<OcrResult> OcrResults { get; set; }
         public DbSet<Annotation> Annotations { get; set; }
+        public DbSet<DocumentTable> DocumentTables { get; set; }
 
         // Stats / caches
         public DbSet<StatsWordFreq> StatsWordFreq { get; set; }
@@ -686,6 +687,29 @@ namespace Dict.Data
                 b.Property(x => x.BoundingBox);
                 b.Property(x => x.Confidence);
                 b.HasOne(x => x.LinkWord).WithMany(w => w.OcrResults).HasForeignKey(x => x.LinkWordId).OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<DocumentTable>(b =>
+            {
+                b.ToTable("document_tables");
+                b.HasKey(x => x.Id);
+                b.Property(x => x.PageNumber).IsRequired();
+                b.Property(x => x.TableIndex).IsRequired();
+                b.Property(x => x.SectionTitle).HasMaxLength(512);
+                b.Property(x => x.Caption).HasMaxLength(512);
+                b.Property(x => x.RowCount);
+                b.Property(x => x.ColumnCount);
+                b.Property(x => x.HeadersJson);
+                b.Property(x => x.CellsJson).IsRequired();
+                b.Property(x => x.SummaryForEmbedding);
+                b.Property(x => x.ContentHash).HasMaxLength(64);
+                b.Property(x => x.CreatedAt);
+                b.HasOne(x => x.OcrJob)
+                 .WithMany()
+                 .HasForeignKey(x => x.OcrJobId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                b.HasIndex(x => x.OcrJobId);
+                b.HasIndex(x => x.ContentHash);
             });
 
             modelBuilder.Entity<Project>(b =>

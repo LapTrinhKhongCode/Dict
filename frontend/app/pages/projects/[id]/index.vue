@@ -12,7 +12,7 @@
       <svg class="w-24 h-24 mb-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
       </svg>
-      <p class="text-3xl font-bold">Thả file PDF hoặc Ảnh vào đây</p>
+      <p class="text-3xl font-bold">Thả tài liệu vào đây</p>
       <p class="text-xl mt-2 opacity-80">để Trợ lý AI bắt đầu nhận diện ngay lập tức!</p>
     </div>
 
@@ -52,7 +52,7 @@
             </svg>
             Tải lên tài liệu mới
           </button>
-          <input type="file" ref="fileInput" @change="handleFileChange" accept="image/*,application/pdf" class="hidden" />
+          <input type="file" ref="fileInput" @change="handleFileChange" accept="image/*,application/pdf,.docx,.pptx,.xlsx,.txt,.csv,.md" class="hidden" />
         </div>
       </div>
       <div v-if="isLoading" class="text-center p-20 text-gray-500 flex flex-col items-center gap-4">
@@ -72,7 +72,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
         </svg>
         <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Project này chưa có tài liệu nào!</h3>
-        <p class="text-gray-500 mt-2">Bấm nút Upload hoặc kéo thả file PDF vào đây để trợ lý AI xử lý.</p>
+        <p class="text-gray-500 mt-2">Bấm nút Upload hoặc kéo thả tài liệu vào đây để trợ lý AI xử lý.</p>
       </div>
 
       <div v-if="!isLoading && files.length" class="bg-white dark:bg-gray-800 shadow-xl rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
@@ -145,6 +145,8 @@ const files = ref([])
 const isLoading = ref(true)
 const error = ref(null)
 const isDragging = ref(false)
+const NATIVE_DOC_EXTENSIONS = new Set(['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'csv', 'md'])
+const DOCUMENT_AI_EXTENSIONS = new Set(['pdf'])
 
 async function fetchFiles() {
   isLoading.value = true
@@ -168,18 +170,43 @@ async function handleFileUpload(pickedFile) {
   if (!pickedFile) return
   const token = localStorage.getItem('jwt_token')
   if (!token) { alert('Vui lòng đăng nhập.'); return }
-  const formData = new FormData()
-  formData.append('image', pickedFile)
-  formData.append('projectId', projectId)
+  const ext = pickedFile.name?.split('.').pop()?.toLowerCase() || ''
+  const isPdfUpload = DOCUMENT_AI_EXTENSIONS.has(ext)
+  const useNativeDocFlow = NATIVE_DOC_EXTENSIONS.has(ext)
+  const primaryFormData = new FormData()
+  if (useNativeDocFlow) {
+    primaryFormData.append('file', pickedFile)
+    primaryFormData.append('projectId', projectId)
+  } else {
+    primaryFormData.append('image', pickedFile)
+    primaryFormData.append('projectId', projectId)
+  }
   isLoading.value = true
   error.value = null
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`, {
-      method: 'POST', body: formData,
+    const endpoint = useNativeDocFlow
+      ? `${config.public.apiBaseUrl}/api/Infer/upload-native-doc`
+      : `${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`
+    const res = await fetch(endpoint, {
+      method: 'POST', body: primaryFormData,
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw new Error(await res.text() || res.statusText)
     const jobData = await res.json()
+
+    if (isPdfUpload && jobData.needsAzureDocumentAi) {
+      const aiFormData = new FormData()
+      aiFormData.append('file', pickedFile)
+      aiFormData.append('projectId', projectId)
+      void fetch(`${config.public.apiBaseUrl}/api/Infer/upload-document-ai`, {
+        method: 'POST',
+        body: aiFormData,
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => {
+        console.warn('Document AI supplementary upload failed:', err)
+      })
+    }
+
     sessionStorage.setItem(`ocr_view_meta_${jobData.jobId}`, JSON.stringify({ jobId: jobData.jobId, imageUrl: jobData.imageUrl }))
     router.push(`/projects/${projectId}/file/${jobData.jobId}`)
   } catch (err) {
@@ -193,7 +220,7 @@ function handleFileChange(e) { handleFileUpload(e.target.files[0]) }
 function handleDrop(e) {
   isDragging.value = false
   const f = e.dataTransfer.files[0]
-  if (!['application/pdf','image/jpeg','image/png'].includes(f.type)) { alert('Chỉ hỗ trợ JPG, PNG hoặc PDF.'); return }
+  if (!f) return
   handleFileUpload(f)
 }
 

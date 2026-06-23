@@ -30,6 +30,38 @@ using Google.Cloud.Vision.V1;
 [Route("api/[controller]")]
 public class InferController : ControllerBase
 {
+    private static readonly HashSet<string> AllowedNativeDocContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/plain",
+        "text/csv",
+        "text/markdown",
+        "application/octet-stream"
+    };
+
+    private static readonly HashSet<string> AllowedNativeDocExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".docx", ".pptx", ".xlsx", ".txt", ".csv", ".md"
+    };
+    private static readonly HashSet<string> AllowedDocumentAiContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "image/jpeg",
+        "image/png",
+        "image/tiff",
+        "image/bmp",
+        "application/octet-stream"
+    };
+    private static readonly HashSet<string> AllowedDocumentAiExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".docx", ".pptx", ".xlsx", ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp"
+    };
 
     private readonly ILogger<InferController> _logger;
     private readonly IOcrProcessingService _ocrProcessingService; 
@@ -160,8 +192,17 @@ public class InferController : ControllerBase
         public int? ProjectId { get; set; }
     }
 
+    public class UploadDocumentAiForm
+    {
+        [Microsoft.AspNetCore.Mvc.FromForm(Name = "file")]
+        public IFormFile File { get; set; }
+
+        [Microsoft.AspNetCore.Mvc.FromForm(Name = "projectId")]
+        public int? ProjectId { get; set; }
+    }
+
     /// <summary>
-    /// Upload tài liệu native (PDF có text layer / DOCX) — không cần Vision OCR
+    /// Upload tài liệu native (PDF/DOCX/PPTX/XLSX/TXT/CSV/MD) — không cần Vision OCR
     /// </summary>
     [HttpPost("upload-native-doc")]
     [Authorize]
@@ -170,9 +211,11 @@ public class InferController : ControllerBase
         if (form.File == null || form.File.Length == 0)
             return BadRequest(new { message = "Không có file." });
 
-        var allowed = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
-        if (!allowed.Contains(form.File.ContentType))
-            return BadRequest(new { message = "Chỉ hỗ trợ PDF và DOCX." });
+        string extension = Path.GetExtension(form.File.FileName ?? string.Empty);
+        bool isAllowedByMime = AllowedNativeDocContentTypes.Contains(form.File.ContentType ?? string.Empty);
+        bool isAllowedByExtension = AllowedNativeDocExtensions.Contains(extension);
+        if (!isAllowedByMime && !isAllowedByExtension)
+            return BadRequest(new { message = "Chỉ hỗ trợ PDF, DOCX, PPTX, XLSX, TXT, CSV, MD." });
 
         try
         {
@@ -188,6 +231,48 @@ public class InferController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Lỗi UploadNativeDoc");
+            return Problem(detail: ex.Message, statusCode: 500);
+        }
+    }
+
+    /// <summary>
+    /// Upload tài liệu bằng Azure Document Intelligence (luồng mới, không động luồng OCR cũ).
+    /// </summary>
+    [HttpPost("upload-document-ai")]
+    [Authorize]
+    public async Task<IActionResult> UploadDocumentAi([FromForm] UploadDocumentAiForm form)
+    {
+        if (form.File == null || form.File.Length == 0)
+            return BadRequest(new { message = "Không có file." });
+
+        string extension = Path.GetExtension(form.File.FileName ?? string.Empty);
+        bool isAllowedByMime = AllowedDocumentAiContentTypes.Contains(form.File.ContentType ?? string.Empty);
+        bool isAllowedByExtension = AllowedDocumentAiExtensions.Contains(extension);
+        if (!isAllowedByMime && !isAllowedByExtension)
+            return BadRequest(new { message = "Document AI chỉ hỗ trợ PDF/DOCX/PPTX/XLSX/JPG/PNG/TIFF/BMP." });
+
+        try
+        {
+            int userId = _currentUserService.UserId;
+            int workspaceId = _currentUserService.WorkspaceId;
+            int? wsId = workspaceId > 0 ? workspaceId : null;
+
+            var (fileSizeOk, fileSizeErr) = await _planLimit.CheckFileSizeAsync(userId, form.File.Length, wsId);
+            if (!fileSizeOk) return StatusCode(402, new { message = fileSizeErr });
+
+            var (ocrOk, ocrErr) = await _planLimit.CheckOcrQuotaAsync(userId, wsId);
+            if (!ocrOk) return StatusCode(402, new { message = ocrErr });
+
+            var result = await _ocrProcessingService.UploadDocumentAiAsync(form.File, userId, workspaceId, form.ProjectId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi UploadDocumentAi");
             return Problem(detail: ex.Message, statusCode: 500);
         }
     }

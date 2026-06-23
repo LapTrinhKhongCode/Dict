@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -64,7 +65,13 @@ namespace Dict.Tests.Services
                 _mockBlobService.Object,
                 _mockVisionClient.Object,
                 _memoryCache,
-                _mockHub.Object
+                _mockHub.Object,
+                new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["FeatureFlags:EnableDocumentAiUpload"] = "false"
+                    })
+                    .Build()
             );
         }
 
