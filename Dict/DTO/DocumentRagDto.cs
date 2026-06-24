@@ -17,6 +17,8 @@ namespace Dict.DTO
         public string SessionId { get; set; } = string.Empty;
         /// <summary>"fast" | "balance" | "high" (default)</summary>
         public string Mode { get; set; } = "high";
+        /// <summary>If true, skip clarification prompts (useful for automated evaluation).</summary>
+        public bool SkipClarify { get; set; } = false;
     }
 
     public class DocumentRagTurnDto

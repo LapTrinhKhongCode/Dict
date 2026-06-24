@@ -1,0 +1,371 @@
+{
+  "metrics": {
+    "total": 24,
+    "pass": 16,
+    "fail": 8,
+    "errors": 0,
+    "pass_rate": 0.667,
+    "avg_point_recall": 0.732,
+    "refuse_accuracy": 0.833,
+    "by_category": {
+      "comparison": {
+        "pass": 3,
+        "total": 6,
+        "rate": 0.5
+      },
+      "fact": {
+        "pass": 5,
+        "total": 7,
+        "rate": 0.714
+      },
+      "logic": {
+        "pass": 2,
+        "total": 3,
+        "rate": 0.667
+      },
+      "multi-file": {
+        "pass": 1,
+        "total": 2,
+        "rate": 0.5
+      },
+      "out-of-scope": {
+        "pass": 5,
+        "total": 6,
+        "rate": 0.833
+      }
+    }
+  },
+  "details": [
+    {
+      "id": "q046",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q013",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q049",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 3,
+      "missed_points": [
+        "FY2020: Lỗ ròng 577.9 tỷ yên",
+        "FY2022: Lãi ròng 99.2 tỷ yên",
+        "Sự chênh lệch rất lớn từ lỗ kỷ lục sang lãi trở lại"
+      ],
+      "reason": "refusal_detected(coverage=0/3)"
+    },
+    {
+      "id": "q102",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q111",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.333,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 3,
+      "missed_points": [
+        "Nhật Bản: 17.583,1 tỷ Yên",
+        "Bắc Mỹ: 13.843,9 tỷ Yên"
+      ],
+      "reason": "refusal_detected(coverage=1/3)"
+    },
+    {
+      "id": "q120",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q101",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q020",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "refusal_detected(coverage=1/1)"
+    },
+    {
+      "id": "q086",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q044",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q105",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": false,
+      "reason": "should_have_refused",
+      "point_recall": 0.0
+    },
+    {
+      "id": "q021",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.667,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 3,
+      "missed_points": [
+        "Nhưng tăng đáng kể gấp 1.94 lần ở nữ giới"
+      ],
+      "reason": "refusal_detected(coverage=2/3)"
+    },
+    {
+      "id": "q001",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 1,
+      "missed_points": [
+        "Khoảng 1 nghìn tỷ Yên (約1兆円)"
+      ],
+      "reason": "low_coverage(0/1)"
+    },
+    {
+      "id": "q116",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q106",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.167,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 6,
+      "missed_points": [
+        "Bảo mật (セキュアであること)",
+        "Có tính đàn hồi/phục hồi (レジリエントであること)",
+        "Có tính co giãn (エラスティックであること)"
+      ],
+      "reason": "low_coverage(1/6)"
+    },
+    {
+      "id": "q058",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q114",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q054",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "refusal_detected(coverage=2/2)"
+    },
+    {
+      "id": "q108",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q090",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q084",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q092",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Choreography: Các service hoạt động độc lập tự chủ phản ứng với các event được gửi qua message queue mà không cần service trung tâm chờ đợi"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q026",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q072",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "IoC Container: Uỷ quyền việc chọn implementation cho component bên ngoài hỗ trợ kiến trúc dạng plug-in"
+      ],
+      "reason": "ok"
+    }
+  ]
+}

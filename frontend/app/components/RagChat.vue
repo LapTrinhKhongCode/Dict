@@ -89,6 +89,33 @@
           </div>
         </div>
 
+        <!-- Clarify bubble -->
+        <div v-else-if="msg.clarify" class="flex flex-col gap-2 animate-message-in">
+          <div class="max-w-[86%] bg-amber-950/30 border border-amber-700/50 rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
+            <p class="text-xs text-amber-300 font-medium mb-2">💬 {{ msg.clarify.question }}</p>
+            <div v-if="msg.clarify.options?.length" class="flex flex-col gap-1">
+              <button
+                v-for="opt in msg.clarify.options"
+                :key="opt"
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', opt)"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-neutral-800 border border-amber-700/50 hover:bg-amber-900/40 text-amber-200 transition truncate"
+              >{{ opt }}</button>
+              <button
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', '')"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-neutral-800 border border-neutral-600 hover:bg-neutral-700 text-neutral-400 transition"
+              >Tất cả tài liệu</button>
+            </div>
+            <div v-else class="flex gap-1 mt-1">
+              <input
+                type="text"
+                placeholder="Nhập lại câu hỏi..."
+                class="flex-1 text-xs px-2 py-1 rounded-lg border border-amber-700/50 bg-neutral-900 text-gray-200 outline-none focus:border-amber-500"
+                @keydown.enter.prevent="e => { respondToClarify((e.target as HTMLInputElement).value, ''); (e.target as HTMLInputElement).value = '' }"
+              />
+            </div>
+          </div>
+        </div>
+
         <!-- Assistant bubble -->
         <div v-else-if="msg.answer" class="flex flex-col gap-2 animate-message-in">
           <div class="max-w-[86%]">
@@ -231,6 +258,7 @@ type ChatMessage = {
   sources?: DocumentRagSource[]
   citations?: DocumentRagCitation[]
   cacheHit?: boolean
+  clarify?: { reason: string; question: string; options?: string[] }
 }
 
 type DocumentRagTurn = {
@@ -553,6 +581,18 @@ async function scanAllOcrForRag() {
   }
 }
 
+function respondToClarify(originalQuestion: string, clarification: string) {
+  const combined = clarification
+    ? `Về tài liệu "${clarification}": ${originalQuestion}`
+    : originalQuestion
+  question.value = combined
+  const lastIdx = messages.value.length - 1
+  if (messages.value[lastIdx]?.clarify) messages.value.splice(lastIdx, 1)
+  const prevIdx = messages.value.length - 1
+  if (messages.value[prevIdx]?.role === 'user') messages.value.splice(prevIdx, 1)
+  nextTick(() => askDocument())
+}
+
 async function askDocument() {
   if (!props.jobId || !question.value.trim() || asking.value) return
 
@@ -663,6 +703,15 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
         )
       }
     } catch { /* ignore */ }
+    streamPhase.value = 'idle'
+    scrollToBottom()
+  } else if (type === 'clarify') {
+    flushPendingChunk()
+    try {
+      const p = JSON.parse(data)
+      msg.clarify = p
+      msg.content = p.question
+    } catch { }
     streamPhase.value = 'idle'
     scrollToBottom()
   } else if (type === 'error') {

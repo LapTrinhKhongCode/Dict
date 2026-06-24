@@ -1,0 +1,5 @@
+requests
+jsonlines
+pandas
+python-dotenv
+tqdm

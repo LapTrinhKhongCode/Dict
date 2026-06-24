@@ -364,7 +364,21 @@ import { useJwt } from '~/composables/useJwt'
 // Import pdfjs-dist (đã có sẵn trong project)
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import cMapAssetUrl from 'pdfjs-dist/cmaps/78-EUC-H.bcmap?url'
+import standardFontAssetUrl from 'pdfjs-dist/standard_fonts/FoxitSerif.pfb?url'
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
+
+function getAssetBaseUrl(url) {
+  const slashIndex = url.lastIndexOf('/')
+  return slashIndex >= 0 ? url.slice(0, slashIndex + 1) : url
+}
+
+const pdfDocumentBaseOptions = {
+  cMapUrl: getAssetBaseUrl(cMapAssetUrl),
+  cMapPacked: true,
+  standardFontDataUrl: getAssetBaseUrl(standardFontAssetUrl),
+  useSystemFonts: true
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -416,7 +430,11 @@ const toast = reactive({ visible: false, message: '', type: 'success' })
  */
 async function generatePdfThumbnail(pdfUrl) {
   try {
-    const pdf = await pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise
+    const pdf = await pdfjsLib.getDocument({
+      ...pdfDocumentBaseOptions,
+      url: pdfUrl,
+      withCredentials: false
+    }).promise
     const page = await pdf.getPage(1)
 
     // Scale để thumbnail đủ nét, không cần quá lớn
@@ -455,8 +473,6 @@ async function generateThumbnailsForFiles(fileList) {
     if (thumbnails.value[file.id]) continue
 
     const url = file.imageUrl || file.fileUrl || file.url
-    console.log('file item:', file)
-console.log('thumbnail url:', file.imageUrl || file.fileUrl || file.url)
     if (!url) continue
 
     const isPdf = file.type === 'pdf' || url.toLowerCase().includes('.pdf')

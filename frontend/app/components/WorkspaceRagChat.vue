@@ -42,6 +42,35 @@
         </div>
 
         <!-- Assistant bubble — chỉ hiện khi đã có content -->
+        <div v-else-if="msg.clarify" class="flex flex-col gap-2 animate-message-in">
+          <div class="max-w-[86%] bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
+            <p class="text-xs text-amber-700 dark:text-amber-300 font-medium mb-2">💬 {{ msg.clarify.question }}</p>
+            <!-- Options for ambiguous_entity -->
+            <div v-if="msg.clarify.options?.length" class="flex flex-col gap-1">
+              <button
+                v-for="opt in msg.clarify.options"
+                :key="opt"
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', opt)"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-amber-300 dark:border-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-200 transition truncate"
+              >{{ opt }}</button>
+              <button
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', '')"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-600 hover:bg-gray-100 dark:hover:bg-neutral-700 text-gray-500 dark:text-neutral-400 transition"
+              >Tất cả tài liệu</button>
+            </div>
+            <!-- Rephrase prompt for low_confidence -->
+            <div v-else class="flex gap-1 mt-1">
+              <input
+                type="text"
+                placeholder="Nhập lại câu hỏi..."
+                class="flex-1 text-xs px-2 py-1 rounded-lg border border-amber-300 dark:border-amber-600 bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 outline-none focus:border-amber-500"
+                @keydown.enter.prevent="e => { respondToClarify((e.target as HTMLInputElement).value, ''); (e.target as HTMLInputElement).value = '' }"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Assistant bubble — chỉ hiện khi đã có content -->
         <div v-else-if="msg.answer" class="flex flex-col gap-2 animate-message-in">
           <div class="max-w-[86%]">
             <div
@@ -179,6 +208,7 @@ type ChatMessage = {
   attributedAnswer?: string
   sources?: WorkspaceSource[]
   citations?: WorkspaceCitation[]
+  clarify?: { reason: string; question: string; options?: string[] }
 }
 
 type ConversationTurn = { role: string; content: string }
@@ -462,11 +492,35 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
     } catch { }
     streamPhase.value = 'idle'
     scrollToBottom()
+  } else if (type === 'clarify') {
+    flushPendingChunk()
+    try {
+      const p = JSON.parse(data)
+      msg.clarify = p
+      msg.content = p.question
+    } catch { }
+    streamPhase.value = 'idle'
+    scrollToBottom()
   } else if (type === 'error') {
     flushPendingChunk()
     msg.answer = data; msg.content = data
     streamPhase.value = 'idle'
   }
+}
+
+function respondToClarify(originalQuestion: string, clarification: string) {
+  // Find the last user message before the clarify bubble
+  const combined = clarification
+    ? `Về tài liệu "${clarification}": ${originalQuestion}`
+    : originalQuestion
+  question.value = combined
+  // Remove the clarify assistant bubble so it's replaced by the real answer
+  const lastIdx = messages.value.length - 1
+  if (messages.value[lastIdx]?.clarify) messages.value.splice(lastIdx, 1)
+  // Remove the user message too so history stays clean
+  const prevIdx = messages.value.length - 1
+  if (messages.value[prevIdx]?.role === 'user') messages.value.splice(prevIdx, 1)
+  nextTick(() => askWorkspace())
 }
 
 async function askWorkspace() {

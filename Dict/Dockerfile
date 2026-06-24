@@ -1,18 +1,25 @@
 ﻿# --- Giai đoạn 1: Build (Chỉ tập trung vào dự án chính) ---
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG TARGETARCH=amd64
 WORKDIR /src
 
 # CHỈ sao chép file dự án chính & restore trực tiếp nó
 COPY Dict/Dict.csproj ./Dict/
 
-RUN dotnet restore ./Dict/Dict.csproj
+RUN if [ "$TARGETARCH" = "amd64" ]; then export DOTNET_RID=linux-x64; \
+    elif [ "$TARGETARCH" = "arm64" ]; then export DOTNET_RID=linux-arm64; \
+    else echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1; fi && \
+    dotnet restore ./Dict/Dict.csproj -r $DOTNET_RID
 
 # Sao chép toàn bộ mã nguồn hiện tại qua
 COPY . .
 
 # THAY ĐỔI: Publish trực tiếp file .csproj thay vì file .sln
-RUN dotnet publish ./Dict/Dict.csproj -c Release -o /app/publish -r linux-arm64 --self-contained false
-RUN find /root/.nuget/packages/ -type f -name "libhf_tokenizers.so" -exec cp {} /app/publish/ \;
+RUN if [ "$TARGETARCH" = "amd64" ]; then export DOTNET_RID=linux-x64; \
+    elif [ "$TARGETARCH" = "arm64" ]; then export DOTNET_RID=linux-arm64; \
+    else echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1; fi && \
+    dotnet publish ./Dict/Dict.csproj -c Release -o /app/publish -r $DOTNET_RID --self-contained false && \
+    find /root/.nuget/packages/ -type f -name "libhf_tokenizers.so" -path "*/$DOTNET_RID/*" -exec cp {} /app/publish/ \;
 # --- Giai đoạn 2: Final Image (Giữ nguyên cấu hình Ghostscript xịn của bạn) ---
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 

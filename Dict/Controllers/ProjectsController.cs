@@ -1,7 +1,6 @@
 using Dict.Data;
 using Dict.DTO;
 using Dict.Models;
-using Dict.Service.IService;
 using iText.IO.Font;
 using iText.IO.Font.Constants;
 using iText.IO.Image;
@@ -22,16 +21,11 @@ using System.Text.Json;
 public class ProjectsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    private readonly IDocumentRagService _documentRagService;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    public ProjectsController(
-        ApplicationDbContext context,
-        IDocumentRagService documentRagService,
-        IHttpClientFactory httpClientFactory)
+    public ProjectsController(ApplicationDbContext context, IHttpClientFactory httpClientFactory)
     {
         _context = context;
-        _documentRagService = documentRagService;
         _httpClientFactory = httpClientFactory;
     }
     private int GetUserId()
@@ -87,31 +81,43 @@ public class ProjectsController : ControllerBase
             return NotFound(new { message = "Không tìm thấy file trong dự án này!" });
         }
 
-        var isAdmin = await _context.WorkspaceMembers
+        // Allow: file owner, workspace admin, or workspace member who owns the project
+        bool isOwner = job.UserId == userId;
+        bool isAdmin = await _context.WorkspaceMembers
             .AnyAsync(wm => wm.WorkspaceId == job.Project.WorkspaceId
                          && wm.UserId == userId
-                         && wm.Role ==  WorkspaceRole.ADMIN);
+                         && wm.Role == WorkspaceRole.ADMIN);
+        bool isMember = await _context.WorkspaceMembers
+            .AnyAsync(wm => wm.WorkspaceId == job.Project.WorkspaceId
+                         && wm.UserId == userId);
 
-        if (!isAdmin)
+        if (!isOwner && !isAdmin && !isMember)
         {
             return StatusCode(StatusCodes.Status403Forbidden,
-                new { message = "Chỉ Admin mới có quyền chỉnh sửa file." });
+                new { message = "Bạn không có quyền chỉnh sửa file này." });
         }
 
-        // ✅ CHỈ update nếu có giá trị mới
+        // ✅ Only update if new value provided — preserve original extension
         if (!string.IsNullOrWhiteSpace(dto.FileName) && job.Media != null)
         {
+            string originalExt = System.IO.Path.GetExtension(job.Media.FileName ?? string.Empty);
+            string newBase = System.IO.Path.GetFileNameWithoutExtension(dto.FileName).Trim();
+            if (string.IsNullOrWhiteSpace(newBase))
+                return BadRequest(new { message = "Tên file không hợp lệ." });
+
+            // Sanitize: remove path separators and null chars
+            newBase = newBase.Replace("/", "").Replace("\\", "").Replace("\0", "");
+            job.Media.FileName = string.IsNullOrEmpty(originalExt) ? newBase : newBase + originalExt;
             _context.Entry(job.Media).Property(x => x.FileName).IsModified = true;
-            job.Media.FileName = dto.FileName;
         }
 
-        // ✅ chỉ update timestamp
+        // ✅ update timestamp
         job.UpdatedAt = DateTime.UtcNow;
         _context.Entry(job).Property(x => x.UpdatedAt).IsModified = true;
 
         await _context.SaveChangesAsync();
 
-        return Ok(new { message = "Cập nhật file thành công!" });
+        return Ok(new { message = "Cập nhật file thành công!", fileName = job.Media?.FileName });
     }
     [HttpDelete("{projectId}/files/{fileId}")]
     public async Task<IActionResult> DeleteProjectFile(int projectId, int fileId)
@@ -146,8 +152,6 @@ public class ProjectsController : ControllerBase
         }
 
         int? mediaId = job.MediaId;
-
-        await _documentRagService.DeleteJobArtifactsAsync(job.Id);
 
         // 🔥 XÓA OCR RESULTS TRƯỚC
         var results = await _context.OcrResults
