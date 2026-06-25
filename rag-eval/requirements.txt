@@ -3,3 +3,4 @@ jsonlines
 pandas
 python-dotenv
 tqdm
+optuna

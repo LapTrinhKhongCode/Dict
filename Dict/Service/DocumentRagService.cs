@@ -24,27 +24,29 @@ namespace Dict.Service
         private const string CacheCollectionName = "rag_answer_cache";
         private const int HistoryTopK = 3;
         private const int EmbeddingDimension = 384;
-        private const int ParentChunkSize = 1600;
-        private const int ParentChunkOverlap = 240;
-        private const int ChildChunkSize = 700;
-        private const int ChildChunkOverlap = 120;
         private const string ParentPointType = "parent";
         private const string ChildPointType = "child";
         private const string ContentTypeText = "text";
         private const string ContentTypeTable = "table";
         private const string ContentTypeFigure = "figure";
         private const string StructuredSegmentOpenTag = "[[RAG_STRUCTURED";
-        private const int QueryVariantLimit = 4;
-        private const int DecompositionSubQueryLimit = 3;
-        private const int RetrievePerQuery = 15;
-        private const int CandidatePoolLimit = 50;
-        private const int RerankCandidateLimit = 20;
-        private const int RrfK = 60;
-        private const double Bm25K1 = 1.5;
-        private const double Bm25B = 0.75;
-        private const float OutOfScopeScoreThreshold = 0.50f;
-        private const float ClarifyScoreThreshold = 0.57f;  // low-confidence zone: ask user to rephrase
-        private const float CacheHitThreshold = 0.92f;
+
+        // Tunable parameters — loaded from RagTuning config section at startup
+        private int _parentChunkSize;
+        private int _parentChunkOverlap;
+        private int _childChunkSize;
+        private int _childChunkOverlap;
+        private int _queryVariantLimit;
+        private int _decompositionSubQueryLimit;
+        private int _retrievePerQuery;
+        private int _candidatePoolLimit;
+        private int _rerankCandidateLimit;
+        private int _rrfK;
+        private double _bm25K1;
+        private double _bm25B;
+        private float _outOfScopeScoreThreshold;
+        private float _clarifyScoreThreshold;
+        private float _cacheHitThreshold;
         private const string DefaultIndexProvider = "legacy";
         private const string DefaultIndexVersion = "v1";
         private const string ProviderMimeParam = "ocr-provider";
@@ -70,12 +72,14 @@ namespace Dict.Service
         private readonly InferenceSession _session;
         private readonly QdrantClient _qdrantClient;
         private readonly HttpClient _httpClient;
+        private readonly IRagLlmRouter _llmRouter;
         private readonly ILogger<DocumentRagService> _logger;
 
-        public DocumentRagService(ApplicationDbContext db, IConfiguration config, ILogger<DocumentRagService> logger)
+        public DocumentRagService(ApplicationDbContext db, IConfiguration config, IRagLlmRouter llmRouter, ILogger<DocumentRagService> logger)
         {
             _db = db;
             _config = config;
+            _llmRouter = llmRouter;
             _logger = logger;
 
             string tokenizerPath = Path.Combine(Directory.GetCurrentDirectory(), "tokenizer.json");
@@ -94,6 +98,24 @@ namespace Dict.Service
                 apiKey: _config["QdrantCloud:ApiKey"]
             );
             _httpClient = new HttpClient(new HttpClientHandler { UseProxy = false });
+
+            // Load tunable RAG params from config (defaults match original hardcoded values)
+            var t = config.GetSection("RagTuning");
+            _parentChunkSize             = t.GetValue("ParentChunkSize",             1600);
+            _parentChunkOverlap          = t.GetValue("ParentChunkOverlap",           240);
+            _childChunkSize              = t.GetValue("ChildChunkSize",               700);
+            _childChunkOverlap           = t.GetValue("ChildChunkOverlap",            120);
+            _queryVariantLimit           = t.GetValue("QueryVariantLimit",              4);
+            _decompositionSubQueryLimit  = t.GetValue("DecompositionSubQueryLimit",    3);
+            _retrievePerQuery            = t.GetValue("RetrievePerQuery",              15);
+            _candidatePoolLimit          = t.GetValue("CandidatePoolLimit",            50);
+            _rerankCandidateLimit        = t.GetValue("RerankCandidateLimit",          20);
+            _rrfK                        = t.GetValue("RrfK",                          60);
+            _bm25K1                      = t.GetValue("Bm25K1",                       1.5);
+            _bm25B                       = t.GetValue("Bm25B",                        0.75);
+            _outOfScopeScoreThreshold    = t.GetValue("OutOfScopeScoreThreshold",     0.50f);
+            _clarifyScoreThreshold       = t.GetValue("ClarifyScoreThreshold",        0.57f);
+            _cacheHitThreshold           = t.GetValue("CacheHitThreshold",            0.92f);
         }
 
         public async Task<DocumentRagIndexResponseDto> IndexDocumentAsync(int jobId, int userId)
@@ -150,7 +172,7 @@ namespace Dict.Service
             int childPointsCount = 0;
             foreach (var page in pages)
             {
-                var parentChunks = ChunkText(page.Text, ParentChunkSize, ParentChunkOverlap);
+                var parentChunks = ChunkText(page.Text, _parentChunkSize, _parentChunkOverlap);
                 for (int parentIndex = 0; parentIndex < parentChunks.Count; parentIndex++)
                 {
                     string parentChunk = parentChunks[parentIndex];
@@ -177,7 +199,7 @@ namespace Dict.Service
                             { "created_at", DateTime.UtcNow.ToString("O") }
                         }
                     });
-                    var childChunks = ChunkText(parentChunk, ChildChunkSize, ChildChunkOverlap);
+                    var childChunks = ChunkText(parentChunk, _childChunkSize, _childChunkOverlap);
                     for (int childIndex = 0; childIndex < childChunks.Count; childIndex++)
                     {
                         string childChunk = childChunks[childIndex];
@@ -213,7 +235,7 @@ namespace Dict.Service
             for (int segmentIndex = 0; segmentIndex < structuredSegments.Count; segmentIndex++)
             {
                 var segment = structuredSegments[segmentIndex];
-                var structuredChunks = ChunkText(segment.Text, ChildChunkSize, ChildChunkOverlap);
+                var structuredChunks = ChunkText(segment.Text, _childChunkSize, _childChunkOverlap);
                 if (structuredChunks.Count == 0)
                     continue;
 
@@ -464,7 +486,7 @@ namespace Dict.Service
                     vector: queryVector,
                     filter: BuildChildSearchFilter(jobId),
                     searchParams: searchParams,
-                    limit: (ulong)RetrievePerQuery
+                    limit: (ulong)_retrievePerQuery
                 );
 
                 for (int rank = 0; rank < searchResult.Count; rank++)
@@ -497,7 +519,7 @@ namespace Dict.Service
                     }
 
                     candidate.BestVectorScore = Math.Max(candidate.BestVectorScore, hit.Score);
-                    candidate.DenseRrfScore += 1.0 / (RrfK + rank + 1);
+                    candidate.DenseRrfScore += 1.0 / (_rrfK + rank + 1);
                     candidate.DenseHitCount += 1;
                 }
             }
@@ -505,7 +527,7 @@ namespace Dict.Service
             var rankedCandidates = candidateMap.Values
                 .OrderByDescending(candidate => candidate.DenseRrfScore)
                 .ThenByDescending(candidate => candidate.BestVectorScore)
-                .Take(CandidatePoolLimit)
+                .Take(_candidatePoolLimit)
                 .ToList();
 
             if (rankedCandidates.Count == 0)
@@ -522,7 +544,8 @@ namespace Dict.Service
 
             // Out-of-scope guard: if best vector score is too low, the query is outside document scope
             float bestVectorScore = (float)rankedCandidates.Max(c => c.BestVectorScore);
-            if (bestVectorScore < OutOfScopeScoreThreshold)
+            bool hasStrongSignal = HasStrongRetrievalSignal(query, rankedCandidates);
+            if (bestVectorScore < _outOfScopeScoreThreshold && !hasStrongSignal)
             {
                 return new DocumentRagAskResponseDto
                 {
@@ -534,15 +557,16 @@ namespace Dict.Service
 
             ApplyKeywordRrf(query, rankedCandidates);
             ApplyCrossSignalRerank(query, rankedCandidates);
+            ApplyExactSignalRerank(query, rankedCandidates);
             ApplyContentTypeRerank(query, rankedCandidates);
 
             rankedCandidates = rankedCandidates
                 .OrderByDescending(candidate => candidate.FinalScore)
                 .ThenByDescending(candidate => candidate.BestVectorScore)
-                .Take(CandidatePoolLimit)
+                .Take(_candidatePoolLimit)
                 .ToList();
 
-            var rerankInput = rankedCandidates.Take(RerankCandidateLimit).ToList();
+            var rerankInput = rankedCandidates.Take(_rerankCandidateLimit).ToList();
             var reranked = await RerankCandidatesAsync(query, rerankInput);
             var rerankedSet = new HashSet<string>(reranked.Select(item => item.Key));
             var finalCandidates = reranked
@@ -710,7 +734,7 @@ namespace Dict.Service
                     collectionName: CollectionName, vector: queryVector,
                     filter: BuildChildSearchFilter(jobId),
                     searchParams: searchParams,
-                    limit: (ulong)RetrievePerQuery);
+                    limit: (ulong)_retrievePerQuery);
 
                 for (int rank = 0; rank < searchResult.Count; rank++)
                 {
@@ -736,14 +760,14 @@ namespace Dict.Service
                         candidateMap[key] = candidate;
                     }
                     candidate.BestVectorScore = Math.Max(candidate.BestVectorScore, hit.Score);
-                    candidate.DenseRrfScore += 1.0 / (RrfK + rank + 1);
+                    candidate.DenseRrfScore += 1.0 / (_rrfK + rank + 1);
                     candidate.DenseHitCount += 1;
                 }
             }
 
             var rankedCandidates = candidateMap.Values
                 .OrderByDescending(c => c.DenseRrfScore).ThenByDescending(c => c.BestVectorScore)
-                .Take(CandidatePoolLimit).ToList();
+                .Take(_candidatePoolLimit).ToList();
 
             if (rankedCandidates.Count == 0)
             {
@@ -752,7 +776,7 @@ namespace Dict.Service
             }
 
             float bestScore = (float)rankedCandidates.Max(c => c.BestVectorScore);
-            if (bestScore < OutOfScopeScoreThreshold)
+            if (bestScore < _outOfScopeScoreThreshold)
             {
                 yield return new RagStreamEvent { Type = "error", Data = "Câu hỏi này nằm ngoài phạm vi nội dung tài liệu hiện tại." };
                 yield break;
@@ -761,13 +785,13 @@ namespace Dict.Service
             ApplyKeywordRrf(query, rankedCandidates);
             ApplyCrossSignalRerank(query, rankedCandidates);
             ApplyContentTypeRerank(query, rankedCandidates);
-            rankedCandidates = rankedCandidates.OrderByDescending(c => c.FinalScore).ThenByDescending(c => c.BestVectorScore).Take(CandidatePoolLimit).ToList();
+            rankedCandidates = rankedCandidates.OrderByDescending(c => c.FinalScore).ThenByDescending(c => c.BestVectorScore).Take(_candidatePoolLimit).ToList();
 
             // Rerank: only for high mode
             List<RetrievalCandidate> finalCandidates;
             if (mode == "high")
             {
-                var reranked = await RerankCandidatesAsync(query, rankedCandidates.Take(RerankCandidateLimit).ToList());
+                var reranked = await RerankCandidatesAsync(query, rankedCandidates.Take(_rerankCandidateLimit).ToList());
                 var rerankedSet = new HashSet<string>(reranked.Select(item => item.Key));
                 finalCandidates = reranked.Concat(rankedCandidates.Where(c => !rerankedSet.Contains(c.Key))).ToList();
             }
@@ -929,7 +953,7 @@ namespace Dict.Service
                     vector: queryVector,
                     filter: workspaceFilter,
                     searchParams: searchParams,
-                    limit: (ulong)RetrievePerQuery);
+                    limit: (ulong)_retrievePerQuery);
 
                 for (int rank = 0; rank < searchResult.Count; rank++)
                 {
@@ -955,14 +979,14 @@ namespace Dict.Service
                         candidateMap[key] = candidate;
                     }
                     candidate.BestVectorScore = Math.Max(candidate.BestVectorScore, hit.Score);
-                    candidate.DenseRrfScore += 1.0 / (RrfK + rank + 1);
+                    candidate.DenseRrfScore += 1.0 / (_rrfK + rank + 1);
                     candidate.DenseHitCount += 1;
                 }
             }
 
             var rankedCandidates = candidateMap.Values
                 .OrderByDescending(c => c.DenseRrfScore).ThenByDescending(c => c.BestVectorScore)
-                .Take(CandidatePoolLimit).ToList();
+                .Take(_candidatePoolLimit).ToList();
 
             if (rankedCandidates.Count == 0)
             {
@@ -971,7 +995,7 @@ namespace Dict.Service
             }
 
             float bestScore = (float)rankedCandidates.Max(c => c.BestVectorScore);
-            if (bestScore < OutOfScopeScoreThreshold)
+            if (bestScore < _outOfScopeScoreThreshold)
             {
                 yield return new RagStreamEvent { Type = "error", Data = "Không tìm thấy nội dung liên quan trong toàn bộ tài liệu workspace." };
                 yield break;
@@ -979,7 +1003,7 @@ namespace Dict.Service
 
             // ---- Clarify: low-confidence zone — ask user to rephrase ----
             bool hasHistory = (safeHistory?.Count ?? 0) > 0;
-            if (bestScore < ClarifyScoreThreshold && !hasHistory && !skipClarify)
+            if (bestScore < _clarifyScoreThreshold && !hasHistory && !skipClarify)
             {
                 string clarifyJson = JsonSerializer.Serialize(new
                 {
@@ -994,11 +1018,14 @@ namespace Dict.Service
             ApplyKeywordRrf(query, rankedCandidates);
             ApplyCrossSignalRerank(query, rankedCandidates);
             ApplyContentTypeRerank(query, rankedCandidates);
-            rankedCandidates = rankedCandidates.OrderByDescending(c => c.FinalScore).ThenByDescending(c => c.BestVectorScore).Take(CandidatePoolLimit).ToList();
+            rankedCandidates = rankedCandidates.OrderByDescending(c => c.FinalScore).ThenByDescending(c => c.BestVectorScore).Take(_candidatePoolLimit).ToList();
+            // Stamp DocumentName before rerank (workspace scope) so LLM sees doc identity
+            foreach (var c in rankedCandidates)
+                c.DocumentName = jobNameMap.TryGetValue(c.JobId, out var dn1) ? dn1 : $"Tài liệu #{c.JobId}";
             List<RetrievalCandidate> finalCandidates;
             if (mode == "high")
             {
-                var reranked = await RerankCandidatesAsync(query, rankedCandidates.Take(RerankCandidateLimit).ToList());
+                var reranked = await RerankCandidatesAsync(query, rankedCandidates.Take(_rerankCandidateLimit).ToList());
                 var rerankedSet = new HashSet<string>(reranked.Select(c => c.Key));
                 finalCandidates = reranked.Concat(rankedCandidates.Where(c => !rerankedSet.Contains(c.Key))).ToList();
             }
@@ -1147,7 +1174,7 @@ namespace Dict.Service
                     vector: queryVector,
                     filter: projectFilter,
                     searchParams: searchParams,
-                    limit: (ulong)RetrievePerQuery);
+                    limit: (ulong)_retrievePerQuery);
                 for (int rank = 0; rank < searchResult.Count; rank++)
                 {
                     var hit = searchResult[rank];
@@ -1172,14 +1199,14 @@ namespace Dict.Service
                         candidateMap[key] = candidate;
                     }
                     candidate.BestVectorScore = Math.Max(candidate.BestVectorScore, hit.Score);
-                    candidate.DenseRrfScore += 1.0 / (RrfK + rank + 1);
+                    candidate.DenseRrfScore += 1.0 / (_rrfK + rank + 1);
                     candidate.DenseHitCount += 1;
                 }
             }
 
             var rankedCandidates = candidateMap.Values
                 .OrderByDescending(c => c.DenseRrfScore).ThenByDescending(c => c.BestVectorScore)
-                .Take(CandidatePoolLimit).ToList();
+                .Take(_candidatePoolLimit).ToList();
 
             if (rankedCandidates.Count == 0)
             {
@@ -1188,7 +1215,7 @@ namespace Dict.Service
             }
 
             float bestScore = (float)rankedCandidates.Max(c => c.BestVectorScore);
-            if (bestScore < OutOfScopeScoreThreshold)
+            if (bestScore < _outOfScopeScoreThreshold)
             {
                 yield return new RagStreamEvent { Type = "error", Data = "Không tìm thấy nội dung liên quan trong tài liệu của dự án." };
                 yield break;
@@ -1196,7 +1223,7 @@ namespace Dict.Service
 
             // ---- Clarify: low-confidence zone — ask user to rephrase ----
             bool hasHistory = (safeHistory?.Count ?? 0) > 0;
-            if (bestScore < ClarifyScoreThreshold && !hasHistory && !skipClarify)
+            if (bestScore < _clarifyScoreThreshold && !hasHistory && !skipClarify)
             {
                 string clarifyJson = JsonSerializer.Serialize(new
                 {
@@ -1211,11 +1238,14 @@ namespace Dict.Service
             ApplyKeywordRrf(query, rankedCandidates);
             ApplyCrossSignalRerank(query, rankedCandidates);
             ApplyContentTypeRerank(query, rankedCandidates);
-            rankedCandidates = rankedCandidates.OrderByDescending(c => c.FinalScore).ThenByDescending(c => c.BestVectorScore).Take(CandidatePoolLimit).ToList();
+            rankedCandidates = rankedCandidates.OrderByDescending(c => c.FinalScore).ThenByDescending(c => c.BestVectorScore).Take(_candidatePoolLimit).ToList();
+            // Stamp DocumentName before rerank (project scope) so LLM sees doc identity
+            foreach (var c in rankedCandidates)
+                c.DocumentName = jobNameMap.TryGetValue(c.JobId, out var dn2) ? dn2 : $"Tài liệu #{c.JobId}";
             List<RetrievalCandidate> finalCandidates;
             if (mode == "high")
             {
-                var reranked = await RerankCandidatesAsync(query, rankedCandidates.Take(RerankCandidateLimit).ToList());
+                var reranked = await RerankCandidatesAsync(query, rankedCandidates.Take(_rerankCandidateLimit).ToList());
                 var rerankedSet = new HashSet<string>(reranked.Select(c => c.Key));
                 finalCandidates = reranked.Concat(rankedCandidates.Where(c => !rerankedSet.Contains(c.Key))).ToList();
             }
@@ -1317,7 +1347,7 @@ namespace Dict.Service
                 .Select(item => item.Trim())
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Take(QueryVariantLimit + DecompositionSubQueryLimit)
+                .Take(_queryVariantLimit + _decompositionSubQueryLimit)
                 .ToList();
 
             _queryExpansionCache[cacheKey] = (result, DateTime.UtcNow.AddMinutes(30));
@@ -1354,7 +1384,7 @@ namespace Dict.Service
                 .Select(item => item.Trim())
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Take(QueryVariantLimit + DecompositionSubQueryLimit + 2)
+                .Take(_queryVariantLimit + _decompositionSubQueryLimit + 2)
                 .ToList();
 
             _queryExpansionCache[cacheKey] = (result, DateTime.UtcNow.AddMinutes(30));
@@ -1385,7 +1415,7 @@ namespace Dict.Service
                 Chỉ tách khi thật sự có nhiều ý/đối tượng cần tìm riêng.
                 Nếu câu hỏi chỉ có 1 ý thì trả về mảng rỗng.
                 Mỗi câu hỏi con phải độc lập, rõ nghĩa, giữ nguyên ngôn ngữ và thuật ngữ kỹ thuật.
-                Tối đa {DecompositionSubQueryLimit} câu.
+                Tối đa {_decompositionSubQueryLimit} câu.
 
                 Câu hỏi gốc:
                 {query}
@@ -1404,7 +1434,7 @@ namespace Dict.Service
                 }
                 """;
 
-            string? jsonText = await CallGeminiJsonAsync(prompt, schema);
+            string? jsonText = await CallLlmJsonAsync(prompt, schema, RagLlmRole.Decomposition);
             if (string.IsNullOrWhiteSpace(jsonText))
                 return new List<string>();
 
@@ -1419,7 +1449,7 @@ namespace Dict.Service
                     .Where(item => !string.IsNullOrWhiteSpace(item))
                     .Select(item => item.Trim())
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Take(DecompositionSubQueryLimit)
+                    .Take(_decompositionSubQueryLimit)
                     .ToList() ?? new List<string>();
             }
             catch (JsonException)
@@ -1560,7 +1590,7 @@ namespace Dict.Service
                         TableDbId = ReadIntPayload(hit.Payload, "table_db_id"),
                         SectionTitle = ReadStringPayload(hit.Payload, "section_title"),
                         BestVectorScore = hit.Score,
-                        DenseRrfScore = 1.0 / (RrfK + rank + 1),
+                        DenseRrfScore = 1.0 / (_rrfK + rank + 1),
                         DenseHitCount = 1
                     });
                 }
@@ -1658,7 +1688,7 @@ namespace Dict.Service
 
             try
             {
-                string? json = await CallGeminiJsonAsync(prompt, schema);
+                string? json = await CallLlmJsonAsync(prompt, schema, RagLlmRole.Rewrite);
                 if (string.IsNullOrWhiteSpace(json)) return query;
 
                 using var doc = JsonDocument.Parse(json);
@@ -1675,7 +1705,7 @@ namespace Dict.Service
         {
             string prompt = $"""
                 Bạn đang giúp mở rộng truy vấn tìm kiếm tài liệu kỹ thuật.
-                Hãy tạo tối đa {QueryVariantLimit} câu truy vấn khác nhau nhưng cùng ý định với câu hỏi gốc.
+                Hãy tạo tối đa {_queryVariantLimit} câu truy vấn khác nhau nhưng cùng ý định với câu hỏi gốc.
                 Ưu tiên giữ các từ khóa kỹ thuật quan trọng (mã lỗi, tên chỉ số, thuật ngữ riêng).
                 Không giải thích thêm.
 
@@ -1696,7 +1726,7 @@ namespace Dict.Service
                 }
                 """;
 
-            string? jsonText = await CallGeminiJsonAsync(prompt, schema);
+            string? jsonText = await CallLlmJsonAsync(prompt, schema, RagLlmRole.QueryExpansion);
             if (string.IsNullOrWhiteSpace(jsonText))
             {
                 return new List<string>();
@@ -1710,7 +1740,7 @@ namespace Dict.Service
                 );
                 return parsed?.Queries?
                     .Where(item => !string.IsNullOrWhiteSpace(item))
-                    .Take(QueryVariantLimit)
+                    .Take(_queryVariantLimit)
                     .ToList() ?? new List<string>();
             }
             catch (JsonException)
@@ -1739,7 +1769,7 @@ namespace Dict.Service
                 }
                 """;
 
-            string? jsonText = await CallGeminiJsonAsync(prompt, schema);
+            string? jsonText = await CallLlmJsonAsync(prompt, schema, RagLlmRole.Hyde);
             if (string.IsNullOrWhiteSpace(jsonText))
             {
                 return string.Empty;
@@ -1759,7 +1789,7 @@ namespace Dict.Service
             }
         }
 
-        private static void ApplyKeywordRrf(string query, List<RetrievalCandidate> candidates)
+        private void ApplyKeywordRrf(string query, List<RetrievalCandidate> candidates)
         {
             var terms = ExtractKeywordTerms(query);
             if (terms.Count == 0)
@@ -1811,7 +1841,7 @@ namespace Dict.Service
 
             for (int rank = 0; rank < keywordRanked.Count; rank++)
             {
-                keywordRanked[rank].Candidate.KeywordRrfScore += 1.0 / (RrfK + rank + 1);
+                keywordRanked[rank].Candidate.KeywordRrfScore += 1.0 / (_rrfK + rank + 1);
             }
 
             foreach (var candidate in candidates)
@@ -1851,6 +1881,54 @@ namespace Dict.Service
 
                 // Increase score when document satisfies more query terms and negation semantics.
                 candidate.FinalScore += overlapRatio * 0.22d + negationSignal;
+            }
+        }
+
+        private static void ApplyExactSignalRerank(string query, List<RetrievalCandidate> candidates)
+        {
+            if (candidates.Count == 0 || string.IsNullOrWhiteSpace(query))
+            {
+                return;
+            }
+
+            var exactTerms = ExtractExactMatchTerms(query);
+            if (exactTerms.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var candidate in candidates)
+            {
+                string text = BuildCandidateSignalText(candidate);
+                int exactHits = 0;
+                int numericHits = 0;
+
+                foreach (string term in exactTerms)
+                {
+                    if (!ContainsLooseTerm(text, term))
+                    {
+                        continue;
+                    }
+
+                    exactHits++;
+                    if (term.Any(char.IsDigit))
+                    {
+                        numericHits++;
+                    }
+                }
+
+                if (exactHits == 0)
+                {
+                    continue;
+                }
+
+                double boost = Math.Min(0.30d, (exactHits * 0.04d) + (numericHits * 0.05d));
+                if (numericHits > 0 && NormalizeContentType(candidate.ContentType) == ContentTypeTable)
+                {
+                    boost += 0.04d;
+                }
+
+                candidate.FinalScore += boost;
             }
         }
 
@@ -2043,6 +2121,109 @@ namespace Dict.Service
             };
         }
 
+        private bool HasStrongRetrievalSignal(string query, List<RetrievalCandidate> candidates)
+        {
+            if (candidates.Count == 0 || string.IsNullOrWhiteSpace(query))
+            {
+                return false;
+            }
+
+            var queryTerms = ExtractKeywordTerms(query);
+            var exactTerms = ExtractExactMatchTerms(query);
+            foreach (var candidate in candidates.Take(5))
+            {
+                string text = BuildCandidateSignalText(candidate);
+
+                if (exactTerms.Any(term => ContainsLooseTerm(text, term)))
+                {
+                    return true;
+                }
+
+                if (queryTerms.Count > 0)
+                {
+                    var tf = BuildTermFrequency(text);
+                    int overlap = queryTerms.Count(term => tf.ContainsKey(term));
+                    int requiredOverlap = Math.Max(2, (int)Math.Ceiling(queryTerms.Count * 0.5d));
+                    if (overlap >= requiredOverlap)
+                    {
+                        return true;
+                    }
+                }
+
+                if (candidate.DenseHitCount >= 2 && candidate.BestVectorScore >= (_outOfScopeScoreThreshold - 0.05f))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string BuildCandidateSignalText(RetrievalCandidate candidate)
+        {
+            return string.Join("\n", new[]
+            {
+                candidate.SectionTitle,
+                candidate.ParentText,
+                candidate.ChildText
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        }
+
+        private static List<string> ExtractExactMatchTerms(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return new List<string>();
+            }
+
+            var terms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var match in Regex.Matches(text, @"(?i)\bfy\s*\d{4}\b").Cast<System.Text.RegularExpressions.Match>())
+            {
+                terms.Add(Regex.Replace(match.Value.Trim(), @"\s+", ""));
+            }
+
+            foreach (var match in Regex.Matches(text, @"\b(?:19|20)\d{2}\b").Cast<System.Text.RegularExpressions.Match>())
+            {
+                terms.Add(match.Value.Trim());
+            }
+
+            foreach (var match in Regex.Matches(text, @"\d[\d\.,/-]*\s*(?:%|％|mg/dl|mg/l|兆円|億円|円|yên|yen|倍|台|件|人|年|月)?", RegexOptions.IgnoreCase).Cast<System.Text.RegularExpressions.Match>())
+            {
+                string value = match.Value.Trim();
+                if (value.Length >= 2)
+                {
+                    terms.Add(value);
+                }
+            }
+
+            foreach (var match in Regex.Matches(text, @"[A-Za-z]{2,}[A-Za-z0-9_\-]*\d+[A-Za-z0-9_\-]*").Cast<System.Text.RegularExpressions.Match>())
+            {
+                string value = match.Value.Trim();
+                if (value.Length >= 3)
+                {
+                    terms.Add(value);
+                }
+            }
+
+            return terms
+                .OrderByDescending(term => term.Length)
+                .Take(10)
+                .ToList();
+        }
+
+        private static bool ContainsLooseTerm(string text, string term)
+        {
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(term))
+            {
+                return false;
+            }
+
+            string normalizedText = Regex.Replace(text.ToLowerInvariant(), @"\s+", "");
+            string normalizedTerm = Regex.Replace(term.ToLowerInvariant(), @"\s+", "");
+            return normalizedText.Contains(normalizedTerm);
+        }
+
         private async Task<string> GetCandidateSourceTextWithTableAsync(RetrievalCandidate candidate)
         {
             if (NormalizeContentType(candidate.ContentType) == ContentTypeTable && candidate.TableDbId > 0)
@@ -2201,7 +2382,7 @@ namespace Dict.Service
             }
         }
 
-        private static double CalculateBm25Score(
+        private double CalculateBm25Score(
             Dictionary<string, int> termFrequency,
             List<string> queryTerms,
             Dictionary<string, int> documentFrequency,
@@ -2230,8 +2411,8 @@ namespace Dict.Service
                 }
 
                 double idf = Math.Log(1d + ((totalDocs - df + 0.5d) / (df + 0.5d)));
-                double numerator = tf * (Bm25K1 + 1d);
-                double denominator = tf + Bm25K1 * (1d - Bm25B + Bm25B * (docLength / avgDocLength));
+                double numerator = tf * (_bm25K1 + 1d);
+                double denominator = tf + _bm25K1 * (1d - _bm25B + _bm25B * (docLength / avgDocLength));
                 score += idf * (numerator / denominator);
             }
 
@@ -2258,7 +2439,10 @@ namespace Dict.Service
             for (int index = 0; index < candidates.Count; index++)
             {
                 var candidate = candidates[index];
-                prompt.AppendLine($"[{index + 1}] Trang {candidate.PageNumber}, đoạn {candidate.ChunkIndex + 1}");
+                string docLabel = string.IsNullOrWhiteSpace(candidate.DocumentName)
+                    ? $"Tài liệu #{candidate.JobId}"
+                    : candidate.DocumentName;
+                prompt.AppendLine($"[{index + 1}] [{docLabel}] Trang {candidate.PageNumber}, đoạn {candidate.ChunkIndex + 1}");
                 prompt.AppendLine(candidate.ChildText);
                 prompt.AppendLine();
             }
@@ -2276,7 +2460,7 @@ namespace Dict.Service
                 }
                 """;
 
-            string? jsonText = await CallGeminiJsonAsync(prompt.ToString(), schema);
+            string? jsonText = await CallLlmJsonAsync(prompt.ToString(), schema, RagLlmRole.Rerank);
             if (string.IsNullOrWhiteSpace(jsonText))
             {
                 return candidates;
@@ -2319,6 +2503,7 @@ namespace Dict.Service
 
         private string BuildCandidateKey(IDictionary<string, Value> payload)
         {
+            int jobId = ReadIntPayload(payload, "job_id");
             int page = ReadIntPayload(payload, "page_number");
             int parent = ReadIntPayload(payload, "parent_index");
             int chunk = ReadIntPayload(payload, "chunk_index");
@@ -2329,49 +2514,13 @@ namespace Dict.Service
                 return string.Empty;
             }
 
-            return $"{page}:{parent}:{chunk}:{pointType}:{contentType}";
+            return $"{jobId}:{page}:{parent}:{chunk}:{pointType}:{contentType}";
         }
 
-        private async Task<string?> CallGeminiJsonAsync(string prompt, string responseSchemaJson)
+        private async Task<string?> CallLlmJsonAsync(string prompt, string responseSchemaJson, string role)
         {
-            string apiKey = _config["GoogleCloud:ApiKey"];
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                return null;
-            }
-
-            apiKey = apiKey.Replace("\r", "").Replace("\n", "").Replace(" ", "").Trim();
-            string endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-            string requestUrl = $"{endpoint}?key={apiKey}";
-
-            using var schemaDoc = JsonDocument.Parse(responseSchemaJson);
-            var requestBody = new
-            {
-                contents = new[] { new { parts = new[] { new { text = prompt } } } },
-                generationConfig = new
-                {
-                    response_mime_type = "application/json",
-                    response_schema = schemaDoc.RootElement
-                }
-            };
-
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(requestUrl, content);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(jsonResponse);
-            var resultText = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString() ?? string.Empty;
-
-            return resultText.Replace("```json", "").Replace("```", "").Trim();
+            var provider = _llmRouter.GetProvider(role);
+            return await provider.GenerateJsonAsync(prompt, responseSchemaJson, role);
         }
 
         private async Task<OcrJob> GetAccessibleJobAsync(int jobId, int userId)
@@ -2479,7 +2628,7 @@ namespace Dict.Service
                 cacheFilter.Must.Add(new Condition { Field = new FieldCondition { Key = "scope_id", Match = new Qdrant.Client.Grpc.Match { Integer = scopeId } } });
 
                 var results = await _qdrantClient.SearchAsync(CacheCollectionName, vector: queryVector, filter: cacheFilter, limit: 1);
-                if (results.Count == 0 || results[0].Score < CacheHitThreshold) return null;
+                if (results.Count == 0 || results[0].Score < _cacheHitThreshold) return null;
 
                 var payload = results[0].Payload;
                 return new CacheEntry
@@ -3466,74 +3615,10 @@ namespace Dict.Service
 
         private async IAsyncEnumerable<string> CallGeminiStreamAsync(string prompt, bool disableThinking = false)
         {
-            string apiKey = _config["GoogleCloud:ApiKey"];
-            if (string.IsNullOrWhiteSpace(apiKey))
+            var provider = _llmRouter.GetProvider(RagLlmRole.Answer);
+            await foreach (var chunk in provider.StreamTextAsync(prompt, RagLlmRole.Answer, disableThinking))
             {
-                yield return "Lỗi cấu hình API key.";
-                yield break;
-            }
-
-            apiKey = apiKey.Replace("\r", "").Replace("\n", "").Replace(" ", "").Trim();
-            string url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key={apiKey}";
-
-            object requestBody;
-            if (disableThinking)
-            {
-                requestBody = new
-                {
-                    contents = new[] { new { parts = new[] { new { text = prompt } } } },
-                    generationConfig = new { thinkingConfig = new { thinkingBudget = 0 } }
-                };
-            }
-            else
-            {
-                requestBody = new { contents = new[] { new { parts = new[] { new { text = prompt } } } } };
-            }
-
-            var request = new HttpRequestMessage(HttpMethod.Post, url)
-            {
-                Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
-            };
-
-            HttpResponseMessage? response = null;
-            string? connectionError = null;
-            try
-            {
-                response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            }
-            catch (Exception ex)
-            {
-                connectionError = $"Lỗi kết nối Gemini: {ex.Message}";
-            }
-
-            if (connectionError != null) { yield return connectionError; yield break; }
-            if (!response!.IsSuccessStatusCode) { yield return $"Lỗi API Gemini: {response.StatusCode}"; yield break; }
-
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var reader = new System.IO.StreamReader(stream);
-
-            while (!reader.EndOfStream)
-            {
-                string? line = await reader.ReadLineAsync();
-                if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data:")) continue;
-
-                string json = line["data:".Length..].Trim();
-                if (json == "[DONE]") break;
-
-                string? chunk = null;
-                try
-                {
-                    using var doc = JsonDocument.Parse(json);
-                    chunk = doc.RootElement
-                        .GetProperty("candidates")[0]
-                        .GetProperty("content")
-                        .GetProperty("parts")[0]
-                        .GetProperty("text").GetString();
-                }
-                catch { /* skip malformed chunk */ }
-
-                if (!string.IsNullOrEmpty(chunk))
-                    yield return chunk;
+                yield return chunk;
             }
         }
 
@@ -3578,7 +3663,7 @@ namespace Dict.Service
 
             try
             {
-                string? json = await CallGeminiJsonAsync(prompt, schema);
+                string? json = await CallLlmJsonAsync(prompt, schema, RagLlmRole.Overview);
                 if (string.IsNullOrWhiteSpace(json)) return string.Empty;
                 using var doc = JsonDocument.Parse(json);
                 return doc.RootElement.GetProperty("overview").GetString()?.Trim() ?? string.Empty;
@@ -3588,58 +3673,32 @@ namespace Dict.Service
 
         private async Task<string> CallGeminiAsync(string prompt)
         {
-            string apiKey = _config["GoogleCloud:ApiKey"];
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                return "Lỗi cấu hình: Không tìm thấy GoogleCloud:ApiKey.";
-            }
-
-            apiKey = apiKey.Replace("\r", "").Replace("\n", "").Replace(" ", "").Trim();
-            string endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-            string requestUrl = $"{endpoint}?key={apiKey}";
-
-            var requestBody = new
-            {
-                contents = new[] { new { parts = new[] { new { text = prompt } } } },
-                generationConfig = new
+            string answerSchema = """
                 {
-                    response_mime_type = "application/json",
-                    response_schema = new
-                    {
-                        type = "object",
-                        properties = new
-                        {
-                            answer = new { type = "string" }
-                        },
-                        required = new[] { "answer" }
-                    }
+                  "type": "object",
+                  "properties": {
+                    "answer": { "type": "string" }
+                  },
+                  "required": ["answer"]
                 }
-            };
+                """;
 
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(requestUrl, content);
-            if (!response.IsSuccessStatusCode)
+            string? json = await CallLlmJsonAsync(prompt, answerSchema, RagLlmRole.Answer);
+            if (string.IsNullOrWhiteSpace(json))
             {
-                string errorContent = await response.Content.ReadAsStringAsync();
-                return $"Lỗi API Gemini: {response.StatusCode}. {ExtractGeminiError(errorContent)}".Trim();
+                string providerName = _llmRouter.GetProviderName(RagLlmRole.Answer);
+                return providerName.Equals("local", StringComparison.OrdinalIgnoreCase)
+                    ? "Lỗi Local LLM hoặc model local chưa sẵn sàng."
+                    : "Lỗi Gemini hoặc quota hiện tại không khả dụng.";
             }
 
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(jsonResponse);
-            var resultText = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text").GetString() ?? "";
-
-            resultText = resultText.Replace("```json", "").Replace("```", "").Trim();
             var finalObj = JsonSerializer.Deserialize<DocumentRagGeminiResponse>(
-                resultText,
+                json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
 
             return string.IsNullOrWhiteSpace(finalObj?.Answer)
-                ? "Không thể đọc câu trả lời từ Gemini."
+                ? "Không thể đọc câu trả lời từ LLM."
                 : finalObj.Answer;
         }
 
@@ -3773,6 +3832,7 @@ namespace Dict.Service
             public double KeywordRrfScore { get; set; }
             public double FinalScore { get; set; }
             public int DenseHitCount { get; set; }
+            public string DocumentName { get; set; } = string.Empty;
         }
 
         private sealed class StructuredSegment

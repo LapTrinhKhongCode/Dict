@@ -38,6 +38,10 @@ namespace Dict.Service
         private static readonly TimeSpan AzureDiTimeout = TimeSpan.FromMinutes(2);
         private const string OcrCachePrefix = "ocr_job_";
         private static readonly TimeSpan OcrCacheTtl = TimeSpan.FromMinutes(10);
+        // Completed jobs never change — cache much longer
+        private static readonly MemoryCacheEntryOptions OcrCompletedCacheOptions = new MemoryCacheEntryOptions()
+            .SetSlidingExpiration(TimeSpan.FromDays(7))
+            .SetAbsoluteExpiration(TimeSpan.FromDays(7));
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _pageOcrLocks = new();
         private const string AzureDiProvider = "azure-di";
         private const string AzureDiMimeParam = "ocr-provider";
@@ -595,6 +599,7 @@ namespace Dict.Service
 
             // 1. Lấy thông tin Job kèm kết quả
             var ocrJob = await _db.OcrJobs
+                .AsNoTracking()
                 .Include(j => j.Media)
                 .Include(j => j.Results)
                 .FirstOrDefaultAsync(j => j.Id == jobId);
@@ -606,7 +611,7 @@ namespace Dict.Service
             {
                 _logger.LogInformation("✅ DB Cache HIT — Job {JobId}", jobId);
                 var dto = MapToResultDto(ocrJob);
-                _cache.Set(cacheKey, dto, OcrCacheTtl);
+                _cache.Set(cacheKey, dto, OcrCompletedCacheOptions);
                 return dto;
             }
             bool isPdf = ocrJob.Media != null &&
@@ -709,9 +714,9 @@ namespace Dict.Service
                 await _db.SaveChangesAsync();
                 _logger.LogInformation("✅ OCR hoàn tất cho Job {JobId}", jobId);
 
-                // Cache kết quả completed
+                // Cache kết quả completed — dùng long TTL vì completed jobs không thay đổi
                 var completedDto = MapToResultDto(ocrJob);
-                _cache.Set(cacheKey, completedDto, OcrCacheTtl);
+                _cache.Set(cacheKey, completedDto, OcrCompletedCacheOptions);
 
                 // SignalR: push về client đang chờ trong room OcrJob_{jobId}
                 await _hub.Clients.Group($"OcrJob_{jobId}")
