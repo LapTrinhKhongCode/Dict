@@ -28,6 +28,7 @@ export default defineNuxtConfig({
 
   vite: {
     build: {
+      assetsInlineLimit: 0, // Không inline assets thành data: URL (bcmap, wasm cần serve qua HTTP)
       rollupOptions: {
         output: {
           // Tách các thư viện nặng thành chunk riêng → browser cache hiệu quả hơn
