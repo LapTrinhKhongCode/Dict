@@ -8,8 +8,7 @@ services:
     env_file:
       - path: ${BACKEND_ENV_FILE:-./backend.env}
         required: false
-    ports:
-      - "${BACKEND_PORT:-5008}:8080"
+    network_mode: host
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_URLS: http://+:8080
