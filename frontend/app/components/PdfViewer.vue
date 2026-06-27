@@ -739,7 +739,7 @@ async function runUploadQueue() {
     if (allDone) {
       try {
         const token = getToken();
-        await fetch(`${config.public.apiBaseUrl}/api/ocr/job/${pdfJobId.value}/complete`, {
+        await fetch(`${config.public.apiBaseUrl}/api/ocr/job/${pdfJobId.value}/complete?totalPages=${totalPages.value}`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${token}` },
         });
