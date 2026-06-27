@@ -17,6 +17,7 @@ services:
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-vision-key.json
     volumes:
       - ${GCP_VISION_KEY_PATH:-../gcp-vision-key.json}:/app/gcp-vision-key.json:ro
+      - ${APPSETTINGS_PRODUCTION_PATH:-../appsettings.Production.json}:/app/appsettings.Production.json:ro
       - trie-cache:/app/cache
     user: root
     restart: unless-stopped

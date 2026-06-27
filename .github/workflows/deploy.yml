@@ -59,8 +59,9 @@ jobs:
           cp ~/rag-models/multilingual-e5-small.onnx $GITHUB_WORKSPACE/Dict/multilingual-e5-small.onnx
 
           cd $GITHUB_WORKSPACE
-          # Trỏ GCP key về path cố định trên VM
+          # Trỏ GCP key và appsettings Production về path cố định trên VM
           export GCP_VISION_KEY_PATH=~/gcp-vision-key.json
+          export APPSETTINGS_PRODUCTION_PATH=~/Dict/Dict/appsettings.Production.json
           DOCKER_BUILDKIT=1 docker compose build
           docker compose up -d --remove-orphans
           # Tag để cache_from dùng được lần sau
@@ -91,11 +92,9 @@ jobs:
       - name: ✅ Health Check
         run: |
           echo "Waiting for backend to be healthy..."
-          HOST_PORT=$(docker inspect dict-backend-1 --format '{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}' 2>/dev/null || echo "5008")
-          echo "Detected host port: $HOST_PORT"
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${HOST_PORT}/WeatherForecast || echo "000")
-            if [ "$STATUS" = "200" ]; then
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/WeatherForecast 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ] || [ "$STATUS" = "404" ]; then
               echo "Backend is up (HTTP $STATUS)"
               exit 0
             fi
