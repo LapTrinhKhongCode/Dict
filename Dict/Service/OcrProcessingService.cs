@@ -498,13 +498,35 @@ namespace Dict.Service
                 else
                 {
                     var uniqueFileName = $"{Guid.NewGuid()}_{image.FileName}";
-                    var compressedBytes = CompressImage(originalImageBytes);
-                    await using (var stream = new MemoryStream(compressedBytes))
+
+                    // PDF: KHÔNG nén. CompressImage (ImageMagick) sẽ phá cấu trúc PDF hoặc
+                    // render về ảnh 1 trang (khi VM có Ghostscript) → pdf.js không đọc được,
+                    // mất luồng lazy-load nhiều trang. Lưu nguyên bytes + đúng content-type
+                    // để pdf.js render trực tiếp và OCR từng trang như luồng cũ.
+                    var fileExt = Path.GetExtension(image.FileName ?? string.Empty);
+                    bool isPdfUpload =
+                        (image.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
+                        || fileExt.Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+
+                    byte[] bytesToStore;
+                    string blobContentType;
+                    if (isPdfUpload)
+                    {
+                        bytesToStore = originalImageBytes;
+                        blobContentType = "application/pdf";
+                    }
+                    else
+                    {
+                        bytesToStore = CompressImage(originalImageBytes);
+                        blobContentType = "image/jpeg";
+                    }
+
+                    await using (var stream = new MemoryStream(bytesToStore))
                     {
                         uploadedUrl = await _blobService.UploadFileBlobAsync(
                             containerName: "ocr-images",
                             content: stream,
-                            contentType: "image/jpeg",
+                            contentType: blobContentType,
                             fileName: uniqueFileName
                         );
                     }
