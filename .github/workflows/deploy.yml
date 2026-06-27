@@ -54,6 +54,11 @@ jobs:
           # Copy config files (gitignored) vào workspace trước khi build
           cp ~/Dict/backend.env $GITHUB_WORKSPACE/backend.env || true
 
+          # Copy model RAG (gitignored vì quá nặng) vào build context
+          # File được tải sẵn 1 lần lên VM tại ~/rag-models/
+          cp ~/rag-models/tokenizer.json $GITHUB_WORKSPACE/Dict/tokenizer.json
+          cp ~/rag-models/multilingual-e5-small.onnx $GITHUB_WORKSPACE/Dict/multilingual-e5-small.onnx
+
           cd $GITHUB_WORKSPACE
           # Trỏ GCP key về path cố định trên VM
           export GCP_VISION_KEY_PATH=~/gcp-vision-key.json
