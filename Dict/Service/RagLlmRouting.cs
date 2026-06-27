@@ -65,7 +65,7 @@ namespace Dict.Service
                 _ => null
             };
 
-            return string.IsNullOrWhiteSpace(configured) ? "gemini" : configured.Trim().ToLowerInvariant();
+            return string.IsNullOrWhiteSpace(configured) ? "local" : configured.Trim().ToLowerInvariant();
         }
     }
 
@@ -170,7 +170,9 @@ namespace Dict.Service
 
             if (!response!.IsSuccessStatusCode)
             {
-                yield return $"Lỗi API Gemini: {response.StatusCode}";
+                string errorBody = string.Empty;
+                try { errorBody = await response.Content.ReadAsStringAsync(cancellationToken); } catch { }
+                yield return $"Lỗi API Gemini: {response.StatusCode} - {errorBody}";
                 yield break;
             }
 
