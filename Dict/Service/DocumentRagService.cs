@@ -3616,9 +3616,25 @@ namespace Dict.Service
         private async IAsyncEnumerable<string> CallGeminiStreamAsync(string prompt, bool disableThinking = false)
         {
             var provider = _llmRouter.GetProvider(RagLlmRole.Answer);
+            string? prevChunk = null;
             await foreach (var chunk in provider.StreamTextAsync(prompt, RagLlmRole.Answer, disableThinking))
             {
-                yield return chunk;
+                // Ollama tokenizer may omit leading space on some tokens.
+                // Inject a space when the previous chunk didn't end with whitespace/newline
+                // and the current chunk doesn't start with one either.
+                string emitChunk = chunk;
+                if (prevChunk != null
+                    && prevChunk.Length > 0
+                    && chunk.Length > 0
+                    && !char.IsWhiteSpace(prevChunk[^1])
+                    && !char.IsWhiteSpace(chunk[0])
+                    && !char.IsPunctuation(chunk[0])
+                    && !char.IsSymbol(chunk[0]))
+                {
+                    emitChunk = " " + chunk;
+                }
+                prevChunk = chunk;
+                yield return emitChunk;
             }
         }
 

@@ -430,7 +430,6 @@ function buildHistory(): ConversationTurn[] {
 
 function cleanAnswer(text: string): string {
   if (!text) return ''
-  const strongClose = '<' + '/strong>'
   return text
     .replace(/\[Nguồn\s*\d+(?:[,、]\s*\d+)*(?:[,、]\s*Tr\.?\s*\d+)?\]/g, '')
     .replace(/\(Nguồn\s*\d+[^)]*\)/g, '')
@@ -445,10 +444,13 @@ function formatAnswer(text: string): string {
   const strongOpen = '<strong class="font-semibold">'
   const strongClose = '<' + '/strong>'
   const brClose = '<' + '/b>'
-  if (/<(ul|ol|li|b|strong|em|br|p|h[1-6])\b/i.test(text)) {
-    return text.replace(/<b>/gi, strongOpen).replace(new RegExp(brClose, 'gi'), strongClose)
+  // Normalize missing spaces between CJK/latin tokens from Ollama streaming
+  const normalized = text
+    .replace(/([^\s\n\-—])([A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐƠƯẠ-Ữ])/g, '$1 $2')
+  if (/<(ul|ol|li|b|strong|em|br|p|h[1-6])\b/i.test(normalized)) {
+    return normalized.replace(/<b>/gi, strongOpen).replace(new RegExp(brClose, 'gi'), strongClose)
   }
-  return text
+  return normalized
     .replace(/\*\*(.+?)\*\*/g, (_m, p1) => `${strongOpen}${p1}${strongClose}`)
     .replace(/\n/g, '<' + 'br>')
 }
