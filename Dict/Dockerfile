@@ -2,12 +2,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
+# Restore — chỉ re-run khi .csproj thay đổi
 COPY Dict/Dict.csproj ./Dict/
 RUN dotnet restore ./Dict/Dict.csproj -r linux-x64
 
-COPY . .
-RUN dotnet publish ./Dict/Dict.csproj -c Release -o /app/publish -r linux-x64 --self-contained false && \
+# Build — re-run khi source code thay đổi
+COPY Dict/ ./Dict/
+RUN dotnet publish ./Dict/Dict.csproj -c Release -o /app/publish -r linux-x64 --self-contained false --no-restore && \
     find /root/.nuget/packages/ -type f -name "libhf_tokenizers.so" -path "*/linux-x64/*" -exec cp {} /app/publish/ \;
+
 # --- Stage 2: Final Image ---
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 

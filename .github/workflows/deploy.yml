@@ -61,8 +61,10 @@ jobs:
           cd $GITHUB_WORKSPACE
           # Trỏ GCP key về path cố định trên VM
           export GCP_VISION_KEY_PATH=~/gcp-vision-key.json
-          DOCKER_BUILDKIT=1 docker compose build --pull
+          DOCKER_BUILDKIT=1 docker compose build
           docker compose up -d --remove-orphans
+          # Tag để cache_from dùng được lần sau
+          docker tag $(docker compose images -q backend) dict-backend:latest 2>/dev/null || true
           docker image prune -f
 
       - name: 🔧 Ensure nginx CORS headers
