@@ -376,6 +376,7 @@ const pdfDocumentBaseOptions = {
   cMapPacked: true,
   standardFontDataUrl: `${_pdfjsCdnBase}/standard_fonts/`,
   wasmUrl: `${_pdfjsCdnBase}/wasm/`,
+  iccUrl: `${_pdfjsCdnBase}/iccs/`,
   useSystemFonts: true
 }
 
@@ -487,6 +488,9 @@ async function generateThumbnailsForFiles(fileList) {
       thumbnailLoading.value = { ...thumbnailLoading.value, [file.id]: false }
       if (dataUrl) {
         thumbnails.value = { ...thumbnails.value, [file.id]: dataUrl }
+      } else {
+        // File có đuôi .pdf nhưng nội dung thật là ảnh (dữ liệu cũ) → dùng URL trực tiếp làm thumbnail
+        thumbnails.value = { ...thumbnails.value, [file.id]: url }
       }
     } else if (isImage) {
       // File ảnh thì dùng trực tiếp làm thumbnail
@@ -508,6 +512,10 @@ const getToken = () => localStorage.getItem('jwt_token') || ''
 
 async function checkAccessAndLoad() {
   const currentProjectId = route.params.projectid
+  // Bỏ qua khi param chưa sẵn sàng (lúc điều hướng/teardown) để tránh gọi /api/projects/undefined
+  if (!currentProjectId || currentProjectId === 'undefined') {
+    return
+  }
   const token = getToken()
   if (!token || !isAuthenticated.value) {
     accessDenied.value = true
