@@ -853,23 +853,25 @@ async function renderJobAsImage(data, jobId, sessionId) {
   pdfDoc.value = null;
   pdfLoadError.value = "";
 
-  if (data.status === "processing" || data.status === "pending") {
-    ocrLoading.value = true;
+  // Ưu tiên hiển thị kết quả OCR đã có sẵn (dữ liệu cũ có thể còn status pending/processing
+  // dù đã OCR xong) — tránh kẹt spinner "AI đang phân tích..." vĩnh viễn.
+  if (data.results?.length > 0) {
+    ocrLoading.value = false;
+    ocrResults.value = data.results;
+    ocrResultsState.value = data.results;
+    return;
+  }
+
+  // Chưa có kết quả mà đang xử lý → chỉ lắng nghe SignalR (không poll lại startLoadJob
+  // vì file mislabel .pdf sẽ lặp vô hạn InvalidPDFException). Nếu không có cập nhật,
+  // vẫn hiển thị ảnh và tắt spinner thay vì kẹt mãi.
+  if ((data.status === "processing" || data.status === "pending")) {
     const signalrOk = await trySetupSignalRForImage(jobId);
-    if (!signalrOk) {
-      setTimeout(() => {
-        if (sessionId !== viewerLoadSession.value) return;
-        startLoadJob(jobId, sessionId);
-      }, 2000);
-    }
+    ocrLoading.value = signalrOk;
     return;
   }
 
   ocrLoading.value = false;
-  if (data.results?.length > 0) {
-    ocrResults.value = data.results;
-    ocrResultsState.value = data.results;
-  }
 }
 
 async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
