@@ -836,21 +836,12 @@ public class InferController : ControllerBase
     // FE gọi sau khi upload xong toàn bộ trang PDF
     [HttpPatch("job/{jobId}/complete")]
     [Authorize]
-    public async Task<IActionResult> MarkJobComplete(int jobId)
+    public async Task<IActionResult> MarkJobComplete(int jobId, [FromQuery] int totalPages)
     {
         try
         {
-            var ocrJob = await _db.OcrJobs.FirstOrDefaultAsync(j => j.Id == jobId);
-            if (ocrJob == null) return NotFound();
-            if (ocrJob.Status == OcrStatus.Completed)
-                return Ok(new { message = "Already completed" });
-
-            await _ocrJobService.UpdateStatusAsync(jobId, new OcrJobUpdateStatusDto
-            {
-                Status = OcrStatus.Completed,
-                DetectedText = null
-            });
-            _logger.LogInformation("✅ Job {JobId} marked completed by FE", jobId);
+            await _ocrJobService.TryCompleteJobAsync(jobId, totalPages > 0 ? totalPages : 1);
+            _logger.LogInformation("✅ Job {JobId} TryComplete called by FE (totalPages={P})", jobId, totalPages);
             return Ok(new { message = "completed" });
         }
         catch (Exception e)
