@@ -756,8 +756,8 @@ async function uploadOnePage(pageNum, retryCount = 0) {
 
   try {
     const page = await pdfDoc.value.getPage(pageNum);
-    // Scale 2.0 — chất lượng tốt hơn cho text nhỏ và font phức tạp (CJK, furigana)
-    const viewport = page.getViewport({ scale: 2.0 });
+    // Scale 1.5 — đủ chất lượng cho Google Vision, nhẹ hơn 2.0 ~44%
+    const viewport = page.getViewport({ scale: 1.5 });
     const canvas = document.createElement("canvas");
     canvas.width = viewport.width;
     canvas.height = viewport.height;
@@ -765,7 +765,7 @@ async function uploadOnePage(pageNum, retryCount = 0) {
       .promise;
 
     const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, "image/png"),
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
     );
 
     // Cleanup canvas để tránh memory leak
@@ -774,7 +774,7 @@ async function uploadOnePage(pageNum, retryCount = 0) {
 
     const token = getToken();
     const formData = new FormData();
-    formData.append("image", blob, `page_${pageNum}.png`);
+    formData.append("image", blob, `page_${pageNum}.jpg`);
     formData.append("jobId", pdfJobId.value);
     formData.append("pageNumber", pageNum);
 
@@ -797,7 +797,7 @@ async function uploadOnePage(pageNum, retryCount = 0) {
         ...pageOcrResults.value,
         [pageNum]: data.results,
       };
-      // pageDimensions dùng scale 2.0 làm hệ quy chiếu cho bounding box
+      // pageDimensions dùng scale 1.5 làm hệ quy chiếu
       pageDimensions.value = {
         ...pageDimensions.value,
         [pageNum]: { w: viewport.width, h: viewport.height },
