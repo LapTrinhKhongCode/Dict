@@ -105,22 +105,37 @@ namespace Dict.Service
             };
 
             var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(requestUrl, content, cancellationToken);
+            HttpResponseMessage response;
+            try
+            {
+                response = await _httpClient.PostAsync(requestUrl, content, cancellationToken);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
             var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var doc = JsonDocument.Parse(jsonResponse);
-            var resultText = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString() ?? string.Empty;
-
-            return resultText.Replace("```json", "").Replace("```", "").Trim();
+            try
+            {
+                using var doc = JsonDocument.Parse(jsonResponse);
+                var resultText = doc.RootElement
+                    .GetProperty("candidates")[0]
+                    .GetProperty("content")
+                    .GetProperty("parts")[0]
+                    .GetProperty("text")
+                    .GetString() ?? string.Empty;
+                return resultText.Replace("```json", "").Replace("```", "").Trim();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public async IAsyncEnumerable<string> StreamTextAsync(string prompt, string role, bool disableThinking = false, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -256,10 +271,18 @@ namespace Dict.Service
                 }
             };
 
-            var response = await _httpClient.PostAsync(
-                $"{baseUrl}/api/generate",
-                new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json"),
-                cancellationToken);
+            HttpResponseMessage response;
+            try
+            {
+                response = await _httpClient.PostAsync(
+                    $"{baseUrl}/api/generate",
+                    new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json"),
+                    cancellationToken);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -267,9 +290,16 @@ namespace Dict.Service
             }
 
             string jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var doc = JsonDocument.Parse(jsonResponse);
-            string text = doc.RootElement.GetProperty("response").GetString() ?? string.Empty;
-            return text.Replace("```json", "").Replace("```", "").Trim();
+            try
+            {
+                using var doc = JsonDocument.Parse(jsonResponse);
+                string text = doc.RootElement.GetProperty("response").GetString() ?? string.Empty;
+                return text.Replace("```json", "").Replace("```", "").Trim();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public async IAsyncEnumerable<string> StreamTextAsync(string prompt, string role, bool disableThinking = false, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
