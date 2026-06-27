@@ -247,7 +247,7 @@ namespace Dict.Service
             _config = config;
             _httpClient = new HttpClient(new HttpClientHandler { UseProxy = false })
             {
-                Timeout = TimeSpan.FromMinutes(5)
+                Timeout = TimeSpan.FromSeconds(15)
             };
         }
 
