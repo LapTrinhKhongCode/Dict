@@ -165,7 +165,7 @@ namespace Dict.Tests.Services
             // Assert
             result.Should().NotBeNull();
             result.JobId.Should().Be(expectedJobId);
-            result.Status.Should().Be("completed");
+            result.Status.Should().Be("pending");
             result.ImageUrl.Should().Be(expectedBlobUrl);
 
             // MediaStore được lưu
@@ -178,10 +178,10 @@ namespace Dict.Tests.Services
             // Blob upload được gọi 1 lần
             _mockBlobService.Verify(b => b.UploadFileBlobAsync("ocr-images", It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
 
-            // Job được update thành completed
+            // Job được tạo với status pending — OCR sẽ được trigger riêng bởi FE
             _mockOcrJobService.Verify(j => j.UpdateStatusAsync(
                 expectedJobId,
-                It.Is<OcrJobUpdateStatusDto>(d => d.Status == "completed")), Times.Once);
+                It.Is<OcrJobUpdateStatusDto>(d => d.Status == "completed")), Times.Never);
         }
     }
 }
