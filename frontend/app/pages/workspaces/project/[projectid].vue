@@ -364,19 +364,18 @@ import { useJwt } from '~/composables/useJwt'
 // Import pdfjs-dist (đã có sẵn trong project)
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import cMapAssetUrl from 'pdfjs-dist/cmaps/78-EUC-H.bcmap?url'
-import standardFontAssetUrl from 'pdfjs-dist/standard_fonts/FoxitSerif.pfb?url'
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
-function getAssetBaseUrl(url) {
-  const slashIndex = url.lastIndexOf('/')
-  return slashIndex >= 0 ? url.slice(0, slashIndex + 1) : url
-}
-
+// PDF.js cần cmaps (font CJK), standard_fonts và wasm (giải mã ảnh JPEG2000/JBIG2).
+// Bản build production của Vite chỉ emit đúng asset được import tĩnh nên các file còn lại bị 404.
+// Vì vậy trỏ thẳng về jsDelivr CDN theo đúng version pdfjs-dist để có đầy đủ asset.
+const _pdfjsVersion = pdfjsLib.version || '5.5.207'
+const _pdfjsCdnBase = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${_pdfjsVersion}`
 const pdfDocumentBaseOptions = {
-  cMapUrl: getAssetBaseUrl(cMapAssetUrl),
+  cMapUrl: `${_pdfjsCdnBase}/cmaps/`,
   cMapPacked: true,
-  standardFontDataUrl: getAssetBaseUrl(standardFontAssetUrl),
+  standardFontDataUrl: `${_pdfjsCdnBase}/standard_fonts/`,
+  wasmUrl: `${_pdfjsCdnBase}/wasm/`,
   useSystemFonts: true
 }
 

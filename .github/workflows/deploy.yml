@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/dict-app
 
 jobs:
   test:
@@ -59,6 +60,27 @@ jobs:
           DOCKER_BUILDKIT=1 docker compose build --pull
           docker compose up -d --remove-orphans
           docker image prune -f
+
+      - name: 🔧 Ensure nginx CORS headers
+        run: |
+          NGINX_CORS_SNIPPET=/etc/nginx/snippets/cors.conf
+          sudo tee $NGINX_CORS_SNIPPET > /dev/null <<'CORSEOF'
+          set $cors_origin "";
+          if ($http_origin ~* "^https://(dict-six-kappa\.vercel\.app|dict-[a-z0-9-]+\.vercel\.app|localhost:[0-9]+)$") {
+              set $cors_origin $http_origin;
+          }
+          add_header 'Access-Control-Allow-Origin' $cors_origin always;
+          add_header 'Access-Control-Allow-Credentials' 'true' always;
+          add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, PATCH, DELETE, OPTIONS' always;
+          add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type, Accept, X-Requested-With' always;
+          CORSEOF
+
+          NGINX_SITE=/etc/nginx/sites-available/default
+          if ! sudo grep -q "cors.conf" "$NGINX_SITE" 2>/dev/null; then
+            echo "Adding cors include to nginx config..."
+            sudo sed -i 's|proxy_pass http://localhost|include snippets/cors.conf;\n            proxy_pass http://localhost|' "$NGINX_SITE" || true
+          fi
+          sudo nginx -t && sudo systemctl reload nginx || echo "Nginx reload skipped"
 
       - name: ✅ Health Check
         run: |
