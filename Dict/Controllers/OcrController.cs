@@ -833,6 +833,33 @@ public class InferController : ControllerBase
         }
     }
 
+    // FE gọi sau khi upload xong toàn bộ trang PDF
+    [HttpPatch("job/{jobId}/complete")]
+    [Authorize]
+    public async Task<IActionResult> MarkJobComplete(int jobId)
+    {
+        try
+        {
+            var ocrJob = await _db.OcrJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            if (ocrJob == null) return NotFound();
+            if (ocrJob.Status == OcrStatus.Completed)
+                return Ok(new { message = "Already completed" });
+
+            await _ocrJobService.UpdateStatusAsync(jobId, new OcrJobUpdateStatusDto
+            {
+                Status = OcrStatus.Completed,
+                DetectedText = null
+            });
+            _logger.LogInformation("✅ Job {JobId} marked completed by FE", jobId);
+            return Ok(new { message = "completed" });
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Lỗi khi mark complete Job {JobId}", jobId);
+            return Problem(detail: e.Message, statusCode: 500);
+        }
+    }
+
     [HttpPost("scan-page-ocr")]
     [Consumes("multipart/form-data")]
     [Authorize]
