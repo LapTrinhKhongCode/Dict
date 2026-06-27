@@ -376,6 +376,7 @@ const pdfDocumentBaseOptions = {
   cMapPacked: true,
   standardFontDataUrl: `${_pdfjsCdnBase}/standard_fonts/`,
   wasmUrl: `${_pdfjsCdnBase}/wasm/`,
+  iccUrl: `${_pdfjsCdnBase}/iccs/`,
   useSystemFonts: true
 }
 
