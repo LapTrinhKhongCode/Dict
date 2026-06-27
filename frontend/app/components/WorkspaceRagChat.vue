@@ -444,13 +444,10 @@ function formatAnswer(text: string): string {
   const strongOpen = '<strong class="font-semibold">'
   const strongClose = '<' + '/strong>'
   const brClose = '<' + '/b>'
-  // Normalize missing spaces between CJK/latin tokens from Ollama streaming
-  const normalized = text
-    .replace(/([^\s\n\-—])([A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐƠƯẠ-Ữ])/g, '$1 $2')
-  if (/<(ul|ol|li|b|strong|em|br|p|h[1-6])\b/i.test(normalized)) {
-    return normalized.replace(/<b>/gi, strongOpen).replace(new RegExp(brClose, 'gi'), strongClose)
+  if (/<(ul|ol|li|b|strong|em|br|p|h[1-6])\b/i.test(text)) {
+    return text.replace(/<b>/gi, strongOpen).replace(new RegExp(brClose, 'gi'), strongClose)
   }
-  return normalized
+  return text
     .replace(/\*\*(.+?)\*\*/g, (_m, p1) => `${strongOpen}${p1}${strongClose}`)
     .replace(/\n/g, '<' + 'br>')
 }
