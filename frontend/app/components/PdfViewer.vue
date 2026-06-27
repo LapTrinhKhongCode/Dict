@@ -487,15 +487,26 @@ let activePdfLoadingTask = null;
 // SignalR connection cho OCR progress
 let signalrConnection = null;
 
-function getAssetBaseUrl(url) {
+function getAssetBaseUrl(url, cdnFallback) {
+  // Nếu Vite inline thành data: URL → dùng CDN fallback thay vì URL sai
+  if (!url || url.startsWith('data:')) {
+    return cdnFallback || url;
+  }
   const slashIndex = url.lastIndexOf("/");
   return slashIndex >= 0 ? url.slice(0, slashIndex + 1) : url;
 }
 
+const _pdfjsVersion = pdfjsLib.version || '5.5.207';
 const pdfDocumentBaseOptions = {
-  cMapUrl: getAssetBaseUrl(cMapAssetUrl),
+  cMapUrl: getAssetBaseUrl(
+    cMapAssetUrl,
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${_pdfjsVersion}/cmaps/`
+  ),
   cMapPacked: true,
-  standardFontDataUrl: getAssetBaseUrl(standardFontAssetUrl),
+  standardFontDataUrl: getAssetBaseUrl(
+    standardFontAssetUrl,
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${_pdfjsVersion}/standard_fonts/`
+  ),
   useSystemFonts: true,
 };
 
