@@ -36,35 +36,62 @@
       <template v-for="(msg, idx) in messages" :key="idx">
         <!-- User bubble -->
         <div v-if="msg.role === 'user'" class="flex justify-end">
-          <div class="max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-br-md px-3 py-2 text-sm">
+          <div class="max-w-[80%] bg-blue-600 text-white rounded-[22px] rounded-br-md px-3 py-2 text-sm shadow-sm animate-message-in">
             {{ msg.content }}
           </div>
         </div>
 
         <!-- Assistant bubble — chỉ hiện khi đã có content -->
-        <div v-else-if="msg.answer" class="flex flex-col gap-2">
-          <div class="flex items-start gap-2">
-            <div class="w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center text-black text-xs font-bold shrink-0 mt-0.5">🌐</div>
-            <div class="flex-1 min-w-0">
-              <div
-                v-if="msg.answer"
-                class="bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-2xl rounded-tl-md px-3 py-2 text-sm prose prose-sm max-w-none dark:prose-invert"
-                v-html="formatAnswer(cleanAnswer(msg.answer || ''))"
-              ></div>
+        <div v-else-if="msg.clarify" class="flex flex-col gap-2 animate-message-in">
+          <div class="max-w-[86%] bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
+            <p class="text-xs text-amber-700 dark:text-amber-300 font-medium mb-2">💬 {{ msg.clarify.question }}</p>
+            <!-- Options for ambiguous_entity -->
+            <div v-if="msg.clarify.options?.length" class="flex flex-col gap-1">
+              <button
+                v-for="opt in msg.clarify.options"
+                :key="opt"
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', opt)"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-amber-300 dark:border-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-200 transition truncate"
+              >{{ opt }}</button>
+              <button
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', '')"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-600 hover:bg-gray-100 dark:hover:bg-neutral-700 text-gray-500 dark:text-neutral-400 transition"
+              >Tất cả tài liệu</button>
+            </div>
+            <!-- Rephrase prompt for low_confidence -->
+            <div v-else class="flex gap-1 mt-1">
+              <input
+                type="text"
+                placeholder="Nhập lại câu hỏi..."
+                class="flex-1 text-xs px-2 py-1 rounded-lg border border-amber-300 dark:border-amber-600 bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 outline-none focus:border-amber-500"
+                @keydown.enter.prevent="e => { respondToClarify((e.target as HTMLInputElement).value, ''); (e.target as HTMLInputElement).value = '' }"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Assistant bubble — chỉ hiện khi đã có content -->
+        <div v-else-if="msg.answer" class="flex flex-col gap-2 animate-message-in">
+          <div class="max-w-[86%]">
+            <div
+              v-if="msg.answer"
+              class="assistant-bubble bg-gray-100/95 dark:bg-neutral-800/95 border border-gray-200 dark:border-neutral-700 rounded-[22px] rounded-tl-md px-3 py-2.5 text-sm prose prose-sm max-w-none dark:prose-invert shadow-sm"
+              v-html="formatAnswer(cleanAnswer(msg.answer || ''))"
+            ></div>
 
               <!-- Citations -->
-              <div v-if="msg.citations?.length" class="mt-1.5 flex flex-wrap gap-1.5 pl-1">
+              <div v-if="msg.citations?.length" class="mt-2 flex flex-wrap gap-1.5 pl-1 transition-opacity duration-300">
                 <span
                   v-for="citation in msg.citations"
                   :key="`c-${idx}-${citation.sourceId}`"
-                  class="px-2 py-0.5 text-[10px] rounded-full border border-gray-300 dark:border-neutral-600 bg-gray-50 dark:bg-neutral-800 text-blue-600 dark:text-blue-400"
+                  class="px-2 py-0.5 text-[10px] rounded-full border border-gray-300 dark:border-neutral-600 bg-white/90 dark:bg-neutral-900/80 text-blue-600 dark:text-blue-400"
                 >
                   {{ citation.label }}
                 </span>
               </div>
 
               <!-- Sources -->
-              <details v-if="msg.sources?.length" class="mt-1.5 pl-1">
+              <details v-if="msg.sources?.length" class="mt-2 pl-1 transition-opacity duration-300">
                 <summary class="text-[10px] text-gray-400 dark:text-neutral-500 cursor-pointer hover:text-gray-600 dark:hover:text-neutral-300 transition select-none">
                   {{ msg.sources.length }} nguồn truy xuất
                 </summary>
@@ -74,7 +101,7 @@
                     :key="`s-${idx}-${source.sourceId}`"
                     @mouseenter="emit('highlight-doc', source.jobId)"
                     @mouseleave="emit('highlight-doc', null)"
-                    class="bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg p-2 transition"
+                    class="bg-gray-50/90 dark:bg-neutral-800/85 border border-gray-200 dark:border-neutral-700 rounded-xl p-2 transition"
                   >
                     <div class="flex items-center justify-between gap-2 flex-wrap">
                       <button
@@ -82,26 +109,26 @@
                         class="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition text-left"
                         title="Mở trong reader"
                       >
-                        🔗 [{{ source.sourceId }}] {{ source.documentName || 'Tài liệu' }} — Tr.{{ source.pageNumber }}
+                        [{{ source.sourceId }}] {{ source.documentName || 'Tài liệu' }} — Tr.{{ source.pageNumber }}<span v-if="source.occurrenceCount && source.occurrenceCount > 1"> · {{ source.occurrenceCount }} vị trí</span>
                       </button>
                       <span class="text-[9px] font-mono text-gray-400 dark:text-neutral-500 shrink-0">{{ formatScore(source.score) }}</span>
                     </div>
+                    <p v-if="source.occurrenceSummary" class="mt-1 text-[10px] text-gray-500 dark:text-neutral-400 line-clamp-2">{{ source.occurrenceSummary }}</p>
                     <p class="mt-1 text-[10px] text-gray-500 dark:text-neutral-400 line-clamp-3">{{ source.text }}</p>
                   </div>
                 </div>
               </details>
-            </div>
           </div>
         </div>
       </template>
 
       <!-- Typing indicator -->
-      <div v-if="asking && !messages.at(-1)?.answer" class="flex items-center gap-2">
-        <div class="w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center text-black text-xs font-bold shrink-0">🌐</div>
-        <div class="bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-2xl px-3 py-2 flex gap-1.5">
-          <span class="typing-dot" style="animation-delay: 0ms"></span>
-          <span class="typing-dot" style="animation-delay: 200ms"></span>
-          <span class="typing-dot" style="animation-delay: 400ms"></span>
+      <div v-if="asking && !messages.at(-1)?.answer" class="max-w-[82%] animate-message-in">
+        <div class="assistant-bubble bg-gray-100/95 dark:bg-neutral-800/95 border border-gray-200 dark:border-neutral-700 rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
+          <div class="flex items-center gap-2 text-[11px] text-gray-500 dark:text-neutral-400">
+            <span class="thinking-pulse"></span>
+            <span class="thinking-label" :data-text="getThinkingLabel()">{{ getThinkingLabel() }}</span>
+          </div>
         </div>
       </div>
 
@@ -111,7 +138,21 @@
     </div>
 
     <!-- Input -->
-    <div class="p-3 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800 shrink-0">
+    <div class="p-3 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800 shrink-0 space-y-2">
+      <!-- Mode selector -->
+      <div class="flex gap-1">
+        <button
+          v-for="m in modes" :key="m.value"
+          @click="selectedMode = m.value"
+          :class="[
+            'flex-1 py-1 text-[9px] font-bold rounded-lg transition border',
+            selectedMode === m.value
+              ? 'bg-yellow-400 text-black border-yellow-400'
+              : 'text-gray-400 dark:text-neutral-500 border-gray-200 dark:border-neutral-700 hover:border-gray-400 dark:hover:border-neutral-500'
+          ]"
+          :title="m.desc"
+        >{{ m.label }}</button>
+      </div>
       <div class="flex gap-2 items-end">
         <textarea
           ref="inputEl"
@@ -137,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onBeforeUnmount } from 'vue'
 
 type WorkspaceSource = {
   sourceId: number
@@ -148,6 +189,8 @@ type WorkspaceSource = {
   text: string
   score: number
   documentName?: string
+  occurrenceCount?: number
+  occurrenceSummary?: string
 }
 
 type WorkspaceCitation = {
@@ -165,6 +208,7 @@ type ChatMessage = {
   attributedAnswer?: string
   sources?: WorkspaceSource[]
   citations?: WorkspaceCitation[]
+  clarify?: { reason: string; question: string; options?: string[] }
 }
 
 type ConversationTurn = { role: string; content: string }
@@ -192,6 +236,17 @@ const chatScrollEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLTextAreaElement | null>(null)
 const _sessionId = ref('')
 const currentSessionId = ref<number | null>(null)
+const selectedMode = ref('high')
+const streamPhase = ref<'idle' | 'retrieving' | 'thinking' | 'answering'>('idle')
+const modes = [
+  { value: 'fast', label: '⚡ Nhanh', desc: 'Không mở rộng query, không rerank' },
+  { value: 'balance', label: '⚖ Cân bằng', desc: 'MultiQuery, không rerank' },
+  { value: 'high', label: '🎯 Chính xác', desc: 'Đầy đủ pipeline' },
+]
+
+let pendingChunk = ''
+let pendingChunkAssistantIdx: number | null = null
+let pendingChunkTimer: ReturnType<typeof setTimeout> | null = null
 
 watch([() => props.workspaceId, () => props.projectId], () => {
   const key = props.projectId ? `proj-${props.projectId}` : `ws-${props.workspaceId ?? 'na'}`
@@ -308,9 +363,63 @@ function autoResize(e: Event) {
   el.style.height = Math.min(el.scrollHeight, 112) + 'px'
 }
 
-function scrollToBottom() {
-  nextTick(() => { if (chatScrollEl.value) chatScrollEl.value.scrollTop = chatScrollEl.value.scrollHeight })
+function scrollToBottom(smooth = false) {
+  nextTick(() => {
+    if (!chatScrollEl.value) return
+    chatScrollEl.value.scrollTo({
+      top: chatScrollEl.value.scrollHeight,
+      behavior: smooth ? 'smooth' : 'auto',
+    })
+  })
 }
+
+function resetPendingChunk() {
+  pendingChunk = ''
+  pendingChunkAssistantIdx = null
+  if (pendingChunkTimer) {
+    clearTimeout(pendingChunkTimer)
+    pendingChunkTimer = null
+  }
+}
+
+function flushPendingChunk() {
+  if (pendingChunkAssistantIdx === null || !pendingChunk) {
+    resetPendingChunk()
+    return
+  }
+
+  const msg = messages.value[pendingChunkAssistantIdx]
+  if (msg) {
+    msg.answer = (msg.answer ?? '') + pendingChunk
+    msg.content = msg.answer
+    scrollToBottom()
+  }
+
+  pendingChunk = ''
+  pendingChunkAssistantIdx = null
+  if (pendingChunkTimer) {
+    clearTimeout(pendingChunkTimer)
+    pendingChunkTimer = null
+  }
+}
+
+function queueChunkAppend(assistantIdx: number, chunk: string) {
+  pendingChunkAssistantIdx = assistantIdx
+  pendingChunk += chunk
+  if (pendingChunkTimer) return
+  pendingChunkTimer = setTimeout(flushPendingChunk, 45)
+}
+
+function getThinkingLabel() {
+  if (streamPhase.value === 'retrieving') return 'Đang tìm đoạn liên quan'
+  if (streamPhase.value === 'thinking') return 'Đang phân tích tài liệu'
+  if (streamPhase.value === 'answering') return 'Đang viết câu trả lời'
+  return 'Đang xử lý'
+}
+
+onBeforeUnmount(() => {
+  resetPendingChunk()
+})
 
 function buildHistory(): ConversationTurn[] {
   return messages.value
@@ -357,12 +466,13 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
   const msg = messages.value[assistantIdx]
   if (!msg) return
   if (type === 'sources') {
+    streamPhase.value = 'thinking'
     try { const p = JSON.parse(data); msg.sources = p.sources ?? [] } catch { }
   } else if (type === 'chunk') {
-    msg.answer = (msg.answer ?? '') + data
-    msg.content = msg.answer
-    scrollToBottom()
+    streamPhase.value = 'answering'
+    queueChunkAppend(assistantIdx, data)
   } else if (type === 'done') {
+    flushPendingChunk()
     try {
       const p = JSON.parse(data)
       msg.answer = p.answer ?? msg.answer
@@ -380,9 +490,37 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
         )
       }
     } catch { }
+    streamPhase.value = 'idle'
+    scrollToBottom()
+  } else if (type === 'clarify') {
+    flushPendingChunk()
+    try {
+      const p = JSON.parse(data)
+      msg.clarify = p
+      msg.content = p.question
+    } catch { }
+    streamPhase.value = 'idle'
+    scrollToBottom()
   } else if (type === 'error') {
+    flushPendingChunk()
     msg.answer = data; msg.content = data
+    streamPhase.value = 'idle'
   }
+}
+
+function respondToClarify(originalQuestion: string, clarification: string) {
+  // Find the last user message before the clarify bubble
+  const combined = clarification
+    ? `Về tài liệu "${clarification}": ${originalQuestion}`
+    : originalQuestion
+  question.value = combined
+  // Remove the clarify assistant bubble so it's replaced by the real answer
+  const lastIdx = messages.value.length - 1
+  if (messages.value[lastIdx]?.clarify) messages.value.splice(lastIdx, 1)
+  // Remove the user message too so history stays clean
+  const prevIdx = messages.value.length - 1
+  if (messages.value[prevIdx]?.role === 'user') messages.value.splice(prevIdx, 1)
+  nextTick(() => askWorkspace())
 }
 
 async function askWorkspace() {
@@ -393,20 +531,22 @@ async function askWorkspace() {
   if (inputEl.value) inputEl.value.style.height = 'auto'
 
   messages.value.push({ role: 'user', content: userText })
-  scrollToBottom()
+  scrollToBottom(true)
 
   const assistantIdx = messages.value.length
   messages.value.push({ role: 'assistant', content: '', answer: '', sources: [], citations: [] })
 
   asking.value = true
   error.value = ''
+  streamPhase.value = 'retrieving'
+  resetPendingChunk()
 
   try {
     const history = buildHistory().slice(0, -1)
     const res = await fetch(getApiEndpoint(), {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ question: userText, topK: 5, conversationHistory: history, sessionId: _sessionId.value }),
+      body: JSON.stringify({ question: userText, topK: 5, conversationHistory: history, sessionId: _sessionId.value, mode: selectedMode.value }),
     })
 
     if (!res.ok || !res.body) throw new Error(await readError(res, 'API lỗi'))
@@ -432,11 +572,13 @@ async function askWorkspace() {
     }
     scrollToBottom()
   } catch (err: any) {
+    resetPendingChunk()
     error.value = err?.message || 'Không thể hỏi workspace.'
     messages.value.splice(assistantIdx, 1)
     messages.value.pop()
   } finally {
     asking.value = false
+    streamPhase.value = 'idle'
   }
 }
 </script>
@@ -446,18 +588,64 @@ async function askWorkspace() {
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
 
-.typing-dot {
-  width: 6px;
-  height: 6px;
-  background-color: #9ca3af;
-  border-radius: 50%;
-  display: inline-block;
-  animation: typing-bounce 1s ease-in-out infinite !important;
+.assistant-bubble {
+  backdrop-filter: blur(10px);
 }
-.dark .typing-dot { background-color: #6b7280; }
 
-@keyframes typing-bounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
-  40% { transform: translateY(-6px); opacity: 1; }
+.animate-message-in {
+  animation: message-in 220ms ease-out;
+}
+
+.thinking-label {
+  position: relative;
+  display: inline-block;
+  color: inherit;
+}
+
+.thinking-label::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 34%,
+    rgba(250, 204, 21, 0.98) 47%,
+    rgba(245, 158, 11, 0.95) 50%,
+    rgba(250, 204, 21, 0.98) 53%,
+    transparent 66%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: thinking-shimmer 2.15s linear infinite;
+}
+
+.thinking-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35);
+  animation: thinking-pulse 1.8s ease-out infinite;
+}
+
+@keyframes thinking-shimmer {
+  0% { background-position: 140% 0; }
+  100% { background-position: -40% 0; }
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes thinking-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35); opacity: 0.8; }
+  70% { box-shadow: 0 0 0 9px rgba(245, 158, 11, 0); opacity: 1; }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); opacity: 0.8; }
 }
 </style>

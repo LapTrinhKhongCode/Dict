@@ -81,31 +81,43 @@ public class ProjectsController : ControllerBase
             return NotFound(new { message = "Không tìm thấy file trong dự án này!" });
         }
 
-        var isAdmin = await _context.WorkspaceMembers
+        // Allow: file owner, workspace admin, or workspace member who owns the project
+        bool isOwner = job.UserId == userId;
+        bool isAdmin = await _context.WorkspaceMembers
             .AnyAsync(wm => wm.WorkspaceId == job.Project.WorkspaceId
                          && wm.UserId == userId
-                         && wm.Role ==  WorkspaceRole.ADMIN);
+                         && wm.Role == WorkspaceRole.ADMIN);
+        bool isMember = await _context.WorkspaceMembers
+            .AnyAsync(wm => wm.WorkspaceId == job.Project.WorkspaceId
+                         && wm.UserId == userId);
 
-        if (!isAdmin)
+        if (!isOwner && !isAdmin && !isMember)
         {
             return StatusCode(StatusCodes.Status403Forbidden,
-                new { message = "Chỉ Admin mới có quyền chỉnh sửa file." });
+                new { message = "Bạn không có quyền chỉnh sửa file này." });
         }
 
-        // ✅ CHỈ update nếu có giá trị mới
+        // ✅ Only update if new value provided — preserve original extension
         if (!string.IsNullOrWhiteSpace(dto.FileName) && job.Media != null)
         {
+            string originalExt = System.IO.Path.GetExtension(job.Media.FileName ?? string.Empty);
+            string newBase = System.IO.Path.GetFileNameWithoutExtension(dto.FileName).Trim();
+            if (string.IsNullOrWhiteSpace(newBase))
+                return BadRequest(new { message = "Tên file không hợp lệ." });
+
+            // Sanitize: remove path separators and null chars
+            newBase = newBase.Replace("/", "").Replace("\\", "").Replace("\0", "");
+            job.Media.FileName = string.IsNullOrEmpty(originalExt) ? newBase : newBase + originalExt;
             _context.Entry(job.Media).Property(x => x.FileName).IsModified = true;
-            job.Media.FileName = dto.FileName;
         }
 
-        // ✅ chỉ update timestamp
+        // ✅ update timestamp
         job.UpdatedAt = DateTime.UtcNow;
         _context.Entry(job).Property(x => x.UpdatedAt).IsModified = true;
 
         await _context.SaveChangesAsync();
 
-        return Ok(new { message = "Cập nhật file thành công!" });
+        return Ok(new { message = "Cập nhật file thành công!", fileName = job.Media?.FileName });
     }
     [HttpDelete("{projectId}/files/{fileId}")]
     public async Task<IActionResult> DeleteProjectFile(int projectId, int fileId)
@@ -139,6 +151,8 @@ public class ProjectsController : ControllerBase
                 new { message = "Chỉ Admin/Owner hoặc người tải lên mới có quyền xóa file." });
         }
 
+        int? mediaId = job.MediaId;
+
         // 🔥 XÓA OCR RESULTS TRƯỚC
         var results = await _context.OcrResults
             .Where(r => r.OcrJobId == job.Id)
@@ -149,20 +163,27 @@ public class ProjectsController : ControllerBase
             _context.OcrResults.RemoveRange(results);
         }
 
-        // 🔥 XÓA MEDIA
-        if (job.MediaId.HasValue)
+        // 🔥 XÓA JOB TRƯỚC để tránh FK từ ocr_jobs -> media_store
+        _context.OcrJobs.Remove(job);
+        await _context.SaveChangesAsync();
+
+        // 🔥 CHỈ XÓA MEDIA khi không còn job nào tham chiếu
+        if (mediaId.HasValue)
         {
-            var mediaRecord = await _context.MediaStore.FindAsync(job.MediaId.Value);
-            if (mediaRecord != null)
+            bool stillReferenced = await _context.OcrJobs
+                .AsNoTracking()
+                .AnyAsync(j => j.MediaId == mediaId.Value);
+
+            if (!stillReferenced)
             {
-                _context.MediaStore.Remove(mediaRecord);
+                var mediaRecord = await _context.MediaStore.FindAsync(mediaId.Value);
+                if (mediaRecord != null)
+                {
+                    _context.MediaStore.Remove(mediaRecord);
+                    await _context.SaveChangesAsync();
+                }
             }
         }
-
-        // 🔥 CUỐI CÙNG MỚI XÓA JOB
-        _context.OcrJobs.Remove(job);
-
-        await _context.SaveChangesAsync();
 
         return Ok(new { message = "Đã xóa file thành công!" });
     }

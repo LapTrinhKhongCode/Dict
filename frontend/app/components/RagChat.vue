@@ -84,41 +84,66 @@
       <template v-for="(msg, idx) in messages" :key="idx">
         <!-- User bubble -->
         <div v-if="msg.role === 'user'" class="flex justify-end">
-          <div class="max-w-[80%] bg-[#1f6feb] text-white rounded-2xl rounded-br-md px-3 py-2 text-sm">
+          <div class="max-w-[80%] bg-[#1f6feb] text-white rounded-[22px] rounded-br-md px-3 py-2 text-sm shadow-sm animate-message-in">
             {{ msg.content }}
           </div>
         </div>
 
+        <!-- Clarify bubble -->
+        <div v-else-if="msg.clarify" class="flex flex-col gap-2 animate-message-in">
+          <div class="max-w-[86%] bg-amber-950/30 border border-amber-700/50 rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
+            <p class="text-xs text-amber-300 font-medium mb-2">💬 {{ msg.clarify.question }}</p>
+            <div v-if="msg.clarify.options?.length" class="flex flex-col gap-1">
+              <button
+                v-for="opt in msg.clarify.options"
+                :key="opt"
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', opt)"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-neutral-800 border border-amber-700/50 hover:bg-amber-900/40 text-amber-200 transition truncate"
+              >{{ opt }}</button>
+              <button
+                @click="respondToClarify(messages[idx - 1]?.content ?? '', '')"
+                class="text-left text-[11px] px-2.5 py-1.5 rounded-lg bg-neutral-800 border border-neutral-600 hover:bg-neutral-700 text-neutral-400 transition"
+              >Tất cả tài liệu</button>
+            </div>
+            <div v-else class="flex gap-1 mt-1">
+              <input
+                type="text"
+                placeholder="Nhập lại câu hỏi..."
+                class="flex-1 text-xs px-2 py-1 rounded-lg border border-amber-700/50 bg-neutral-900 text-gray-200 outline-none focus:border-amber-500"
+                @keydown.enter.prevent="e => { respondToClarify((e.target as HTMLInputElement).value, ''); (e.target as HTMLInputElement).value = '' }"
+              />
+            </div>
+          </div>
+        </div>
+
         <!-- Assistant bubble -->
-        <div v-else class="flex flex-col gap-2">
-          <div class="flex items-start gap-2">
-            <div class="w-6 h-6 rounded-full bg-[#f0c040] flex items-center justify-center text-black text-xs font-bold shrink-0 mt-0.5">🤖</div>
-            <div class="flex-1 min-w-0">
-              <div
-                class="bg-[#161b22] border border-[#30363d] rounded-2xl rounded-tl-md px-3 py-2 text-sm text-gray-100 prose prose-invert prose-sm max-w-none"
-                v-html="formatAnswer(cleanAnswer(msg.answer || ''))"
-              ></div>
+        <div v-else-if="msg.answer" class="flex flex-col gap-2 animate-message-in">
+          <div class="max-w-[86%]">
+            <div
+              class="assistant-bubble bg-[#161b22]/95 border border-[#30363d] rounded-[22px] rounded-tl-md px-3 py-2.5 text-sm text-gray-100 prose prose-invert prose-sm max-w-none shadow-sm"
+              v-html="formatAnswer(cleanAnswer(msg.answer || ''))"
+            ></div>
 
               <!-- Cache hit badge -->
-              <div v-if="msg.cacheHit" class="mt-1 pl-1">
+              <div v-if="msg.cacheHit" class="mt-1.5 pl-1">
                 <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-400/10 text-yellow-400 border border-yellow-400/30" title="Phản hồi tức thì từ cache">⚡ Cache</span>
               </div>
 
               <!-- Citations inline -->
-              <div v-if="msg.citations?.length" class="mt-1.5 flex flex-wrap gap-1.5 pl-1">
+              <div v-if="msg.citations?.length" class="mt-2 flex flex-wrap gap-1.5 pl-1 transition-opacity duration-300">
                 <button
                   v-for="citation in msg.citations"
                   :key="`c-${idx}-${citation.sourceId}`"
                   @click="emit('highlight-source', { pageNumber: citation.pageNumber, text: getHighlightKeywords(msg) })"
                   @mouseenter="emit('highlight-source', { pageNumber: citation.pageNumber, text: getHighlightKeywords(msg) })"
-                  class="px-2 py-0.5 text-[10px] rounded-full border border-[#30363d] bg-[#0d1117] text-[#58a6ff] hover:border-[#f0c040] hover:text-[#f0c040] transition"
+                  class="px-2 py-0.5 text-[10px] rounded-full border border-[#30363d] bg-[#0d1117]/90 text-[#58a6ff] hover:border-[#f0c040] hover:text-[#f0c040] transition"
                 >
                   {{ citation.label }}
                 </button>
               </div>
 
               <!-- Sources collapsible -->
-              <details v-if="msg.sources?.length" class="mt-1.5 pl-1">
+              <details v-if="msg.sources?.length" class="mt-2 pl-1 transition-opacity duration-300">
                 <summary class="text-[10px] text-gray-500 cursor-pointer hover:text-gray-300 transition select-none">
                   {{ msg.sources.length }} nguồn truy xuất
                 </summary>
@@ -126,7 +151,7 @@
                   <div
                     v-for="source in msg.sources"
                     :key="`s-${idx}-${source.sourceId}`"
-                    class="bg-[#0d1117] border border-[#30363d] rounded-lg p-2"
+                    class="bg-[#0d1117]/90 border border-[#30363d] rounded-xl p-2"
                   >
                     <div class="flex items-center justify-between gap-2">
                       <button
@@ -134,26 +159,26 @@
                         @mouseenter="emit('highlight-source', { pageNumber: source.pageNumber, text: getHighlightKeywords(msg) })"
                         class="text-[11px] font-bold text-[#58a6ff] hover:text-[#f0c040] transition text-left"
                       >
-                        [{{ source.sourceId }}] Tr.{{ source.pageNumber }}, đoạn {{ source.chunkIndex + 1 }}
+                        [{{ source.sourceId }}] Tr.{{ source.pageNumber }}, đoạn {{ source.chunkIndex + 1 }}<span v-if="source.occurrenceCount && source.occurrenceCount > 1"> · {{ source.occurrenceCount }} vị trí</span>
                       </button>
                       <span class="text-[9px] font-mono text-gray-600 shrink-0">{{ formatScore(source.score) }}</span>
                     </div>
+                    <p v-if="source.occurrenceSummary" class="mt-1 text-[10px] text-[#8b949e] line-clamp-2">{{ source.occurrenceSummary }}</p>
                     <p class="mt-1 text-[10px] text-gray-400 line-clamp-3">{{ source.text }}</p>
                   </div>
                 </div>
               </details>
-            </div>
           </div>
         </div>
       </template>
 
       <!-- Typing indicator: show only while waiting for first chunk -->
-      <div v-if="asking && !messages.at(-1)?.answer" class="flex items-center gap-2">
-        <div class="w-6 h-6 rounded-full bg-[#f0c040] flex items-center justify-center text-black text-xs font-bold shrink-0">🤖</div>
-        <div class="bg-[#161b22] border border-[#30363d] rounded-2xl px-3 py-2 flex gap-1.5">
-          <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
-          <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
-          <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+      <div v-if="asking && !messages.at(-1)?.answer" class="max-w-[82%] animate-message-in">
+        <div class="assistant-bubble bg-[#161b22]/95 border border-[#30363d] rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
+          <div class="flex items-center gap-2 text-[11px] text-gray-400">
+            <span class="thinking-pulse"></span>
+            <span class="thinking-label" :data-text="thinkingLabel">{{ thinkingLabel }}</span>
+          </div>
         </div>
       </div>
 
@@ -163,14 +188,28 @@
     </div>
 
     <!-- Input area -->
-    <div class="p-3 border-t border-[#30363d] bg-[#161b22] shrink-0">
+    <div class="p-3 border-t border-[#30363d] bg-[#161b22] shrink-0 space-y-2">
+      <!-- Mode selector -->
+      <div class="flex gap-1">
+        <button
+          v-for="m in modes" :key="m.value"
+          @click="selectedMode = m.value"
+          :class="[
+            'flex-1 py-1 text-[9px] font-bold rounded-lg transition border',
+            selectedMode === m.value
+              ? 'bg-[#f0c040] text-black border-[#f0c040]'
+              : 'bg-transparent text-gray-500 border-[#30363d] hover:border-gray-500 hover:text-gray-300'
+          ]"
+          :title="m.desc"
+        >{{ m.label }}</button>
+      </div>
       <div class="flex gap-2 items-end">
         <textarea
           ref="inputEl"
           v-model="question"
           rows="1"
           class="flex-1 bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] text-sm rounded-xl px-3 py-2 outline-none focus:border-[#58a6ff] resize-none max-h-28 min-h-[38px]"
-          placeholder="Hỏi về tài liệu..."
+          :placeholder="selectedMode === 'fast' ? 'Hỏi rõ ý — phản hồi nhanh...' : 'Hỏi về tài liệu...'"
           @keydown.enter.exact.prevent="askDocument"
           @input="autoResize"
         />
@@ -190,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, computed, watch, onMounted } from 'vue'
+import { ref, nextTick, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 
 type DocumentRagSource = {
   sourceId: number
@@ -200,6 +239,8 @@ type DocumentRagSource = {
   chunkIndex: number
   text: string
   score: number
+  occurrenceCount?: number
+  occurrenceSummary?: string
 }
 
 type DocumentRagCitation = {
@@ -217,6 +258,7 @@ type ChatMessage = {
   sources?: DocumentRagSource[]
   citations?: DocumentRagCitation[]
   cacheHit?: boolean
+  clarify?: { reason: string; question: string; options?: string[] }
 }
 
 type DocumentRagTurn = {
@@ -245,6 +287,23 @@ const error = ref('')
 const indexStatus = ref('')
 const chatScrollEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLTextAreaElement | null>(null)
+const selectedMode = ref('high')
+const streamPhase = ref<'idle' | 'retrieving' | 'thinking' | 'answering'>('idle')
+const modes = [
+  { value: 'fast', label: '⚡ Nhanh', desc: 'Không mở rộng query, không rerank — trả lời ngay. Cần hỏi rõ ý.' },
+  { value: 'balance', label: '⚖ Cân bằng', desc: 'Mở rộng query, không rerank — nhanh hơn High.' },
+  { value: 'high', label: '🎯 Chính xác', desc: 'Đầy đủ pipeline: MultiQuery + HyDE + Rerank.' },
+]
+const thinkingLabel = computed(() => {
+  if (streamPhase.value === 'retrieving') return 'Đang tìm đoạn liên quan'
+  if (streamPhase.value === 'thinking') return 'Đang phân tích tài liệu'
+  if (streamPhase.value === 'answering') return 'Đang viết câu trả lời'
+  return 'Đang xử lý'
+})
+
+let pendingChunk = ''
+let pendingChunkAssistantIdx: number | null = null
+let pendingChunkTimer: ReturnType<typeof setTimeout> | null = null
 
 // Session management
 type SessionSummary = { id: number; title: string; messageCount: number; updatedAt: string }
@@ -365,13 +424,57 @@ function autoResize(e: Event) {
   el.style.height = Math.min(el.scrollHeight, 112) + 'px'
 }
 
-function scrollToBottom() {
+function scrollToBottom(smooth = false) {
   nextTick(() => {
     if (chatScrollEl.value) {
-      chatScrollEl.value.scrollTop = chatScrollEl.value.scrollHeight
+      chatScrollEl.value.scrollTo({
+        top: chatScrollEl.value.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      })
     }
   })
 }
+
+function resetPendingChunk() {
+  pendingChunk = ''
+  pendingChunkAssistantIdx = null
+  if (pendingChunkTimer) {
+    clearTimeout(pendingChunkTimer)
+    pendingChunkTimer = null
+  }
+}
+
+function flushPendingChunk() {
+  if (pendingChunkAssistantIdx === null || !pendingChunk) {
+    resetPendingChunk()
+    return
+  }
+
+  const msg = messages.value[pendingChunkAssistantIdx]
+  if (msg) {
+    msg.answer = (msg.answer ?? '') + pendingChunk
+    msg.content = msg.answer
+    scrollToBottom()
+  }
+
+  pendingChunk = ''
+  pendingChunkAssistantIdx = null
+  if (pendingChunkTimer) {
+    clearTimeout(pendingChunkTimer)
+    pendingChunkTimer = null
+  }
+}
+
+function queueChunkAppend(assistantIdx: number, chunk: string) {
+  pendingChunkAssistantIdx = assistantIdx
+  pendingChunk += chunk
+  if (pendingChunkTimer) return
+  pendingChunkTimer = setTimeout(flushPendingChunk, 45)
+}
+
+onBeforeUnmount(() => {
+  resetPendingChunk()
+})
 
 function buildConversationHistory(): DocumentRagTurn[] {
   return messages.value
@@ -478,6 +581,18 @@ async function scanAllOcrForRag() {
   }
 }
 
+function respondToClarify(originalQuestion: string, clarification: string) {
+  const combined = clarification
+    ? `Về tài liệu "${clarification}": ${originalQuestion}`
+    : originalQuestion
+  question.value = combined
+  const lastIdx = messages.value.length - 1
+  if (messages.value[lastIdx]?.clarify) messages.value.splice(lastIdx, 1)
+  const prevIdx = messages.value.length - 1
+  if (messages.value[prevIdx]?.role === 'user') messages.value.splice(prevIdx, 1)
+  nextTick(() => askDocument())
+}
+
 async function askDocument() {
   if (!props.jobId || !question.value.trim() || asking.value) return
 
@@ -487,10 +602,12 @@ async function askDocument() {
   if (inputEl.value) inputEl.value.style.height = 'auto'
 
   messages.value.push({ role: 'user', content: userText })
-  scrollToBottom()
+  scrollToBottom(true)
 
   asking.value = true
   error.value = ''
+  streamPhase.value = 'retrieving'
+  resetPendingChunk()
 
   // Add a placeholder assistant message we'll fill via streaming
   const assistantIdx = messages.value.length
@@ -508,6 +625,7 @@ async function askDocument() {
         topK: 5,
         conversationHistory: historyWithoutLastUser,
         sessionId: _sessionId.value,
+        mode: selectedMode.value,
       }),
     })
 
@@ -542,11 +660,13 @@ async function askDocument() {
 
     scrollToBottom()
   } catch (err: any) {
+    resetPendingChunk()
     error.value = err?.message || 'Không thể hỏi tài liệu.'
     messages.value.splice(assistantIdx, 1) // remove empty placeholder
     messages.value.pop() // remove user message
   } finally {
     asking.value = false
+    streamPhase.value = 'idle'
   }
 }
 
@@ -555,15 +675,16 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
   if (!msg) return
 
   if (type === 'sources') {
+    streamPhase.value = 'thinking'
     try {
       const parsed = JSON.parse(data)
       msg.sources = parsed.sources ?? []
     } catch { /* ignore */ }
   } else if (type === 'chunk') {
-    msg.answer = (msg.answer ?? '') + data
-    msg.content = msg.answer
-    scrollToBottom()
+    streamPhase.value = 'answering'
+    queueChunkAppend(assistantIdx, data)
   } else if (type === 'done') {
+    flushPendingChunk()
     try {
       const parsed = JSON.parse(data)
       msg.answer = parsed.answer ?? msg.answer
@@ -582,9 +703,22 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
         )
       }
     } catch { /* ignore */ }
+    streamPhase.value = 'idle'
+    scrollToBottom()
+  } else if (type === 'clarify') {
+    flushPendingChunk()
+    try {
+      const p = JSON.parse(data)
+      msg.clarify = p
+      msg.content = p.question
+    } catch { }
+    streamPhase.value = 'idle'
+    scrollToBottom()
   } else if (type === 'error') {
+    flushPendingChunk()
     msg.answer = data
     msg.content = data
+    streamPhase.value = 'idle'
   }
 }
 </script>
@@ -601,6 +735,51 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #484f58;
   border-radius: 10px;
+}
+
+.assistant-bubble {
+  backdrop-filter: blur(10px);
+}
+
+.animate-message-in {
+  animation: message-in 220ms ease-out;
+}
+
+.thinking-label {
+  position: relative;
+  display: inline-block;
+  color: inherit;
+}
+
+.thinking-label::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 34%,
+    rgba(250, 204, 21, 0.98) 47%,
+    rgba(245, 158, 11, 0.95) 50%,
+    rgba(250, 204, 21, 0.98) 53%,
+    transparent 66%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: thinking-shimmer 2.15s linear infinite;
+}
+
+.thinking-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: #f0c040;
+  box-shadow: 0 0 0 0 rgba(240, 192, 64, 0.35);
+  animation: thinking-pulse 1.8s ease-out infinite;
 }
 
 .line-clamp-3 {
@@ -629,5 +808,21 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
 
 .prose :deep(strong) {
   color: #ffffff;
+}
+
+@keyframes thinking-shimmer {
+  0% { background-position: 140% 0; }
+  100% { background-position: -40% 0; }
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes thinking-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(240, 192, 64, 0.35); opacity: 0.8; }
+  70% { box-shadow: 0 0 0 9px rgba(240, 192, 64, 0); opacity: 1; }
+  100% { box-shadow: 0 0 0 0 rgba(240, 192, 64, 0); opacity: 0.8; }
 }
 </style>

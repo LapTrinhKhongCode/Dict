@@ -32,8 +32,8 @@ jobs:
 
   deploy:
     needs: test
-    runs-on: self-hosted
-    
+    runs-on: [self-hosted, azure-vm]
+
     steps:
       - name: 🔔 Notify Slack - Deployment Started
         uses: slackapi/slack-github-action@v1.26.0
@@ -42,20 +42,36 @@ jobs:
         with:
           payload: |
             {
-              "text": ${{ toJSON(format('🚀 *[MiYo CI/CD]* Tiến trình tự động Deploy đã bắt đầu trên Raspberry Pi 5! | Commit: {0} | Cập nhật bởi: {1}', github.event.head_commit.message, github.actor)) }}
+              "text": ${{ toJSON(format('🚀 *[MiYo CI/CD]* Deploy bắt đầu trên Azure VM! | Commit: {0} | Bởi: {1}', github.event.head_commit.message, github.actor)) }}
             }
 
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🏗️ Build Docker Image (no downtime)
+      - name: 🏗️ Build & Deploy Docker (zero-downtime)
         run: |
-          cd ~/app/Dict
+          cd ~/Dict
           git fetch --all
           git reset --hard origin/main
-          DOCKER_BUILDKIT=1 docker compose build
-          docker compose up -d
+          DOCKER_BUILDKIT=1 docker compose build --pull
+          docker compose up -d --remove-orphans
           docker image prune -f
+
+      - name: ✅ Health Check
+        run: |
+          echo "Waiting for backend to be healthy..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5008/api/ocr/health || echo "000")
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ]; then
+              echo "Backend is up (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "  Attempt $i/30 — HTTP $STATUS, retrying in 5s..."
+            sleep 5
+          done
+          echo "Backend did not become healthy in time!"
+          docker compose logs --tail=50
+          exit 1
 
       - name: 🎉 Notify Slack - Deployment Success
         if: success()
@@ -65,7 +81,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "✅ *[MiYo CI/CD] SUCCESS!* Hệ thống từ điển MiYo đã được deploy thành công lên Pi 5.\nAPI RAG & Backend .NET Core đã hoạt động ổn định tại cổng 8082!"
+              "text": "✅ *[MiYo CI/CD] SUCCESS!* Backend MiYo đã deploy thành công lên Azure VM.\nAPI đang hoạt động tại https://dict.australiaeast.cloudapp.azure.com"
             }
 
       - name: ❌ Notify Slack - Deployment Failed
@@ -76,5 +92,5 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚨 *[MiYo CI/CD] FAILED!* Quá trình build Docker hoặc Deploy trên Pi 5 dính lỗi rồi. Kiểm tra ngay log trên GitHub Actions!"
+              "text": "🚨 *[MiYo CI/CD] FAILED!* Build hoặc Deploy trên Azure VM bị lỗi. Kiểm tra log trên GitHub Actions!"
             }

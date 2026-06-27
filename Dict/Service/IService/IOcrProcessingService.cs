@@ -6,6 +6,7 @@ namespace Dict.Service.IService
     {
         Task<OcrProcessingResultDto> UploadImageOnlyAsync(IFormFile image, int userId, int workspaceId, int? projectId);
         Task<OcrProcessingResultDto> UploadNativeDocAsync(IFormFile file, int userId, int workspaceId, int? projectId);
+        Task<OcrProcessingResultDto> UploadDocumentAiAsync(IFormFile file, int userId, int workspaceId, int? projectId);
         Task<OcrProcessingResultDto> ProcessOcrLazyAsync(int jobId);
         Task<OcrProcessingResultDto> ProcessImageAsync(IFormFile image, int userId, int workspaceId, int? projectId, bool saveAnnotated);
         Task<IEnumerable<OcrJobDetailDto>> GetRecentOcrJobsForUserAsync(int userId, int limit = 5);
@@ -13,4 +14,3 @@ namespace Dict.Service.IService
         Task<object> UploadAndOcrPageAsync(int jobId, int pageNumber, IFormFile image);
     }
 }
-

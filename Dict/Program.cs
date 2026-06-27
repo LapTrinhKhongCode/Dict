@@ -197,6 +197,9 @@ builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWorkspaceInvitationService, WorkspaceInvitationService>();
 builder.Services.AddScoped<IFileCommentService, FileCommentService>();
 builder.Services.AddScoped<IWordCommentService, WordCommentService>();
+builder.Services.AddScoped<GeminiRagLlmProvider>();
+builder.Services.AddScoped<LocalRagLlmProvider>();
+builder.Services.AddScoped<IRagLlmRouter, RagLlmRouter>();
 builder.Services.AddScoped<IDocumentRagService, DocumentRagService>();
 builder.Services.AddSingleton<TrieAutocompleteCache>();
 // Đăng ký TrieLoaderService vừa là Singleton (để inject qua [FromServices])
@@ -218,6 +221,7 @@ builder.Services.AddSingleton<LogQueueService>();
 builder.Services.AddSingleton<KanjiCache>();
 // Đăng ký thằng công nhân chạy ngầm (HostedService)
 builder.Services.AddHostedService<LogProcessorService>();
+builder.Services.AddHostedService<OcrCacheWarmupService>();
 builder.Services.AddScoped<IJsonBuilderService, JsonBuilder>();
 builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddScoped<IKanjiService, KanjiService>();

@@ -388,6 +388,8 @@ import { TextLayer } from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
 
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import cMapAssetUrl from "pdfjs-dist/cmaps/78-EUC-H.bcmap?url";
+import standardFontAssetUrl from "pdfjs-dist/standard_fonts/FoxitSerif.pfb?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const ocrResultsState = useOcrResultsState();
@@ -396,7 +398,6 @@ const props = defineProps({
   fileUrl: { type: String, required: false },
   fileData: { type: Uint8Array, required: false },
   jobId: { type: [String, Number], required: false },
-  apiKey: { type: String, required: true },
   projectId: { type: [String, Number], required: false }, // THÊM DÒNG NÀY
 });
 
@@ -477,6 +478,7 @@ const pageOcrResults = ref({});
 const pageUploadStatus = ref({});
 const uploadQueue = ref([]);
 const pdfJobId = ref(null);
+const allowPdfPageOcrUpload = ref(true);
 const hubMediaId = ref(null); // canonical ID dùng cho SignalR room (mediaId từ API)
 let isUploadRunning = false;
 const pageDimensions = ref({});
@@ -484,6 +486,18 @@ let activePdfLoadingTask = null;
 
 // SignalR connection cho OCR progress
 let signalrConnection = null;
+
+function getAssetBaseUrl(url) {
+  const slashIndex = url.lastIndexOf("/");
+  return slashIndex >= 0 ? url.slice(0, slashIndex + 1) : url;
+}
+
+const pdfDocumentBaseOptions = {
+  cMapUrl: getAssetBaseUrl(cMapAssetUrl),
+  cMapPacked: true,
+  standardFontDataUrl: getAssetBaseUrl(standardFontAssetUrl),
+  useSystemFonts: true,
+};
 
 async function setupSignalR(jobId) {
   if (!process.client) return;
@@ -581,6 +595,7 @@ function resetViewerState() {
   uploadQueue.value = [];
   pageOcrResults.value = {};
   pdfLoadError.value = "";
+  allowPdfPageOcrUpload.value = true;
 }
 
 function appendCacheBust(url) {
@@ -592,6 +607,7 @@ function appendCacheBust(url) {
 function createPdfLoadingTask(source, forceFreshUrl = false) {
   if (typeof source === "string") {
     return pdfjsLib.getDocument({
+      ...pdfDocumentBaseOptions,
       url: forceFreshUrl ? appendCacheBust(source) : source,
       disableRange: true,
       disableStream: true,
@@ -602,6 +618,7 @@ function createPdfLoadingTask(source, forceFreshUrl = false) {
 
   if (source?.url) {
     return pdfjsLib.getDocument({
+      ...pdfDocumentBaseOptions,
       ...source,
       url: forceFreshUrl ? appendCacheBust(source.url) : source.url,
       disableRange: true,
@@ -611,7 +628,10 @@ function createPdfLoadingTask(source, forceFreshUrl = false) {
     });
   }
 
-  return pdfjsLib.getDocument(source);
+  return pdfjsLib.getDocument({
+    ...pdfDocumentBaseOptions,
+    ...(source ?? {}),
+  });
 }
 
 async function initViewerFromProps(force = false) {
@@ -676,6 +696,7 @@ async function initPdfJob(file) {
 }
 
 function enqueuePagesAhead(fromPage) {
+  if (!allowPdfPageOcrUpload.value) return;
   const AHEAD = 2;
   for (
     let p = fromPage;
@@ -775,6 +796,7 @@ async function uploadOnePage(pageNum, retryCount = 0) {
 }
 
 watch(currentPage, (newPage) => {
+  if (!allowPdfPageOcrUpload.value) return;
   enqueuePagesAhead(newPage);
 });
 
@@ -837,6 +859,8 @@ async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
     if (isPdf) {
       ocrMode.value = false;
       ocrLoading.value = false; // Tắt vòng quay loading
+      const hasExistingResults = Array.isArray(data.results) && data.results.length > 0;
+      allowPdfPageOcrUpload.value = !(data.status === "completed" && hasExistingResults);
 
       if (!pdfDoc.value) {
         ocrImageUrl.value = data.imageUrl; // Đánh dấu đã nạp URL
@@ -882,7 +906,9 @@ async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
           viewMode.value === "scroll" ? setupScrollObserver() : renderPage(1);
 
           // Logic 3 trang của bạn được gọi tại đây (chỉ chạy 1 lần lúc khởi tạo)
-          enqueuePagesAhead(1);
+          if (allowPdfPageOcrUpload.value) {
+            enqueuePagesAhead(1);
+          }
         } catch (err) {
           if (sessionId !== viewerLoadSession.value) return;
           console.error("Lỗi vẽ PDF ban đầu:", err);

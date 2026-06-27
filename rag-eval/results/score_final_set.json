@@ -1,0 +1,386 @@
+{
+  "metrics": {
+    "total": 25,
+    "pass": 24,
+    "fail": 1,
+    "errors": 0,
+    "pass_rate": 0.96,
+    "avg_point_recall": 0.849,
+    "refuse_accuracy": 1.0,
+    "by_category": {
+      "comparison": {
+        "pass": 6,
+        "total": 6,
+        "rate": 1.0
+      },
+      "fact": {
+        "pass": 4,
+        "total": 5,
+        "rate": 0.8
+      },
+      "logic": {
+        "pass": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "multi-file": {
+        "pass": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "out-of-scope": {
+        "pass": 4,
+        "total": 4,
+        "rate": 1.0
+      }
+    }
+  },
+  "details": [
+    {
+      "id": "q148",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Không"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q149",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.667,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 3,
+      "missed_points": [
+        "Nhóm tim ngừng đập: 3 ca"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q150",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 3,
+      "points_total": 3,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q151",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q152",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q153",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 1,
+      "missed_points": [
+        "Khoảng 4.0% (4.0%程度)"
+      ],
+      "reason": "low_coverage(0/1)"
+    },
+    {
+      "id": "q154",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 3,
+      "points_total": 3,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q155",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 3,
+      "points_total": 3,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q156",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q157",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q158",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Kết hợp nhiều thiết bị và dịch vụ để tạo ra trải nghiệm nhất quán do người dùng chủ đạo"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q159",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q160",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q161",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q162",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q163",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 5,
+      "points_total": 5,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q164",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Những lần sau: Docker sẽ sử dụng bản sao cục bộ để tiết kiệm thời gian và chỉ tải lại khi bản gốc trên Docker Hub có sự thay đổi"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q165",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q166",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q167",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q168",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q169",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q170",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q171",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q172",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.667,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 3,
+      "missed_points": [
+        "I&SS: 14.022 tỷ Yên"
+      ],
+      "reason": "ok"
+    }
+  ]
+}

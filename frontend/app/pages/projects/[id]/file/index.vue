@@ -107,7 +107,7 @@
             type="file"
             ref="fileInput"
             @change="handleFileChange"
-            accept="image/*,application/pdf"
+            accept="image/*,application/pdf,.docx,.pptx,.xlsx,.txt,.csv,.md"
             class="hidden"
           />
         </div>
@@ -350,23 +350,33 @@ async function handleFileUpload(pickedFile) {
     return;
   }
 
+  const ext = pickedFile.name?.split(".").pop()?.toLowerCase() || "";
+  const nativeDocExtensions = new Set(["pdf", "docx", "pptx", "xlsx", "txt", "csv", "md"]);
+  const isPdfUpload = ext === "pdf";
+  const useNativeDocFlow = nativeDocExtensions.has(ext);
+
   // Tạo FormData giống hệt thuộc tính -F trong lệnh curl
-  const formData = new FormData();
-  formData.append("image", pickedFile);
-  formData.append("projectId", projectId);
+  const primaryFormData = new FormData();
+  if (useNativeDocFlow) {
+    primaryFormData.append("file", pickedFile);
+    primaryFormData.append("projectId", projectId);
+  } else {
+    primaryFormData.append("image", pickedFile);
+    primaryFormData.append("projectId", projectId);
+  }
 
   isLoading.value = true;
   error.value = null; // Reset lỗi cũ nếu có
 
   try {
     // Gọi API của C# (Nhớ thêm ?saveAnnotated=false giống curl của bạn)
-    const apiUrl = `${
-      config.public.apiBaseUrl || "https://localhost:7084"
-    }/api/Infer/upload-and-infer?saveAnnotated=false`;
+    const apiUrl = useNativeDocFlow
+      ? `${config.public.apiBaseUrl || "https://localhost:7084"}/api/Infer/upload-native-doc`
+      : `${config.public.apiBaseUrl || "https://localhost:7084"}/api/Infer/upload-and-infer?saveAnnotated=false`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
-      body: formData,
+      body: primaryFormData,
       headers: {
         Authorization: `Bearer ${token}`,
         // KHÔNG set Content-Type ở đây, trình duyệt sẽ tự động set 'multipart/form-data' kèm boundary chuẩn
@@ -379,6 +389,22 @@ async function handleFileUpload(pickedFile) {
     }
 
     const jobData = await response.json();
+
+    if (isPdfUpload && jobData.needsAzureDocumentAi) {
+      const aiFormData = new FormData();
+      aiFormData.append("file", pickedFile);
+      aiFormData.append("projectId", projectId);
+      void fetch(
+        `${config.public.apiBaseUrl || "https://localhost:7084"}/api/Infer/upload-document-ai`,
+        {
+          method: "POST",
+          body: aiFormData,
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      ).catch((err) => {
+        console.warn("Document AI supplementary upload failed:", err);
+      });
+    }
 
     // Lưu tạm jobId và imageUrl vào sessionStorage cho trang sau
     // (Lưu ý: jobData lúc này CHƯA có cục results tọa độ chữ đâu nhé)
@@ -409,13 +435,7 @@ function handleFileChange(event) {
 function handleDrop(event) {
   isDragging.value = false;
   const selectedFile = event.dataTransfer.files[0];
-  // Kiểm tra loại file
-  if (
-    !["application/pdf", "image/jpeg", "image/png"].includes(selectedFile.type)
-  ) {
-    alert("Chỉ hỗ trợ file Ảnh (JPG, PNG) hoặc PDF.");
-    return;
-  }
+  if (!selectedFile) return;
   handleFileUpload(selectedFile);
 }
 

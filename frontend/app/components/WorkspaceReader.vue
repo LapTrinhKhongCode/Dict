@@ -228,6 +228,20 @@ const currentPage = ref(1);
 const totalPages = ref(0);
 const scannedPagesCache = ref({});
 const localResults = ref([]);
+const shouldUseLegacyPdfOcr = computed(
+  () => !Array.isArray(props.results) || props.results.length === 0,
+);
+
+function seedPdfResultsCacheFromProps() {
+  if (!Array.isArray(props.results) || props.results.length === 0) return;
+  const grouped = {};
+  for (const row of props.results) {
+    const pageNumber = Number(row?.pageNumber || 1);
+    if (!grouped[pageNumber]) grouped[pageNumber] = [];
+    grouped[pageNumber].push(row);
+  }
+  scannedPagesCache.value = { ...grouped, ...scannedPagesCache.value };
+}
 
 // --- Annotation states ---
 const annotationCanvas = ref(null);
@@ -272,7 +286,12 @@ watch(
 watch(
   () => props.results,
   (newVal) => {
-    if (!isPdf.value) {
+    if (isPdf.value) {
+      seedPdfResultsCacheFromProps();
+      if (Array.isArray(scannedPagesCache.value[currentPage.value])) {
+        localResults.value = scannedPagesCache.value[currentPage.value];
+      }
+    } else {
       localResults.value = newVal;
     }
   },
@@ -298,8 +317,11 @@ async function renderPdf() {
     const loadingTask = pdfjsLib.getDocument(props.imageUrl);
     pdfDoc.value = await loadingTask.promise;
     totalPages.value = pdfDoc.value.numPages;
+    seedPdfResultsCacheFromProps();
     await drawPageToScreen(currentPage.value);
-    preloadOcr(currentPage.value, 3);
+    if (shouldUseLegacyPdfOcr.value) {
+      preloadOcr(currentPage.value, 3);
+    }
   } catch (error) {
     console.error("Lỗi khi render PDF:", error);
   }
@@ -336,7 +358,9 @@ async function changePage(delta) {
   if (newPage >= 1 && newPage <= totalPages.value) {
     currentPage.value = newPage;
     await drawPageToScreen(currentPage.value);
-    preloadOcr(currentPage.value, 3);
+    if (shouldUseLegacyPdfOcr.value) {
+      preloadOcr(currentPage.value, 3);
+    }
   }
 }
 

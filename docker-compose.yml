@@ -5,14 +5,19 @@ services:
       dockerfile: ./Dict/Dockerfile
       cache_from:
         - dict-backend:latest
+    env_file:
+      - path: ${BACKEND_ENV_FILE:-./backend.env}
+        required: false
     ports:
-      - "5008:8080"
+      - "${BACKEND_PORT:-5008}:8080"
     environment:
-      - ASPNETCORE_URLS=http://+:8080
-      - CorsOrigins=https://dict-six-kappa.vercel.app
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-vision-key.json
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      CorsOrigins: ${CORS_ORIGINS:-https://dict-six-kappa.vercel.app}
+      FrontendUrl: ${FRONTEND_URL:-https://dict-six-kappa.vercel.app}
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-vision-key.json
     volumes:
-      - ../gcp-vision-key.json:/app/gcp-vision-key.json:ro
+      - ${GCP_VISION_KEY_PATH:-../gcp-vision-key.json}:/app/gcp-vision-key.json:ro
       - trie-cache:/app/cache
     user: root
     restart: unless-stopped

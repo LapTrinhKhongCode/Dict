@@ -1,0 +1,359 @@
+{
+  "metrics": {
+    "total": 24,
+    "pass": 21,
+    "fail": 3,
+    "errors": 0,
+    "pass_rate": 0.875,
+    "avg_point_recall": 0.765,
+    "refuse_accuracy": 1.0,
+    "by_category": {
+      "comparison": {
+        "pass": 3,
+        "total": 3,
+        "rate": 1.0
+      },
+      "fact": {
+        "pass": 6,
+        "total": 8,
+        "rate": 0.75
+      },
+      "logic": {
+        "pass": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "multi-file": {
+        "pass": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "out-of-scope": {
+        "pass": 7,
+        "total": 7,
+        "rate": 1.0
+      }
+    }
+  },
+  "details": [
+    {
+      "id": "q103",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q078",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q065",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q030",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q028",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q107",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q118",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q005",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 3,
+      "points_total": 3,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q055",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q076",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 3,
+      "points_total": 3,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q012",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "MAU PSN (trang 41): 1.08 ức người (108 triệu)"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q070",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q112",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 1,
+      "missed_points": [
+        "Do việc ghi nhận khoản lỗ định giá từ các giao dịch hoán đổi lãi suất tại công ty con tài chính bán hàng ở Mỹ"
+      ],
+      "reason": "refusal_detected(coverage=0/1)"
+    },
+    {
+      "id": "q087",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Public (Công khai): Bất kỳ ai cũng có thể tìm và tải image về"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q014",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q117",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 1,
+      "missed_points": [
+        "Dự báo cổ tức cho năm tài chính này hiện đang bị bỏ trống (chưa xác định)"
+      ],
+      "reason": "low_coverage(0/1)"
+    },
+    {
+      "id": "q018",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q029",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q032",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 2,
+      "missed_points": [
+        "Không sử dụng thuốc nhóm barbiturate hoặc non-barbiturate",
+        "Bao gồm cả thuốc Vegetamin"
+      ],
+      "reason": "refusal_detected(coverage=0/2)"
+    },
+    {
+      "id": "q036",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q095",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q004",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q015",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    },
+    {
+      "id": "q082",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    }
+  ]
+}

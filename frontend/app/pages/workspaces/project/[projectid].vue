@@ -78,7 +78,7 @@
       type="file"
       ref="fileInput"
       @change="handleFileChange"
-      accept="image/*,application/pdf"
+      accept="image/*,application/pdf,.docx,.pptx,.xlsx,.txt,.csv,.md"
       class="hidden"
     />
   </div>
@@ -364,7 +364,21 @@ import { useJwt } from '~/composables/useJwt'
 // Import pdfjs-dist (đã có sẵn trong project)
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import cMapAssetUrl from 'pdfjs-dist/cmaps/78-EUC-H.bcmap?url'
+import standardFontAssetUrl from 'pdfjs-dist/standard_fonts/FoxitSerif.pfb?url'
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
+
+function getAssetBaseUrl(url) {
+  const slashIndex = url.lastIndexOf('/')
+  return slashIndex >= 0 ? url.slice(0, slashIndex + 1) : url
+}
+
+const pdfDocumentBaseOptions = {
+  cMapUrl: getAssetBaseUrl(cMapAssetUrl),
+  cMapPacked: true,
+  standardFontDataUrl: getAssetBaseUrl(standardFontAssetUrl),
+  useSystemFonts: true
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -416,7 +430,11 @@ const toast = reactive({ visible: false, message: '', type: 'success' })
  */
 async function generatePdfThumbnail(pdfUrl) {
   try {
-    const pdf = await pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false }).promise
+    const pdf = await pdfjsLib.getDocument({
+      ...pdfDocumentBaseOptions,
+      url: pdfUrl,
+      withCredentials: false
+    }).promise
     const page = await pdf.getPage(1)
 
     // Scale để thumbnail đủ nét, không cần quá lớn
@@ -455,8 +473,6 @@ async function generateThumbnailsForFiles(fileList) {
     if (thumbnails.value[file.id]) continue
 
     const url = file.imageUrl || file.fileUrl || file.url
-    console.log('file item:', file)
-console.log('thumbnail url:', file.imageUrl || file.fileUrl || file.url)
     if (!url) continue
 
     const isPdf = file.type === 'pdf' || url.toLowerCase().includes('.pdf')
@@ -644,6 +660,14 @@ async function handleDeleteFile() {
   }
 }
 
+const NATIVE_DOC_EXTENSIONS = new Set(['docx', 'pptx', 'xlsx', 'txt', 'csv', 'md'])
+const DOCUMENT_AI_EXTENSIONS = new Set(['pdf'])
+
+function isNativeDocFile(file) {
+  const ext = file?.name?.split('.').pop()?.toLowerCase() || ''
+  return NATIVE_DOC_EXTENSIONS.has(ext)
+}
+
 async function handleFileUpload(pickedFile) {
   if (!pickedFile || uploading.value) return
   const token = getToken()
@@ -654,14 +678,37 @@ async function handleFileUpload(pickedFile) {
   pendingFile.value = { name: pickedFile.name, type: ext }
 
   const formData = new FormData()
-  formData.append('image', pickedFile)
-  formData.append('projectId', projectId)
+  const isPdfUpload = DOCUMENT_AI_EXTENSIONS.has(ext)
+  const useNativeDocFlow = isNativeDocFile(pickedFile)
+  if (useNativeDocFlow) {
+    formData.append('file', pickedFile)
+    formData.append('projectId', projectId)
+  } else {
+    formData.append('image', pickedFile)
+    formData.append('projectId', projectId)
+  }
 
   try {
-    const res = await fetch(`${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`, {
+    const endpoint = useNativeDocFlow
+      ? `${config.public.apiBaseUrl}/api/Infer/upload-native-doc`
+      : `${config.public.apiBaseUrl}/api/Infer/upload-and-infer?saveAnnotated=false`
+    const res = await fetch(endpoint, {
       method: 'POST', body: formData, headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw new Error(await res.text() || "Lỗi upload")
+    const uploadData = await res.json()
+    if (isPdfUpload && uploadData.needsAzureDocumentAi) {
+      const aiFormData = new FormData()
+      aiFormData.append('file', pickedFile)
+      aiFormData.append('projectId', projectId)
+      void fetch(`${config.public.apiBaseUrl}/api/Infer/upload-document-ai`, {
+        method: 'POST',
+        body: aiFormData,
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(err => {
+        console.warn('Document AI supplementary upload failed:', err)
+      })
+    }
     showToast("Tải lên thành công!")
     await fetchFiles(token)
   } catch (err) {

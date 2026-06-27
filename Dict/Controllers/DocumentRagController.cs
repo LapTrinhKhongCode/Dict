@@ -69,7 +69,7 @@ namespace Dict.Controllers
             {
                 await foreach (var ev in _documentRagService.AskDocumentStreamAsync(
                     jobId, userId, request.Question, request.TopK,
-                    request.ConversationHistory, request.SessionId))
+                    request.ConversationHistory, request.SessionId, request.Mode))
                 {
                     await Response.WriteAsync($"event: {ev.Type}\ndata: {ev.Data}\n\n");
                     await Response.Body.FlushAsync();
@@ -136,7 +136,7 @@ namespace Dict.Controllers
             {
                 await foreach (var ev in _documentRagService.AskWorkspaceStreamAsync(
                     workspaceId, userId, request.Question, request.TopK,
-                    request.ConversationHistory, request.SessionId))
+                    request.ConversationHistory, request.SessionId, request.Mode, request.SkipClarify))
                 {
                     await Response.WriteAsync($"event: {ev.Type}\ndata: {ev.Data}\n\n");
                     await Response.Body.FlushAsync();
@@ -197,7 +197,7 @@ namespace Dict.Controllers
             {
                 await foreach (var ev in _documentRagService.AskProjectStreamAsync(
                     projectId, userId, request.Question, request.TopK,
-                    request.ConversationHistory, request.SessionId))
+                    request.ConversationHistory, request.SessionId, request.Mode, request.SkipClarify))
                 {
                     await Response.WriteAsync($"event: {ev.Type}\ndata: {ev.Data}\n\n");
                     await Response.Body.FlushAsync();

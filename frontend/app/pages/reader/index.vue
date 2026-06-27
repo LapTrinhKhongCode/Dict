@@ -184,16 +184,25 @@ function cancelRename() {
 
 async function saveRename() {
   isEditingName.value = false
-  const name = editableName.value.trim()
-  if (!name || name === originalName || !jobId.value || !projectId.value) return
+  const raw = editableName.value.trim()
+  if (!raw || raw === originalName || !jobId.value || !projectId.value) return
+  // Strip extension if user accidentally typed it — backend preserves the original extension
+  const name = raw.replace(/\.[^/.]+$/, '').trim() || raw
   renameSaving.value = true
   try {
-    await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId.value}/files/${jobId.value}`, {
+    const res = await fetch(`${config.public.apiBaseUrl}/api/projects/${projectId.value}/files/${jobId.value}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt.value}` },
       body: JSON.stringify({ fileName: name })
     })
-    originalName = name
+    if (res.ok) {
+      const data = await res.json()
+      // Sync displayed name with what backend actually stored (includes extension)
+      if (data.fileName) editableName.value = data.fileName
+      originalName = editableName.value
+    } else {
+      editableName.value = originalName
+    }
   } catch {
     editableName.value = originalName
   } finally {
