@@ -116,8 +116,8 @@
           </div>
         </div>
 
-        <!-- Assistant bubble -->
-        <div v-else-if="msg.answer" class="flex flex-col gap-2 animate-message-in">
+        <!-- Assistant bubble — chỉ hiện khi stream xong -->
+        <div v-else-if="msg.answer && !msg.isStreaming" class="flex flex-col gap-2 animate-message-in">
           <div class="max-w-[86%]">
             <div
               class="assistant-bubble bg-[#161b22]/95 border border-[#30363d] rounded-[22px] rounded-tl-md px-3 py-2.5 text-sm text-gray-100 prose prose-invert prose-sm max-w-none shadow-sm"
@@ -172,8 +172,8 @@
         </div>
       </template>
 
-      <!-- Typing indicator: show only while waiting for first chunk -->
-      <div v-if="asking && !messages.at(-1)?.answer" class="max-w-[82%] animate-message-in">
+      <!-- Typing indicator: hiện khi đang hỏi hoặc đang stream -->
+      <div v-if="asking || messages.at(-1)?.isStreaming" class="max-w-[82%] animate-message-in">
         <div class="assistant-bubble bg-[#161b22]/95 border border-[#30363d] rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
           <div class="flex items-center gap-2 text-[11px] text-gray-400">
             <span class="thinking-pulse"></span>
@@ -259,6 +259,7 @@ type ChatMessage = {
   citations?: DocumentRagCitation[]
   cacheHit?: boolean
   clarify?: { reason: string; question: string; options?: string[] }
+  isStreaming?: boolean
 }
 
 type DocumentRagTurn = {
@@ -294,12 +295,29 @@ const modes = [
   { value: 'balance', label: '⚖ Cân bằng', desc: 'Mở rộng query, không rerank — nhanh hơn High.' },
   { value: 'high', label: '🎯 Chính xác', desc: 'Đầy đủ pipeline: MultiQuery + HyDE + Rerank.' },
 ]
-const thinkingLabel = computed(() => {
-  if (streamPhase.value === 'retrieving') return 'Đang tìm đoạn liên quan'
-  if (streamPhase.value === 'thinking') return 'Đang phân tích tài liệu'
-  if (streamPhase.value === 'answering') return 'Đang viết câu trả lời'
-  return 'Đang xử lý'
-})
+const thinkingMessages = [
+  'Đang tìm đoạn liên quan...',
+  'Đang phân tích tài liệu...',
+  'Đang tổng hợp thông tin...',
+  'Đang soạn câu trả lời...',
+  'Đang kiểm tra độ chính xác...',
+]
+const thinkingIdx = ref(0)
+let thinkingTimer: ReturnType<typeof setInterval> | null = null
+
+const thinkingLabel = computed(() => thinkingMessages[thinkingIdx.value])
+
+function startRotating() {
+  thinkingIdx.value = 0
+  if (thinkingTimer) clearInterval(thinkingTimer)
+  thinkingTimer = setInterval(() => {
+    thinkingIdx.value = (thinkingIdx.value + 1) % thinkingMessages.length
+  }, 700)
+}
+
+function stopRotating() {
+  if (thinkingTimer) { clearInterval(thinkingTimer); thinkingTimer = null }
+}
 
 let pendingChunk = ''
 let pendingChunkAssistantIdx: number | null = null
@@ -474,6 +492,7 @@ function queueChunkAppend(assistantIdx: number, chunk: string) {
 
 onBeforeUnmount(() => {
   resetPendingChunk()
+  stopRotating()
 })
 
 function buildConversationHistory(): DocumentRagTurn[] {
@@ -608,6 +627,7 @@ async function askDocument() {
   error.value = ''
   streamPhase.value = 'retrieving'
   resetPendingChunk()
+  startRotating()
 
   // Add a placeholder assistant message we'll fill via streaming
   const assistantIdx = messages.value.length
@@ -675,16 +695,16 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
   if (!msg) return
 
   if (type === 'sources') {
-    streamPhase.value = 'thinking'
     try {
       const parsed = JSON.parse(data)
       msg.sources = parsed.sources ?? []
     } catch { /* ignore */ }
   } else if (type === 'chunk') {
-    streamPhase.value = 'answering'
+    msg.isStreaming = true
     queueChunkAppend(assistantIdx, data)
   } else if (type === 'done') {
     flushPendingChunk()
+    stopRotating()
     try {
       const parsed = JSON.parse(data)
       msg.answer = parsed.answer ?? msg.answer
@@ -692,6 +712,7 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
       msg.citations = parsed.citations ?? []
       msg.cacheHit = parsed.cacheHit === true
       msg.content = msg.answer
+      msg.isStreaming = false
       // Auto-save to DB session
       const userMsg = messages.value.slice(0, assistantIdx).findLast((m: any) => m.role === 'user')
       if (userMsg) {
@@ -707,6 +728,7 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
     scrollToBottom()
   } else if (type === 'clarify') {
     flushPendingChunk()
+    stopRotating()
     try {
       const p = JSON.parse(data)
       msg.clarify = p
@@ -716,8 +738,10 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
     scrollToBottom()
   } else if (type === 'error') {
     flushPendingChunk()
+    stopRotating()
     msg.answer = data
     msg.content = data
+    msg.isStreaming = false
     streamPhase.value = 'idle'
   }
 }
