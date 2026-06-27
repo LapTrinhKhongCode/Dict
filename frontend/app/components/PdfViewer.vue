@@ -729,6 +729,25 @@ async function runUploadQueue() {
     }
   }
   isUploadRunning = false;
+
+  // Kiểm tra tất cả trang đã done/cached → mark job completed
+  if (pdfJobId.value && totalPages.value > 0) {
+    const allDone = Array.from({ length: totalPages.value }, (_, i) => i + 1).every(
+      (p) => pageUploadStatus.value[p] === "done" || pageUploadStatus.value[p] === "cached"
+        || pageUploadStatus.value[String(p)] === "done" || pageUploadStatus.value[String(p)] === "cached"
+    );
+    if (allDone) {
+      try {
+        const token = getToken();
+        await fetch(`${config.public.apiBaseUrl}/api/ocr/job/${pdfJobId.value}/complete`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        console.warn("Could not mark job complete:", e);
+      }
+    }
+  }
 }
 
 async function uploadOnePage(pageNum, retryCount = 0) {
