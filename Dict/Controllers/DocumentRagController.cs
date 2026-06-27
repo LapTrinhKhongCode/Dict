@@ -11,10 +11,14 @@ namespace Dict.Controllers
     public class DocumentRagController : ControllerBase
     {
         private readonly IDocumentRagService _documentRagService;
+        private readonly ILogger<DocumentRagController> _logger;
 
-        public DocumentRagController(IDocumentRagService documentRagService)
+        public DocumentRagController(
+            IDocumentRagService documentRagService,
+            ILogger<DocumentRagController> logger)
         {
             _documentRagService = documentRagService;
+            _logger = logger;
         }
 
         [HttpPost("{jobId:int}/index")]
@@ -28,6 +32,11 @@ namespace Dict.Controllers
             }
             catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
             catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message }); }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi IndexDocument jobId={JobId}", jobId);
+                return Problem(detail: ex.Message, statusCode: 500, title: "Index tài liệu thất bại");
+            }
         }
 
         [HttpPost("{jobId:int}/ask")]
