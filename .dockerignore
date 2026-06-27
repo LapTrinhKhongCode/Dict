@@ -3,10 +3,6 @@
 **/obj/
 **/out/
 
-# Large model files — copied to VM manually, not baked into image
-Dict/multilingual-e5-small.onnx
-Dict/tokenizer.json
-
 # Test projects
 Dict.Tests/
 Dict.Indexer/
