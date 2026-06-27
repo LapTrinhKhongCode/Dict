@@ -125,7 +125,7 @@ def call_rag(question: str) -> dict:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="test_set",
-                        choices=["test_set", "dev_set", "holdout_set", "final_set"])
+                        choices=["test_set", "dev_set", "holdout_set", "holdout_v2", "final_set"])
     args = parser.parse_args()
 
     dataset_path = DATASETS_DIR / f"{args.dataset}.jsonl"

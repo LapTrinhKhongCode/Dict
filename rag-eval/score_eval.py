@@ -249,7 +249,7 @@ def aggregate(scored: list[dict]) -> dict:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="test_set",
-                        choices=["test_set", "dev_set", "holdout_set", "dev_set_sweep24", "final_set"])
+                        choices=["test_set", "dev_set", "holdout_set", "holdout_v2", "dev_set_sweep24", "final_set"])
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--llm-judge", action="store_true",
                         help="Use local qwen7B to re-judge missed expected_points (slower but more accurate)")

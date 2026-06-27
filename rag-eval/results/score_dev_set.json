@@ -1,11 +1,11 @@
 {
   "metrics": {
     "total": 72,
-    "pass": 63,
-    "fail": 9,
+    "pass": 62,
+    "fail": 10,
     "errors": 0,
-    "pass_rate": 0.875,
-    "avg_point_recall": 0.801,
+    "pass_rate": 0.861,
+    "avg_point_recall": 0.792,
     "refuse_accuracy": 0.727,
     "by_category": {
       "comparison": {
@@ -19,9 +19,9 @@
         "rate": 0.842
       },
       "logic": {
-        "pass": 18,
+        "pass": 17,
         "total": 21,
-        "rate": 0.857
+        "rate": 0.81
       },
       "multi-file": {
         "pass": 7,
@@ -198,13 +198,11 @@
       "must_refuse": false,
       "has_error": false,
       "pass": true,
-      "point_recall": 0.5,
+      "point_recall": 1.0,
       "num_recall": 1.0,
-      "points_hit": 1,
+      "points_hit": 2,
       "points_total": 2,
-      "missed_points": [
-        "Ký hiệu & giúp mở Notepad chạy ngầm dưới nền (background) để tiếp tục dùng Terminal"
-      ],
+      "missed_points": [],
       "reason": "ok"
     },
     {
@@ -254,13 +252,11 @@
       "must_refuse": false,
       "has_error": false,
       "pass": true,
-      "point_recall": 0.5,
+      "point_recall": 1.0,
       "num_recall": 1.0,
-      "points_hit": 1,
+      "points_hit": 2,
       "points_total": 2,
-      "missed_points": [
-        "Khi người dùng đã có nhiều kinh nghiệm sử dụng C++"
-      ],
+      "missed_points": [],
       "reason": "ok"
     },
     {
@@ -342,11 +338,13 @@
       "must_refuse": false,
       "has_error": false,
       "pass": true,
-      "point_recall": 1.0,
+      "point_recall": 0.5,
       "num_recall": 1.0,
-      "points_hit": 2,
+      "points_hit": 1,
       "points_total": 2,
-      "missed_points": [],
+      "missed_points": [
+        "Ứng dụng Web: Có thể tạo bằng kỹ năng và mã nguồn chung nhưng không mang lại trải nghiệm chuyên biệt cho từng thiết bị"
+      ],
       "reason": "ok"
     },
     {
@@ -369,15 +367,16 @@
       "scope": "in-domain",
       "must_refuse": false,
       "has_error": false,
-      "pass": true,
-      "point_recall": 0.5,
+      "pass": false,
+      "point_recall": 0.0,
       "num_recall": 1.0,
-      "points_hit": 1,
+      "points_hit": 0,
       "points_total": 2,
       "missed_points": [
-        "Vì nó tạo ra sự liên kết đồng bộ và kết hợp chặt chẽ (tight coupling) giữa các service"
+        "Vì nó tạo ra sự liên kết đồng bộ và kết hợp chặt chẽ (tight coupling) giữa các service",
+        "Gây ra sự phụ thuộc lẫn nhau dẫn đến các vấn đề về hiệu suất và tính khả dụng"
       ],
-      "reason": "ok"
+      "reason": "low_coverage(0/2)"
     },
     {
       "id": "q008",
@@ -532,16 +531,15 @@
       "must_refuse": false,
       "has_error": false,
       "pass": false,
-      "point_recall": 0.0,
+      "point_recall": 0.333,
       "num_recall": 1.0,
-      "points_hit": 0,
+      "points_hit": 1,
       "points_total": 3,
       "missed_points": [
         "Do có sự phụ thuộc trực tiếp vào database driver trên máy khách",
-        "Dễ gặp sự cố với tường lửa giữa máy khách và máy chủ",
-        "Khả năng mở rộng bị giới hạn bởi database server"
+        "Dễ gặp sự cố với tường lửa giữa máy khách và máy chủ"
       ],
-      "reason": "refusal_detected(coverage=0/3)"
+      "reason": "refusal_detected(coverage=1/3)"
     },
     {
       "id": "q040",
@@ -718,11 +716,13 @@
       "must_refuse": false,
       "has_error": false,
       "pass": true,
-      "point_recall": 1.0,
+      "point_recall": 0.5,
       "num_recall": 1.0,
-      "points_hit": 2,
+      "points_hit": 1,
       "points_total": 2,
-      "missed_points": [],
+      "missed_points": [
+        "Do dùng quá liều TCA có khả năng gây tử vong cao hơn so với SSRI"
+      ],
       "reason": "ok"
     },
     {
@@ -824,11 +824,13 @@
       "must_refuse": false,
       "has_error": false,
       "pass": true,
-      "point_recall": 1.0,
+      "point_recall": 0.667,
       "num_recall": 1.0,
-      "points_hit": 3,
+      "points_hit": 2,
       "points_total": 3,
-      "missed_points": [],
+      "missed_points": [
+        "Cả hai đều có nguy cơ thực tế cao hơn dự đoán"
+      ],
       "reason": "ok"
     },
     {
@@ -851,9 +853,9 @@
       "scope": "out-of-domain",
       "must_refuse": true,
       "has_error": false,
-      "pass": false,
-      "reason": "should_have_refused",
-      "point_recall": 0.0
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
     },
     {
       "id": "q043",
@@ -905,9 +907,9 @@
       "scope": "out-of-domain",
       "must_refuse": true,
       "has_error": false,
-      "pass": true,
-      "reason": "correct_refusal",
-      "point_recall": 1.0
+      "pass": false,
+      "reason": "should_have_refused",
+      "point_recall": 0.0
     },
     {
       "id": "q037",

@@ -1,0 +1,150 @@
+{
+  "metrics": {
+    "total": 8,
+    "pass": 6,
+    "fail": 2,
+    "errors": 0,
+    "pass_rate": 0.75,
+    "avg_point_recall": 0.643,
+    "refuse_accuracy": 1.0,
+    "by_category": {
+      "comparison": {
+        "pass": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "fact": {
+        "pass": 1,
+        "total": 2,
+        "rate": 0.5
+      },
+      "logic": {
+        "pass": 4,
+        "total": 4,
+        "rate": 1.0
+      },
+      "out-of-scope": {
+        "pass": 1,
+        "total": 1,
+        "rate": 1.0
+      }
+    }
+  },
+  "details": [
+    {
+      "id": "q173",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q174",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q175",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Có thể kết hợp với mô hình xử lý hướng sự kiện (event-driven) để tăng khả năng mở rộng"
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "q176",
+      "category": "logic",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q177",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 1,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "q178",
+      "category": "fact",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 0.0,
+      "points_hit": 0,
+      "points_total": 1,
+      "missed_points": [
+        "Khoảng 2.3 nghìn tỷ yên"
+      ],
+      "reason": "refusal_detected(coverage=0/1)"
+    },
+    {
+      "id": "q179",
+      "category": "comparison",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 0.0,
+      "points_hit": 0,
+      "points_total": 2,
+      "missed_points": [
+        "Mobility khoảng 2.3 nghìn tỷ yên nhiều hơn Life Solution khoảng 1.5 nghìn tỷ yên",
+        "Chênh lệch khoảng 0.8 nghìn tỷ yên"
+      ],
+      "reason": "refusal_detected(coverage=0/2)"
+    },
+    {
+      "id": "q180",
+      "category": "out-of-scope",
+      "scope": "out-of-domain",
+      "must_refuse": true,
+      "has_error": false,
+      "pass": true,
+      "reason": "correct_refusal",
+      "point_recall": 1.0
+    }
+  ]
+}

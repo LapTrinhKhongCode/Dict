@@ -17,3 +17,14 @@ Dict/requirements.txt
 /Dict/tokenizer.json
 /Dict/appsettings.json
 /Dict/appsettings.Production.json
+
+# rag-eval: bao cao Word + cac ban backup (~260MB, binary, thay doi lien tuc)
+rag-eval/baocao/
+# rag-eval: PDF nguon dung danh gia OCR (~36MB, binary, tai tao duoc tu tai lieu goc)
+rag-eval/results/ocr_eval_pdfs/
+# Python bytecode cache
+__pycache__/
+# GCP service account keys (ten file thay doi theo key moi)
+rag-eval/*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.json
+*credentials*.json
+*service-account*.json
