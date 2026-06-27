@@ -1110,8 +1110,8 @@ async function renderPage(pageNum) {
     canvas.style.width = `${Math.floor(viewport.width)}px`;
     canvas.style.height = `${Math.floor(viewport.height)}px`;
 
-    // Hệ quy chiếu tọa độ Google Vision: phải khớp với scale upload (1.5)
-    const ocrViewport = page.getViewport({ scale: 1.5 });
+    // Hệ quy chiếu tọa độ Google Vision: phải khớp với scale upload (2.0)
+    const ocrViewport = page.getViewport({ scale: 2.0 });
     pageDimensions.value = {
       ...pageDimensions.value,
       [pageNum]: { w: ocrViewport.width, h: ocrViewport.height },
@@ -1412,8 +1412,9 @@ function getOcrTextStyleForPdf(r, pageNum) {
     w = Math.max(...xs) - x,
     h = Math.max(...ys) - y;
 
-  // pageDimensions được lưu ở scale 1.5, nên ratio tính theo đó
-  const ratio = scale.value / 1.5;
+  // pageDimensions được lưu ở scale 2.0 (upload scale), nên ratio tính theo đó
+  const uploadScale = 2.0;
+  const ratio = scale.value / uploadScale;
 
   x *= ratio;
   y *= ratio;
