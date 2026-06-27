@@ -50,9 +50,12 @@ jobs:
 
       - name: 🏗️ Build & Deploy Docker (zero-downtime)
         run: |
-          cd ~/Dict
-          git fetch --all
-          git reset --hard origin/main
+          # Copy config files (gitignored) vào workspace trước khi build
+          cp ~/Dict/backend.env $GITHUB_WORKSPACE/backend.env || true
+
+          cd $GITHUB_WORKSPACE
+          # Trỏ GCP key về path cố định trên VM
+          export GCP_VISION_KEY_PATH=~/gcp-vision-key.json
           DOCKER_BUILDKIT=1 docker compose build --pull
           docker compose up -d --remove-orphans
           docker image prune -f
@@ -60,8 +63,10 @@ jobs:
       - name: ✅ Health Check
         run: |
           echo "Waiting for backend to be healthy..."
+          HOST_PORT=$(docker inspect dict-backend-1 --format '{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}' 2>/dev/null || echo "5008")
+          echo "Detected host port: $HOST_PORT"
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5008/WeatherForecast || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${HOST_PORT}/WeatherForecast || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "Backend is up (HTTP $STATUS)"
               exit 0
