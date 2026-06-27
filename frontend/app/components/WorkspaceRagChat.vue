@@ -70,8 +70,8 @@
           </div>
         </div>
 
-        <!-- Assistant bubble — chỉ hiện khi đã có content -->
-        <div v-else-if="msg.answer" class="flex flex-col gap-2 animate-message-in">
+        <!-- Assistant bubble — chỉ hiện khi stream xong -->
+        <div v-else-if="msg.answer && !msg.isStreaming" class="flex flex-col gap-2 animate-message-in">
           <div class="max-w-[86%]">
             <div
               v-if="msg.answer"
@@ -122,8 +122,8 @@
         </div>
       </template>
 
-      <!-- Typing indicator -->
-      <div v-if="asking && !messages.at(-1)?.answer" class="max-w-[82%] animate-message-in">
+      <!-- Typing indicator — hiện khi đang hỏi hoặc đang stream -->
+      <div v-if="asking || messages.at(-1)?.isStreaming" class="max-w-[82%] animate-message-in">
         <div class="assistant-bubble bg-gray-100/95 dark:bg-neutral-800/95 border border-gray-200 dark:border-neutral-700 rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
           <div class="flex items-center gap-2 text-[11px] text-gray-500 dark:text-neutral-400">
             <span class="thinking-pulse"></span>
@@ -209,6 +209,7 @@ type ChatMessage = {
   sources?: WorkspaceSource[]
   citations?: WorkspaceCitation[]
   clarify?: { reason: string; question: string; options?: string[] }
+  isStreaming?: boolean
 }
 
 type ConversationTurn = { role: string; content: string }
@@ -410,15 +411,33 @@ function queueChunkAppend(assistantIdx: number, chunk: string) {
   pendingChunkTimer = setTimeout(flushPendingChunk, 45)
 }
 
-function getThinkingLabel() {
-  if (streamPhase.value === 'retrieving') return 'Đang tìm đoạn liên quan'
-  if (streamPhase.value === 'thinking') return 'Đang phân tích tài liệu'
-  if (streamPhase.value === 'answering') return 'Đang viết câu trả lời'
-  return 'Đang xử lý'
+const thinkingMessages = [
+  'Đang tìm đoạn liên quan...',
+  'Đang phân tích tài liệu...',
+  'Đang tổng hợp thông tin...',
+  'Đang soạn câu trả lời...',
+  'Đang kiểm tra độ chính xác...',
+]
+const thinkingIdx = ref(0)
+let thinkingTimer: ReturnType<typeof setInterval> | null = null
+
+function getThinkingLabel() { return thinkingMessages[thinkingIdx.value] }
+
+function startRotating() {
+  thinkingIdx.value = 0
+  if (thinkingTimer) clearInterval(thinkingTimer)
+  thinkingTimer = setInterval(() => {
+    thinkingIdx.value = (thinkingIdx.value + 1) % thinkingMessages.length
+  }, 700)
+}
+
+function stopRotating() {
+  if (thinkingTimer) { clearInterval(thinkingTimer); thinkingTimer = null }
 }
 
 onBeforeUnmount(() => {
   resetPendingChunk()
+  stopRotating()
 })
 
 function buildHistory(): ConversationTurn[] {
@@ -465,19 +484,20 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
   const msg = messages.value[assistantIdx]
   if (!msg) return
   if (type === 'sources') {
-    streamPhase.value = 'thinking'
     try { const p = JSON.parse(data); msg.sources = p.sources ?? [] } catch { }
   } else if (type === 'chunk') {
-    streamPhase.value = 'answering'
+    msg.isStreaming = true
     queueChunkAppend(assistantIdx, data)
   } else if (type === 'done') {
     flushPendingChunk()
+    stopRotating()
     try {
       const p = JSON.parse(data)
       msg.answer = p.answer ?? msg.answer
       msg.attributedAnswer = p.attributedAnswer ?? msg.answer
       msg.citations = p.citations ?? []
       msg.content = msg.answer
+      msg.isStreaming = false
       // Auto-save turn to DB
       const userMsg = messages.value.slice(0, assistantIdx).findLast((m: any) => m.role === 'user')
       if (userMsg) {
@@ -493,6 +513,7 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
     scrollToBottom()
   } else if (type === 'clarify') {
     flushPendingChunk()
+    stopRotating()
     try {
       const p = JSON.parse(data)
       msg.clarify = p
@@ -502,7 +523,9 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
     scrollToBottom()
   } else if (type === 'error') {
     flushPendingChunk()
+    stopRotating()
     msg.answer = data; msg.content = data
+    msg.isStreaming = false
     streamPhase.value = 'idle'
   }
 }
@@ -539,6 +562,7 @@ async function askWorkspace() {
   error.value = ''
   streamPhase.value = 'retrieving'
   resetPendingChunk()
+  startRotating()
 
   try {
     const history = buildHistory().slice(0, -1)
