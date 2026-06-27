@@ -843,6 +843,35 @@ async function checkAccessByProjectId(token, projectId) {
   }
 }
 
+async function renderJobAsImage(data, jobId, sessionId) {
+  // Dùng cho file có đuôi .pdf nhưng nội dung thật là ảnh (dữ liệu cũ),
+  // hoặc file ảnh thường: hiển thị bằng chế độ ảnh + OCR overlay (luồng ổn định cũ).
+  ocrMode.value = true;
+  ocrImageUrl.value = data.imageUrl;
+  totalPages.value = 1;
+  allowPdfPageOcrUpload.value = false;
+  pdfDoc.value = null;
+  pdfLoadError.value = "";
+
+  if (data.status === "processing" || data.status === "pending") {
+    ocrLoading.value = true;
+    const signalrOk = await trySetupSignalRForImage(jobId);
+    if (!signalrOk) {
+      setTimeout(() => {
+        if (sessionId !== viewerLoadSession.value) return;
+        startLoadJob(jobId, sessionId);
+      }, 2000);
+    }
+    return;
+  }
+
+  ocrLoading.value = false;
+  if (data.results?.length > 0) {
+    ocrResults.value = data.results;
+    ocrResultsState.value = data.results;
+  }
+}
+
 async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
   if (sessionId !== viewerLoadSession.value) return;
 
@@ -930,9 +959,16 @@ async function startLoadJob(jobId, sessionId = viewerLoadSession.value) {
           }
         } catch (err) {
           if (sessionId !== viewerLoadSession.value) return;
-          console.error("Lỗi vẽ PDF ban đầu:", err);
-          pdfLoadError.value = "Không thể tải PDF. Vui lòng thử lại.";
-          pdfDoc.value = null;
+          // Một số file (dữ liệu cũ) có đuôi .pdf nhưng nội dung thật là ảnh JPEG/PNG.
+          // pdf.js ném InvalidPDFException — fallback sang chế độ ảnh + OCR overlay thay vì báo lỗi.
+          if (err?.name === "InvalidPDFException") {
+            console.warn("Nội dung .pdf thực chất là ảnh — chuyển sang chế độ ảnh + OCR:", data.imageUrl);
+            await renderJobAsImage(data, jobId, sessionId);
+          } else {
+            console.error("Lỗi vẽ PDF ban đầu:", err);
+            pdfLoadError.value = "Không thể tải PDF. Vui lòng thử lại.";
+            pdfDoc.value = null;
+          }
         } finally {
           if (activePdfLoadingTask) {
             activePdfLoadingTask = null;
