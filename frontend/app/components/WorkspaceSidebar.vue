@@ -364,7 +364,8 @@
               </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-              <button @click="showCreateProject = false"
+              <p v-if="createProjectError" class="flex-1 text-xs text-red-500 self-center">{{ createProjectError }}</p>
+              <button @click="showCreateProject = false; createProjectError = ''"
                 class="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Hủy</button>
               <button @click="handleCreateProject" :disabled="!projectForm.name.trim() || creatingProject"
                 class="px-5 py-2 text-sm rounded-lg bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-gray-900 font-semibold transition-colors">
@@ -475,6 +476,7 @@ async function fetchSidebarOrgs() {
 const showCreateProject = ref(false)
 const creatingProject = ref(false)
 const projectForm = ref({ name: '', description: '' })
+const createProjectError = ref('')
 
 const deleteTarget = ref<any>(null)
 const deletingProject = ref(false)
@@ -572,6 +574,7 @@ async function handleCreateWs() {
 
 async function handleCreateProject() {
   if (!projectForm.value.name.trim() || creatingProject.value || !activeWs.value) return
+  createProjectError.value = ''
   try {
     creatingProject.value = true
     const p = await createProject(activeWs.value.id, projectForm.value)
@@ -579,6 +582,8 @@ async function handleCreateProject() {
     showCreateProject.value = false
     projectForm.value = { name: '', description: '' }
     goToProject(p.id)
+  } catch (err: any) {
+    createProjectError.value = err?.data?.message || err?.message || 'Không thể tạo dự án. Vui lòng thử lại.'
   } finally { creatingProject.value = false }
 }
 
