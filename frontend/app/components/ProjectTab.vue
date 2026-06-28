@@ -218,8 +218,12 @@ async function handleUpdate() {
 
 async function handleDelete(id: number) {
   if (!confirm('Xóa dự án này? Tất cả từ vựng sẽ bị xóa.')) return
-  await deleteProject(id)
-  projects.value = projects.value.filter(p => p.id !== id)
+  try {
+    await deleteProject(id)
+    projects.value = projects.value.filter(p => p.id !== id)
+  } catch (e: any) {
+    alert(e?.data?.message || e?.message || 'Không thể xóa dự án. Vui lòng thử lại.')
+  }
 }
 
 onMounted(load)
