@@ -381,7 +381,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useWorkspace } from '~/composables/useWorkspace'
 import { useProject } from '~/composables/useProject'
@@ -481,7 +481,20 @@ const createProjectError = ref('')
 const deleteTarget = ref<any>(null)
 const deletingProject = ref(false)
 
-// 🪄 HÀM LOAD THÔNG MINH: Có tham số 'silent' để không bị chớp giật loading khi tải ngầm
+// Sau khi workspaces load xong, tự detect ws từ URL nếu chưa có activeWs
+watch(workspaces, (fresh) => {
+  if (activeWs.value) return // Đã có rồi, không cần set lại
+  const path = route.path
+  const wsMatch = path.match(/\/workspaces\/(\d+)/) || path.match(/\/workspaces\/project\/(\d+)/)
+  if (!wsMatch) return
+  const wsIdFromUrl = parseInt(wsMatch[1])
+  const found = fresh.find((w: any) => w.id === wsIdFromUrl)
+  if (found) {
+    activeWs.value = found
+    emit('panel-change', true)
+    loadProjects(found.id)
+  }
+})
 async function load(silent = false) {
   const token = jwt.value || (process.client ? localStorage.getItem('jwt_token') : null)
   if (!token) return
@@ -517,6 +530,18 @@ watch(() => route.path, (newPath) => {
   // Kéo theo update trạng thái bôi xanh Project đang chọn
   const match = newPath.match(/\/project\/(\d+)/)
   activeProjectId.value = match ? parseInt(match[1]) : null
+
+  // Tự detect workspace từ URL để set activeWs khi user navigate thẳng vào trang
+  const wsMatch = newPath.match(/\/workspaces\/(\d+)/) || newPath.match(/\/workspaces\/project\/(\d+)/)
+  if (wsMatch) {
+    const wsIdFromUrl = parseInt(wsMatch[1])
+    const wsFromUrl = workspaces.value.find((w: any) => w.id === wsIdFromUrl)
+    if (wsFromUrl && activeWs.value?.id !== wsFromUrl.id) {
+      activeWs.value = wsFromUrl
+      emit('panel-change', true)
+      loadProjects(wsFromUrl.id)
+    }
+  }
 }, { immediate: true })
 
 
