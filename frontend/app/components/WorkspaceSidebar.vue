@@ -394,6 +394,15 @@ const { getProjects, createProject } = useProject()
 const { jwt, isAuthenticated, role } = useJwt()
 const config = useRuntimeConfig()
 
+// Workspace ID hiện tại — lấy từ route hoặc activeWs, không phụ thuộc vào user click
+const currentWorkspaceId = computed<number | null>(() => {
+  if (activeWs.value?.id) return activeWs.value.id
+  const m = route.params.id ? parseInt(route.params.id as string) : null
+  if (m) return m
+  // /workspaces/project/:projectid — lấy ws từ workspaces list theo project
+  return null
+})
+
 // Check Premium status
 const isPremium = ref(false)
 async function checkPremium() {
@@ -598,11 +607,12 @@ async function handleCreateWs() {
 }
 
 async function handleCreateProject() {
-  if (!projectForm.value.name.trim() || creatingProject.value || !activeWs.value) return
+  const wsId = currentWorkspaceId.value
+  if (!projectForm.value.name.trim() || creatingProject.value || !wsId) return
   createProjectError.value = ''
   try {
     creatingProject.value = true
-    const p = await createProject(activeWs.value.id, projectForm.value)
+    const p = await createProject(wsId, projectForm.value)
     projects.value.unshift(p)
     showCreateProject.value = false
     projectForm.value = { name: '', description: '' }
