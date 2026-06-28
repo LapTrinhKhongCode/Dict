@@ -364,7 +364,8 @@
               </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-              <button @click="showCreateProject = false"
+              <p v-if="createProjectError" class="flex-1 text-xs text-red-500 self-center">{{ createProjectError }}</p>
+              <button @click="showCreateProject = false; createProjectError = ''"
                 class="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Hủy</button>
               <button @click="handleCreateProject" :disabled="!projectForm.name.trim() || creatingProject"
                 class="px-5 py-2 text-sm rounded-lg bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-gray-900 font-semibold transition-colors">
@@ -380,7 +381,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useWorkspace } from '~/composables/useWorkspace'
 import { useProject } from '~/composables/useProject'
@@ -392,6 +393,15 @@ const { getMyWorkspaces, createWorkspace } = useWorkspace()
 const { getProjects, createProject } = useProject()
 const { jwt, isAuthenticated, role } = useJwt()
 const config = useRuntimeConfig()
+
+// Workspace ID hiện tại — lấy từ route hoặc activeWs, không phụ thuộc vào user click
+const currentWorkspaceId = computed<number | null>(() => {
+  if (activeWs.value?.id) return activeWs.value.id
+  const m = route.params.id ? parseInt(route.params.id as string) : null
+  if (m) return m
+  // /workspaces/project/:projectid — lấy ws từ workspaces list theo project
+  return null
+})
 
 // Check Premium status
 const isPremium = ref(false)
@@ -475,11 +485,25 @@ async function fetchSidebarOrgs() {
 const showCreateProject = ref(false)
 const creatingProject = ref(false)
 const projectForm = ref({ name: '', description: '' })
+const createProjectError = ref('')
 
 const deleteTarget = ref<any>(null)
 const deletingProject = ref(false)
 
-// 🪄 HÀM LOAD THÔNG MINH: Có tham số 'silent' để không bị chớp giật loading khi tải ngầm
+// Sau khi workspaces load xong, tự detect ws từ URL nếu chưa có activeWs
+watch(workspaces, (fresh) => {
+  if (activeWs.value) return // Đã có rồi, không cần set lại
+  const path = route.path
+  const wsMatch = path.match(/\/workspaces\/(\d+)/) || path.match(/\/workspaces\/project\/(\d+)/)
+  if (!wsMatch) return
+  const wsIdFromUrl = parseInt(wsMatch[1])
+  const found = fresh.find((w: any) => w.id === wsIdFromUrl)
+  if (found) {
+    activeWs.value = found
+    emit('panel-change', true)
+    loadProjects(found.id)
+  }
+})
 async function load(silent = false) {
   const token = jwt.value || (process.client ? localStorage.getItem('jwt_token') : null)
   if (!token) return
@@ -515,6 +539,18 @@ watch(() => route.path, (newPath) => {
   // Kéo theo update trạng thái bôi xanh Project đang chọn
   const match = newPath.match(/\/project\/(\d+)/)
   activeProjectId.value = match ? parseInt(match[1]) : null
+
+  // Tự detect workspace từ URL để set activeWs khi user navigate thẳng vào trang
+  const wsMatch = newPath.match(/\/workspaces\/(\d+)/) || newPath.match(/\/workspaces\/project\/(\d+)/)
+  if (wsMatch) {
+    const wsIdFromUrl = parseInt(wsMatch[1])
+    const wsFromUrl = workspaces.value.find((w: any) => w.id === wsIdFromUrl)
+    if (wsFromUrl && activeWs.value?.id !== wsFromUrl.id) {
+      activeWs.value = wsFromUrl
+      emit('panel-change', true)
+      loadProjects(wsFromUrl.id)
+    }
+  }
 }, { immediate: true })
 
 
@@ -571,14 +607,18 @@ async function handleCreateWs() {
 }
 
 async function handleCreateProject() {
-  if (!projectForm.value.name.trim() || creatingProject.value || !activeWs.value) return
+  const wsId = currentWorkspaceId.value
+  if (!projectForm.value.name.trim() || creatingProject.value || !wsId) return
+  createProjectError.value = ''
   try {
     creatingProject.value = true
-    const p = await createProject(activeWs.value.id, projectForm.value)
+    const p = await createProject(wsId, projectForm.value)
     projects.value.unshift(p)
     showCreateProject.value = false
     projectForm.value = { name: '', description: '' }
     goToProject(p.id)
+  } catch (err: any) {
+    createProjectError.value = err?.data?.message || err?.message || 'Không thể tạo dự án. Vui lòng thử lại.'
   } finally { creatingProject.value = false }
 }
 

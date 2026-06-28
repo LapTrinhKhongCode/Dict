@@ -28,6 +28,7 @@
             </select>
           </div>
           <button
+            @click="saveAnnotations"
             class="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium transition"
           >
             Lưu kết quả
