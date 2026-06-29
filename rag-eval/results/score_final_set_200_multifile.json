@@ -1,0 +1,766 @@
+{
+  "metrics": {
+    "total": 50,
+    "pass": 45,
+    "fail": 5,
+    "errors": 1,
+    "pass_rate": 0.9,
+    "avg_point_recall": 0.724,
+    "refuse_accuracy": null,
+    "by_category": {
+      "multi-file": {
+        "pass": 45,
+        "total": 50,
+        "rate": 0.9
+      }
+    }
+  },
+  "details": [
+    {
+      "id": "mf_q01",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q02",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.4,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q03",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 0.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Trong khi đó, Sony Life riêng phần giá trị hợp đồng đang hiệu lực đã lên tới 61.1兆円, cho thấy quy mô tài sản quản lý tài chính của Sony rất lớn so với hoạt động tài trợ mua xe của Toyota."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q04",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        ".NET định nghĩa Bounded Context là chia hệ thống theo domain nghiệp vụ với ngôn ngữ chung (ubiquitous language) rõ ràng, và giao tiếp với nhau qua integration event hoặc anti-corruption layer."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q05",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q06",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "AWS Serverless loại bỏ hoàn toàn nhu cầu provisioning và quản lý hạ tầng, tự động mở rộng theo workload mà không cần trả chi phí cố định dư thừa."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q07",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.5,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q08",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q09",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q10",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q11",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 2,
+      "missed_points": [
+        "Ở bệnh nhân Đái tháo đường, đánh giá rủi ro gãy xương chỉ bằng mật độ xương sẽ đánh giá thấp nguy cơ, vì chất lượng xương suy giảm dù mật độ có thể bình thường.",
+        "Ở bệnh nhân Trầm cảm, chỉ dựa vào việc đáp ứng tiêu chuẩn 'depressive episode' là không đủ để lập kế hoạch điều trị, cần xét đến đồng mắc, tiền sử hưng cảm và bối cảnh cá nhân."
+      ],
+      "reason": "low_coverage(0/2)"
+    },
+    {
+      "id": "mf_q12",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q13",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q14",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q15",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q16",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 0.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Tài liệu .NET đề xuất dùng Web Application hoặc Portable Class Library để chia sẻ mã nguồn giữa nhiều loại thiết bị, thay vì viết native app riêng biệt cho từng nền tảng."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q17",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q18",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Mảng Mobility của JR Đông Nhật Bản là sustainable business cần sự ổn định vững chắc, vận hành trong phạm vi cash flow hiện có thay vì rủi ro xoay vòng vốn nhanh."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q19",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "AWS thúc đẩy vòng quay đổi mới bằng cách tự động hóa CI/CD, thử nghiệm, lắng nghe phản hồi và phát hành tính năng mới liên tục để ra thị trường nhanh hơn."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q20",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q21",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 2,
+      "missed_points": [
+        "Toyota có dòng tiền hoạt động dương mạnh từ ô tô nhưng âm ở tài chính, ngược lại mảng tài chính có dòng tiền tài trợ (huy động) dương lớn.",
+        "JR Đông Nhật Bản quản trị dòng tiền bằng cách giới hạn mảng Mobility tự sinh tự chi trong phạm vi ổn định, trong khi Life Solutions được tài trợ linh hoạt để thúc đẩy tăng trưởng."
+      ],
+      "reason": "refusal_detected(coverage=0/2)"
+    },
+    {
+      "id": "mf_q22",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "AWS Polyglot Persistence lại khuyến nghị phân tán dữ liệu, cho phép từng microservice tự chọn loại cơ sở dữ liệu riêng phù hợp nhất với nhu cầu thay vì dùng chung một database khổng lồ."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q23",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q24",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q25",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q26",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "CQRS trong .NET tách biệt logic cập nhật trạng thái (Command) khỏi logic đọc dữ liệu (Query) để dễ mở rộng và bảo trì ở mức hệ thống phần mềm."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q27",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 0.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "JR Đông Nhật Bản vận hành 1,470.1km Shinkansen và 6,224.5km tuyến thường/BRT."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q28",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q29",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 0.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q30",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 0.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "JR Đông Nhật Bản tung ra vé tháng off-peak rẻ hơn 10% để khuyến khích đi lại ngoài giờ cao điểm, thích ứng với thói quen tránh đông đúc sau COVID."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q31",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q32",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 0.0,
+      "points_hit": 0,
+      "points_total": 2,
+      "missed_points": [
+        "Việc quá do dự không điều trị trầm cảm nhẹ có thể khiến bệnh trầm trọng hoặc mạn tính hóa.",
+        "Việc kéo dài SSI ở bệnh nhân không nặng sau mổ làm tăng rủi ro biến chứng (gấp 3.4 lần) so với việc chuyển sang phác đồ basal-bolus tối ưu hơn."
+      ],
+      "reason": "low_coverage(0/2)"
+    },
+    {
+      "id": "mf_q33",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q34",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q35",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "AWS gợi ý dùng kiến trúc Serverless (như Lambda) để loại bỏ gánh nặng quản lý hạ tầng, giúp đội ngũ tập trung hoàn toàn vào business logic để phát hành siêu tốc."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q36",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q37",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Sony tái cấu trúc tách mảng Electronics để tạo vị thế bình đẳng, thúc đẩy hợp tác mạnh mẽ giữa các studio game, âm nhạc, phim ảnh nhằm tối đa hóa giá trị thương hiệu IP."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q38",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Hướng dẫn Đái tháo đường đề xuất bỏ các từ mang tính ra lệnh/kỳ thị như 'chỉ đạo' (指導) thay bằng 'hỗ trợ điều trị' (サポート) để phù hợp với nguyên tắc ra quyết định chia sẻ (Shared decision-making)."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q39",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Người dùng Docker dùng lệnh tag để gắn namespace và push các image đã xây dựng lên repository Public của Docker Hub để cộng đồng có thể pull về dùng."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q40",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 0.5,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Một image cục bộ như docker-whale trên Docker chỉ chiếm dung lượng rất nhỏ (khoảng 247 MB đến 273.7 MB), chứa lớp phần mềm cơ bản chạy trong container."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q41",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q42",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q43",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q44",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": false,
+      "point_recall": 0.0,
+      "num_recall": 1.0,
+      "points_hit": 0,
+      "points_total": 2,
+      "missed_points": [
+        "Khi thói quen chơi game mở rộng, Sony chuyển hướng đầu tư hơn một nửa vào Live service thay vì chỉ tập trung sản xuất game Console độc quyền truyền thống.",
+        "Khi nhu cầu xã hội thay đổi và thiếu nhân lực logistics, JR Đông Nhật Bản tận dụng tài sản đường sắt mở dịch vụ Hako Byun chở hàng tươi sống, y tế ngay trong ngày."
+      ],
+      "reason": "low_coverage(0/2)"
+    },
+    {
+      "id": "mf_q45",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 0.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Trong thiết kế .NET, nếu một class bị tiêm quá nhiều Dependency (ví dụ 15 cái), đó là 'code smell' báo hiệu thiết kế vi phạm nguyên tắc đơn trách nhiệm (Single Responsibility) và cần tái cấu trúc."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q46",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": true,
+      "pass": false,
+      "reason": "api_error: HTTPSConnectionPool(host='localhost', port=7084): Max retries exceeded with url: /api/rag/project/13/ask/stream (Caused by NewConnectionError(\"HTTPSConnection(host='localhost', port=7084): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))",
+      "point_recall": 0.0
+    },
+    {
+      "id": "mf_q47",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "AWS sử dụng kiến trúc Microservices kết hợp hệ sinh thái Container và dịch vụ quản lý như API Gateway để đạt khả năng mở rộng (scalability) siêu tốc phục vụ lượng lớn request độc lập."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q48",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 1.0,
+      "num_recall": 1.0,
+      "points_hit": 2,
+      "points_total": 2,
+      "missed_points": [],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q49",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 0.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Sony điều chỉnh kế hoạch phân bổ đầu tư, dự kiến đến 2025 sẽ chuyển dịch hơn một nửa nguồn lực mảng game sang phát triển Live Service nhằm đón đầu xu hướng tiêu dùng mới."
+      ],
+      "reason": "ok"
+    },
+    {
+      "id": "mf_q50",
+      "category": "multi-file",
+      "scope": "in-domain",
+      "must_refuse": false,
+      "has_error": false,
+      "pass": true,
+      "point_recall": 0.5,
+      "num_recall": 1.0,
+      "points_hit": 1,
+      "points_total": 2,
+      "missed_points": [
+        "Khi có nhiều Bounded Context, .NET gợi ý lập Context Map để ghi nhận rõ context nào public/subscribe sự kiện nào để giữ các hệ thống liên kết lỏng (loose coupling) lỏng lẻo nhưng có kiểm soát."
+      ],
+      "reason": "ok"
+    }
+  ]
+}

@@ -27,6 +27,12 @@ import os
 RESULTS_DIR = Path(__file__).parent / "results"
 load_dotenv(Path(__file__).parent / ".env")
 
+
+def get_available_datasets() -> list[str]:
+    datasets_dir = Path(__file__).parent / "datasets"
+    return sorted(path.stem for path in datasets_dir.glob("*.jsonl"))
+
+
 # ── LLM judge (local Ollama) ───────────────────────────────────────────────
 
 _OLLAMA_BASE = None
@@ -247,9 +253,10 @@ def aggregate(scored: list[dict]) -> dict:
 # ── main ────────────────────────────────────────────────────────────────────
 
 def main():
+    available_datasets = get_available_datasets()
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="test_set",
-                        choices=["test_set", "dev_set", "holdout_set", "holdout_v2", "dev_set_sweep24", "final_set"])
+                        choices=available_datasets)
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--llm-judge", action="store_true",
                         help="Use local qwen7B to re-judge missed expected_points (slower but more accurate)")
