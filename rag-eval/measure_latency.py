@@ -59,6 +59,10 @@ HEADERS = {
 STREAM_URL = f"{API_BASE}/api/rag/project/{PROJECT_ID}/ask/stream"
 
 
+def get_available_datasets() -> list[str]:
+    return sorted(path.stem for path in DATASETS_DIR.glob("*.jsonl"))
+
+
 def measure_one(question: str, mode: str, timeout: int = 180) -> dict:
     """Gửi 1 câu hỏi, đọc SSE tăng dần, trả về các mốc thời gian (giây)."""
     payload = {"question": question, "topK": TOP_K, "mode": mode, "skipClarify": True}
@@ -158,9 +162,10 @@ def summarize(label, values):
 
 
 def main():
+    available_datasets = get_available_datasets()
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default="final_set",
-                    choices=["test_set", "dev_set", "holdout_set", "holdout_v2", "final_set"])
+                    choices=available_datasets)
     ap.add_argument("--mode", default=os.environ.get("MODE", "high"),
                     help="Chế độ pipeline gửi cho backend (vd: high, low)")
     ap.add_argument("--warmup", type=int, default=3,

@@ -53,6 +53,10 @@ HEADERS = {
 STREAM_URL = f"{API_BASE}/api/rag/project/{PROJECT_ID}/ask/stream"
 
 
+def get_available_datasets() -> list[str]:
+    return sorted(path.stem for path in DATASETS_DIR.glob("*.jsonl") if path.stem != "job_map")
+
+
 def parse_sse(raw: str) -> dict:
     """Parse SSE events from a streamed response string → collected fields."""
     result = {"answer": "", "sources": [], "citations": [], "error": None}
@@ -123,9 +127,10 @@ def call_rag(question: str) -> dict:
 
 
 def main():
+    available_datasets = get_available_datasets()
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="test_set",
-                        choices=["test_set", "dev_set", "holdout_set", "holdout_v2", "final_set"])
+                        choices=available_datasets)
     args = parser.parse_args()
 
     dataset_path = DATASETS_DIR / f"{args.dataset}.jsonl"
