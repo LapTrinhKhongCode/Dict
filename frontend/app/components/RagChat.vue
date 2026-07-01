@@ -117,7 +117,7 @@
         </div>
 
         <!-- Assistant bubble — chỉ hiện khi stream xong -->
-        <div v-else-if="msg.answer && !msg.isStreaming" class="flex flex-col gap-2 animate-message-in">
+        <div v-else-if="msg.answer" class="flex flex-col gap-2 animate-message-in">
           <div class="max-w-[86%]">
             <div
               class="assistant-bubble bg-[#161b22]/95 border border-[#30363d] rounded-[22px] rounded-tl-md px-3 py-2.5 text-sm text-gray-100 prose prose-invert prose-sm max-w-none shadow-sm"
@@ -173,7 +173,7 @@
       </template>
 
       <!-- Typing indicator: hiện khi đang hỏi hoặc đang stream -->
-      <div v-if="asking || messages.at(-1)?.isStreaming" class="max-w-[82%] animate-message-in">
+      <div v-if="asking && !messages.at(-1)?.answer" class="max-w-[82%] animate-message-in">
         <div class="assistant-bubble bg-[#161b22]/95 border border-[#30363d] rounded-[22px] rounded-tl-md px-3 py-2.5 shadow-sm">
           <div class="flex items-center gap-2 text-[11px] text-gray-400">
             <span class="thinking-pulse"></span>
@@ -366,7 +366,11 @@ async function loadSession(id: number) {
   } catch { /* silent */ }
 }
 
-async function newSession() {
+// Thêm tham số keepMessages
+async function newSession(keepMessages?: boolean) {
+  // Biến keepMessages === true đảm bảo an toàn, tránh nhận nhầm MouseEvent từ nút click
+  const shouldKeep = keepMessages === true; 
+  
   if (!props.jobId) return
   try {
     const res = await fetch(`${config.public.apiBaseUrl}/api/chat/sessions`, {
@@ -378,7 +382,12 @@ async function newSession() {
       const data = await res.json()
       currentSessionId.value = data.id
       _sessionId.value = `db-${data.id}`
-      messages.value = []
+      
+      // SỬA TẠI ĐÂY: Chỉ xóa mảng messages nếu không phải là auto-save
+      if (!shouldKeep) {
+        messages.value = []
+      }
+      
       sessions.value.unshift({ id: data.id, title: data.title, messageCount: 0, updatedAt: new Date().toISOString() })
     }
   } catch { /* silent */ }
@@ -394,9 +403,10 @@ async function deleteSession(id: number) {
 
 async function saveTurnToSession(userText: string, assistantAnswer: string, sourcesJson?: string, citationsJson?: string) {
   if (!currentSessionId.value) {
-    // auto-create session on first message
-    await newSession()
+    // SỬA TẠI ĐÂY: Truyền `true` để không bị clear mất tin nhắn đang hiển thị
+    await newSession(true)
   }
+  
   if (!currentSessionId.value) return
   try {
     const res = await fetch(`${config.public.apiBaseUrl}/api/chat/sessions/${currentSessionId.value}/turn`, {
@@ -655,26 +665,45 @@ async function askDocument() {
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
+    let eventType = '' 
     let buffer = ''
 
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
+      
+      if (value) {
+        buffer += decoder.decode(value, { stream: true })
+      }
 
-      // Parse SSE events from buffer
       const lines = buffer.split('\n')
-      buffer = lines.pop() ?? '' // last partial line stays in buffer
+      buffer = lines.pop() ?? '' // Giữ lại phần chưa có \n
 
-      let eventType = ''
       for (const line of lines) {
-        if (line.startsWith('event:')) {
-          eventType = line.slice('event:'.length).trim()
-        } else if (line.startsWith('data:')) {
-          const data = line.slice('data:'.length).trim()
-          handleStreamEvent(eventType, data, assistantIdx)
-          eventType = ''
+        if (line.trim() === '') {
+          eventType = '' 
+          continue
         }
+
+        if (line.startsWith('event:')) {
+          eventType = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          const dataStr = line.slice(5)
+          const cleanData = dataStr.startsWith(' ') ? dataStr.slice(1) : dataStr
+          handleStreamEvent(eventType, cleanData, assistantIdx)
+        }
+      }
+
+      if (done) {
+        // QUAN TRỌNG: Xử lý nốt dòng cuối cùng nếu BE ngắt đột ngột 
+        // mà không có dấu xuống dòng (\n)
+        if (buffer.trim() !== '') {
+          if (buffer.startsWith('data:')) {
+            const dataStr = buffer.slice(5)
+            const cleanData = dataStr.startsWith(' ') ? dataStr.slice(1) : dataStr
+            handleStreamEvent(eventType || 'chunk', cleanData, assistantIdx)
+          }
+        }
+        break // Xử lý xong buffer cuối mới được thoát
       }
     }
 
@@ -687,6 +716,11 @@ async function askDocument() {
   } finally {
     asking.value = false
     streamPhase.value = 'idle'
+    const lastMsg = messages.value.at(-1)
+    if (lastMsg && lastMsg.role === 'assistant') {
+      lastMsg.isStreaming = false
+      flushPendingChunk()
+    }
   }
 }
 
@@ -705,6 +739,7 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
   } else if (type === 'done') {
     flushPendingChunk()
     stopRotating()
+    msg.isStreaming = false
     try {
       const parsed = JSON.parse(data)
       msg.answer = parsed.answer ?? msg.answer
@@ -712,7 +747,7 @@ function handleStreamEvent(type: string, data: string, assistantIdx: number) {
       msg.citations = parsed.citations ?? []
       msg.cacheHit = parsed.cacheHit === true
       msg.content = msg.answer
-      msg.isStreaming = false
+      
       // Auto-save to DB session
       const userMsg = messages.value.slice(0, assistantIdx).findLast((m: any) => m.role === 'user')
       if (userMsg) {
